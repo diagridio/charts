@@ -1,4 +1,4 @@
-{{- $gomemlimit := include "cra.GetGoLangGOMEMLIMITFromResourceLimits" (dict "limits" .Values.agent.resources.limits "golimit" .Values.agent.goSoftLimit) }}
+{{- $gomemlimit := include "catalyst.GetGoLangGOMEMLIMITFromResourceLimits" (dict "limits" .Values.agent.resources.limits "golimit" .Values.agent.goSoftLimit) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:

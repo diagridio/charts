@@ -58,7 +58,7 @@ agent:
           memory: 250Mi
     tls:
       enabled: true
-      existingSecretName: ""
+      existingSecretName: "tls"
       mutual: true
       root:
         certFilename: "ca.crt"
