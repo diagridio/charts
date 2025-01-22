@@ -1,0 +1,172 @@
+#------------------------------------------------------------------------------
+# Agent – Always enabled.
+#------------------------------------------------------------------------------
+agent:
+  logLevel: info
+
+  config:
+    host:
+      id: ""
+      region_id: ""
+      region_metadata:
+        display_name: ""
+        cloud_provider: ""
+      ingress_ip_addr: ""
+      egress_addresses: []
+    control_plane_url: ""
+    inspection:
+      enabled: false
+    placement:
+      max_project_count: 15
+    project:
+      dns_top_level_domain: ""
+      ingress_tls_secret_name: ""
+      default_workflow: namespace
+      enable_scheduler_service: false
+      dapr_hot_reloading: false
+      sidecar_capture_init_errors: false
+      redis_kafka_cache:
+        enabled: false
+    sidecar:
+      image_tag: 'edge'
+    api_token_error:
+      image_tag: 'edge'
+    otel:
+      enabled: true
+      # TODO: change to public registry?
+      image_repository: ""
+      image_tag: 'edge'
+      metrics_endpoint: https://metrics.local.diagrid.io:443/api/v1/push
+      metrics_tls_insecure: true
+      internal_cortex_enabled: false
+      internal_cortex_endpoint: ""
+      internal_cortex_org_id: common
+      loki_enabled: false
+      loki_endpoint: https://logs.local.diagrid.io:443/loki/api/v1/push
+      loki_tls_insecure: true
+      logs_resources:
+        limits:
+          memory: 500Mi
+        requests:
+          cpu: 50m
+          memory: 500Mi
+      metrics_resources:
+        limits:
+          memory: 1100Mi
+        requests:
+          cpu: 75m
+          memory: 250Mi
+    tls:
+      enabled: true
+      existingSecretName: ""
+      mutual: true
+      root:
+        certFilename: "ca.crt"
+      issuer:
+        certFilename: "tls.crt"
+        keyFilename: "tls.key"
+    upstream_dapr:
+      # images wil be pulled from a dockerhub proxy so we don't hit ratelimits
+      # TODO: change to public registry?
+      container_registry: ""
+    internal_dapr:
+      # TODO: change to public registry?
+      container_registry: ""
+      sentry_resources:
+        limits:
+          memory: 100Mi
+      scheduler_resources:
+        limits:
+          memory: 175Mi
+        requests:
+          memory: 130Mi
+      scheduler:
+        storage_class: standard
+        storage_size: 8Gi
+    artifacts:
+      # make sure the k0s container image version works with the vcluster chart version when updating these, best is to copy the container image version from the vcluster release
+      vcluster_k0s_chart_version: "0.15.2"
+      # TODO: change to public registry?
+      vcluster_k0s_container_image: ""
+      # TODO: change to public registry?
+      core_dns_container_image: ""
+      internal_registry_username: ""
+      internal_registry_password: ""
+    kubernetes:
+      qps: 25
+      burst: 10
+    denylist:
+      enabled: false
+
+  # secrets config for integrating with a secret provider
+  secrets:
+    provider: inmemory
+    redis:
+      host: ""
+      password: ""
+    aws:
+      region: ""
+
+  metrics:
+    port: 9090
+
+  replicaCount: 1
+
+  image:
+    # TODO: change to public registry?
+    registry: ""
+    name: cra-agent
+    # using single quotes so the script set_helm_version updates this value to the release version
+    tag: 'edge'
+    fullName: ""
+    pullPolicy: Always
+
+  imagePullSecrets: []
+  nameOverride: ""
+  fullnameOverride: ""
+
+  service:
+    type: ClusterIP
+    port: 9090
+
+  serviceAccount:
+      # Annotations to add to the service account
+      annotations: {}
+      # The name of the service account to use.
+      # If not set and create is true, a name is generated using the fullname template
+      name: ""
+
+  podAnnotations:
+    prometheus.io/port: "9090"
+    prometheus.io/scrape: "true"
+    
+  podSecurityContext: {}
+    # fsGroup: 2000
+
+  securityContext: {}
+    # capabilities:
+    #   drop:
+    #   - ALL
+    # readOnlyRootFilesystem: true
+    # runAsNonRoot: true
+    # runAsUser: 1000
+
+  resources:
+    limits:
+      memory: 1200Mi
+    requests:
+      cpu: 40m
+      memory: 100Mi
+
+  nodeSelector: {}
+
+  tolerations: []
+
+  affinity: {}
+
+  # Golang Soft Memory Limit via env var GOMEMLIMIT
+  goSoftLimit:
+    percent: 90
+  #  override: 600MiB  # it will set GOMEMLIMIT to this value. Supported suffixes, if not using a straight bytes number, are B, KiB, MiB, GiB, and TiB.
+
+  extraEnvs: []

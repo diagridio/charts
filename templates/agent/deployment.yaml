@@ -1,0 +1,114 @@
+{{- $gomemlimit := include "cra.GetGoLangGOMEMLIMITFromResourceLimits" (dict "limits" .Values.agent.resources.limits "golimit" .Values.agent.goSoftLimit) }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "agent.name" . }}
+  labels:
+    {{- include "agent.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.agent.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "agent.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/cra-agent-config: {{ include (print $.Template.BasePath "/agent/configmap.yaml") . | sha256sum }}
+        {{- with .Values.agent.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "agent.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.agent.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      restartPolicy: Always
+      serviceAccountName: {{ include "agent.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.agent.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.agent.securityContext | nindent 12 }}
+{{- if .Values.agent.image.fullName }}
+          image: "{{ .Values.agent.image.fullName }}"
+{{- else }}
+          image: "{{ .Values.agent.image.registry }}/{{ .Values.agent.image.name }}:{{ .Values.agent.image.tag }}"
+{{- end }}
+          imagePullPolicy: {{ .Values.agent.image.pullPolicy }}
+          command: ["./agent"]
+          args:
+          - "--log-level={{ .Values.agent.logLevel }}"
+          {{- if .Values.agent.config.tls.enabled }}
+          - "--tls.enabled=true"
+          - "--tls.mutual={{ .Values.agent.config.tls.mutual }}"
+          - "--tls.cacert=/grpc-tls-certs/{{ required ".Values.agent.config.tls.root.certFilename is required" .Values.agent.config.tls.root.certFilename }}"
+          - "--tls.clientcert=/grpc-tls-certs/{{ required ".Values.agent.config.tls.issuer.certFilename is required" .Values.agent.config.tls.issuer.certFilename }}"
+          - "--tls.clientkey=/grpc-tls-certs/{{ required ".Values.agent.config.tls.issuer.keyFilename is required" .Values.agent.config.tls.issuer.keyFilename }}"
+          {{- end }}
+          {{- if eq .Values.agent.secrets.provider "redis" }}
+          - "--secretsprovider=redis"
+          - "--secrets_redis.host={{ required ".Values.agent.secrets.redis.host entry required when .Values.agent.secrets.provider is set to redis" .Values.agent.secrets.redis.host }}"
+          - "--secrets_redis.password={{ .Values.agent.secrets.redis.password }}"
+          {{- end }}
+          {{- if eq .Values.agent.secrets.provider "aws" }}
+          - "--secretsprovider=aws.secretmanager"
+          - "--secrets_aws_secretmanager.region={{ required ".Values.agent.secrets.aws.region entry required when .Values.agent.secrets.provider is set to aws" .Values.agent.secrets.aws.region }}"
+          {{- end }}
+          env:
+          - name: CONFIG_FILE_DIR
+            value: /etc/cra-agent
+          {{- if (and $gomemlimit (ne $gomemlimit "0")) }}
+          - name: GOMEMLIMIT
+            value: {{ $gomemlimit }}
+          {{- end }}
+          {{- if .Values.agent.extraEnvs }}
+          {{- toYaml .Values.agent.extraEnvs | nindent 10 }}
+          {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: probes
+            failureThreshold: 3
+            periodSeconds: 10
+            initialDelaySeconds: 5
+          ports:
+          - name: metrics
+            containerPort: {{ .Values.agent.metrics.port }}
+            protocol: TCP
+          - name: probes
+            containerPort: 8080
+            protocol: TCP
+          resources:
+            {{- toYaml .Values.agent.resources | nindent 12 }}
+          volumeMounts:
+          - name: agent-config
+            mountPath: /etc/cra-agent
+          {{- if .Values.agent.config.tls.enabled }}
+          - name: grpc-client-tls
+            mountPath: /grpc-tls-certs
+            readOnly: true
+          {{- end }}
+      volumes:
+      - name: agent-config
+        configMap:
+          name: {{ include "agent.name" . }}-config
+      {{- if .Values.agent.config.tls.enabled }}
+      - name: grpc-client-tls
+        secret:
+          secretName: {{ required ".Values.agent.config.tls.existingSecretName is required" .Values.agent.config.tls.existingSecretName }}
+      {{- end }}
+      {{- with .Values.agent.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.agent.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.agent.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
