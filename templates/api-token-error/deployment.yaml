@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "api-token-error.fullname" . }}
+  labels:
+    {{- include "api-token-error.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.apiTokenError.autoscaling.enabled }}
+  replicas: {{ .Values.apiTokenError.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "api-token-error.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+      {{- with .Values.apiTokenError.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "api-token-error.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.apiTokenError.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.apiTokenError.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.apiTokenError.securityContext | nindent 12 }}
+{{- if .Values.apiTokenError.image.fullName }}
+          image: "{{ .Values.apiTokenError.image.fullName }}"
+{{- else }}
+          image: "{{ .Values.apiTokenError.image.registry }}/{{ .Values.apiTokenError.image.name }}:{{ .Values.apiTokenError.image.tag }}"
+{{- end }}
+          imagePullPolicy: {{ .Values.apiTokenError.image.pullPolicy }}
+          command: ["./api-token-error"]
+          args: []
+          env: []
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: grpc
+              containerPort: 50001
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.apiTokenError.resources | nindent 12 }}
+      {{- with .Values.apiTokenError.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.apiTokenError.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.apiTokenError.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

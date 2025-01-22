@@ -1,5 +1,5 @@
 #------------------------------------------------------------------------------
-# Agent – Always enabled.
+# agent – always enabled
 #------------------------------------------------------------------------------
 agent:
   logLevel: info
@@ -170,3 +170,63 @@ agent:
   #  override: 600MiB  # it will set GOMEMLIMIT to this value. Supported suffixes, if not using a straight bytes number, are B, KiB, MiB, GiB, and TiB.
 
   extraEnvs: []
+
+
+#------------------------------------------------------------------------------
+# api_token_error – always enabled
+#------------------------------------------------------------------------------
+apiTokenError:
+  replicaCount: 1
+  
+  image:
+    registry: ""
+    name: cra-agent
+    tag: edge
+    # optional full name of the container image to use
+    fullName: ""
+    pullPolicy: Always
+  
+  imagePullSecrets: []
+  nameOverride: "api-token-error"
+  fullnameOverride: ""
+  
+  podAnnotations: {}
+  
+  podSecurityContext: {}
+    # fsGroup: 2000
+  
+  securityContext: {}
+    # capabilities:
+    #   drop:
+    #   - ALL
+    # readOnlyRootFilesystem: true
+    # runAsNonRoot: true
+    # runAsUser: 1000
+  
+  service:
+    type: ClusterIP
+  
+  resources: {}
+    # We usually recommend not to specify default resources and to leave this as a conscious
+    # choice for the user. This also increases chances charts run on environments with little
+    # resources, such as Minikube. If you do want to specify resources, uncomment the following
+    # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+    # limits:
+    #   cpu: 100m
+    #   memory: 128Mi
+    # requests:
+    #   cpu: 100m
+    #   memory: 128Mi
+  
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 100
+    targetCPUUtilizationPercentage: 80
+    # targetMemoryUtilizationPercentage: 80
+  
+  nodeSelector: {}
+  
+  tolerations: []
+  
+  affinity: {}
