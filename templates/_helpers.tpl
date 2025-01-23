@@ -104,7 +104,6 @@ Create a fully qualified app name for agent
   }}
 {{- end }}
 
-
 {{/*
 Common labels for agent
 */}}
@@ -112,7 +111,6 @@ Common labels for agent
 {{- include "common.labels" . }}
 app.kubernetes.io/component: agent
 {{- end }}
-
 
 {{/*
 Selector labels
@@ -123,11 +121,17 @@ app.kubernetes.io/component: agent
 {{- end }}
 
 {{/*
-Create the name of the service account to use
+Create the name of the service account to use for agent
 */}}
 {{- define "agent.serviceAccountName" -}}
-{{- default (include "agent.fullname" .) .Values.agent.serviceAccount.name }}
+  {{- if .Values.agent.serviceAccount.name }}
+    {{- .Values.agent.serviceAccount.name | trunc 63 | trimSuffix "-" }}
+  {{- else }}
+    {{- printf "%s-sa" (include "agent.fullname" .) | trunc 63 | trimSuffix "-" }}
+  {{- end }}
 {{- end }}
+
+
 
 
 
@@ -136,7 +140,7 @@ API Token Error Helpers
 */}}
 
 {{/*
-Create the name of the api-token-error resource.
+Create the name of the api-token-error resource
 */}}
 {{- define "api-token-error.name" -}}
   {{- include "common.name" (dict 
