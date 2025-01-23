@@ -11,16 +11,17 @@ Priority:
 4. Chart name
 */}}
 {{- define "common.name" -}}
-{{- if .nameOverride }}
+{{- if and .nameOverride (ne .nameOverride "") }}
   {{- .nameOverride | trunc 63 | trimSuffix "-" }}
-{{- else if and (hasKey . "global") (hasKey .global "nameOverride") }}
+{{- else if and (hasKey . "global") (hasKey .global "nameOverride") (ne .global.nameOverride "") }}
   {{- .global.nameOverride | trunc 63 | trimSuffix "-" }}
-{{- else if .defaultName }}
+{{- else if and .defaultName (ne .defaultName "") }}
   {{- .defaultName | trunc 63 | trimSuffix "-" }}
 {{- else }}
   {{- .Chart.Name | trunc 63 | trimSuffix "-" }}
 {{- end }}
 {{- end }}
+
 
 {{/*
 Create a default fully qualified app name
@@ -30,9 +31,9 @@ Priority:
 3. Release name + resource name, with special handling if release name contains resource name
 */}}
 {{- define "common.fullname" -}}
-{{- if .fullnameOverride }}
+{{- if and .fullnameOverride (ne .fullnameOverride "") }}
   {{- .fullnameOverride | trunc 63 | trimSuffix "-" }}
-{{- else if and (hasKey . "global") (hasKey .global "fullnameOverride") }}
+{{- else if and (hasKey . "global") (hasKey .global "fullnameOverride") (ne .global.fullnameOverride "") }}
   {{- .global.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
   {{- $name := .name }}
@@ -47,6 +48,7 @@ Priority:
   {{- end }}
 {{- end }}
 {{- end }}
+
 
 {{/*
 Create chart name and version as used by the chart label
