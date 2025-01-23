@@ -24,6 +24,10 @@ jobs:
       - name: Set up Kind
         uses: helm/kind-action@v1.3.0
 
+      - name: Install Contour CRDs
+        run: |
+          kubectl apply -f https://projectcontour.io/quickstart/contour.yaml
+
       - name: Helm Lint
         run: |
           helm lint ./

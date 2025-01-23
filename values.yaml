@@ -221,6 +221,7 @@ agent:
 # API_TOKEN_ERROR Configurations
 #------------------------------------------------------------------------------
 apiTokenError:
+  enabled: true
   replicaCount: 1
   
   image:

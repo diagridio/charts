@@ -1,3 +1,4 @@
+{{- if .Values.apiTokenError.enabled }}
 ---
 apiVersion: projectcontour.io/v1
 kind: HTTPProxy
@@ -19,3 +20,4 @@ spec:
         - name: api-token-error
           port: 50001
           protocol: h2c
+{{- end }}
