@@ -20,11 +20,11 @@ jobs:
 
       - name: Helm Lint
         run: |
-          helm lint ./charts
+          helm lint ./
 
       - name: Helm Template
         run: |
-          helm template my-release ./charts > rendered.yaml
+          helm template my-release ./ > rendered.yaml
 
       - name: Set up Kind
         uses: helm/kind-action@v1
@@ -33,4 +33,4 @@ jobs:
 
       - name: Helm Install
         run: |
-          helm install my-release ./charts --namespace test --create-namespace --wait
+          helm install my-release ./ --namespace test --create-namespace --wait
