@@ -2,6 +2,10 @@
 # Global Options
 #------------------------------------------------------------------------------
 global:
+  # Override the name of the chart
+  nameOverride: "catalyst"
+  # Override the full name of the chart+release
+  fullnameOverride: ""
   image:
     # Global image pull policy for all container images in the chart
     # Can be overridden by individual image pullPolicy
@@ -15,15 +19,6 @@ global:
 
   # Global labels applied to all resources deployed by the chart
   labels: {}
-
-
-#------------------------------------------------------------------------------
-# Common Options
-#------------------------------------------------------------------------------
-# Override the name of the chart
-nameOverride: ""
-# Override the full name of the chart+release
-fullnameOverride: ""
 
 
 #------------------------------------------------------------------------------

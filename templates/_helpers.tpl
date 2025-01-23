@@ -1,7 +1,6 @@
 {{/*
-Common Naming Helpers
+Common Helpers
 */}}
-
 
 {{/*
 Create a default name for the chart
@@ -14,7 +13,7 @@ Priority:
 {{- define "common.name" -}}
 {{- if .nameOverride }}
   {{- .nameOverride | trunc 63 | trimSuffix "-" }}
-{{- else if .global.nameOverride }}
+{{- else if and (hasKey . "global") (hasKey .global "nameOverride") }}
   {{- .global.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- else if .defaultName }}
   {{- .defaultName | trunc 63 | trimSuffix "-" }}
@@ -33,14 +32,18 @@ Priority:
 {{- define "common.fullname" -}}
 {{- if .fullnameOverride }}
   {{- .fullnameOverride | trunc 63 | trimSuffix "-" }}
-{{- else if .global.fullnameOverride }}
+{{- else if and (hasKey . "global") (hasKey .global "fullnameOverride") }}
   {{- .global.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
   {{- $name := .name }}
-  {{- if contains $name .Release.Name }}
-    {{- .Release.Name | trunc 63 | trimSuffix "-" }}
+  {{- if and (hasKey . "Release") (hasKey .Release "Name") }}
+    {{- if contains $name .Release.Name }}
+      {{- .Release.Name | trunc 63 | trimSuffix "-" }}
+    {{- else }}
+      {{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
+    {{- end }}
   {{- else }}
-    {{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
+    {{- $name }}
   {{- end }}
 {{- end }}
 {{- end }}
@@ -85,11 +88,12 @@ Create the name of the agent resource
 {{- define "agent.name" -}}
   {{- include "common.name" (dict 
       "nameOverride" .Values.agent.nameOverride 
-      "global.nameOverride" .Values.global.nameOverride 
       "defaultName" "agent" 
-      "Chart.Name" .Chart.Name) 
-  }}
+      "Chart.Name" .Chart.Name
+      "global" .Values.global
+  ) }}
 {{- end }}
+
 
 {{/*
 Create a fully qualified app name for agent
@@ -97,12 +101,12 @@ Create a fully qualified app name for agent
 {{- define "agent.fullname" -}}
   {{- include "common.fullname" (dict 
       "fullnameOverride" .Values.agent.fullnameOverride 
-      "global.fullnameOverride" .Values.global.fullnameOverride 
-      "Release.Name" .Release.Name 
+      "Release" .Release 
       "name" (include "agent.name" .) 
-  ) 
-  }}
+      "global" .Values.global
+  ) }}
 {{- end }}
+
 
 {{/*
 Common labels for agent
@@ -145,11 +149,12 @@ Create the name of the api-token-error resource
 {{- define "api-token-error.name" -}}
   {{- include "common.name" (dict 
       "nameOverride" .Values.apiTokenError.nameOverride 
-      "global.nameOverride" .Values.global.nameOverride 
       "defaultName" "api-token-error" 
-      "Chart.Name" .Chart.Name) 
-  }}
+      "Chart.Name" .Chart.Name
+      "global" .Values.global
+  ) }}
 {{- end }}
+
 
 {{/*
 Create a fully qualified app name for api-token-error
@@ -157,13 +162,11 @@ Create a fully qualified app name for api-token-error
 {{- define "api-token-error.fullname" -}}
   {{- include "common.fullname" (dict 
       "fullnameOverride" .Values.apiTokenError.fullnameOverride 
-      "global.fullnameOverride" .Values.global.fullnameOverride 
-      "Release.Name" .Release.Name 
+      "Release" .Release 
       "name" (include "api-token-error.name" .) 
-  ) 
-  }}
+      "global" .Values.global
+  ) }}
 {{- end }}
-
 
 {{- define "api-token-error.labels" -}}
 {{- include "common.labels" . }}
