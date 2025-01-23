@@ -25,7 +25,6 @@ jobs:
         uses: helm/kind-action@v1.3.0
         with:
           cluster-name: 'helm-test-cluster'
-          wait: 'true'
 
       - name: Set Kubeconfig for Kind
         run: |
