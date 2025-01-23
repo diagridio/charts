@@ -18,6 +18,12 @@ jobs:
         with:
           version: 'v3.14.3'
 
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Set up Kind
+        uses: helm/kind-action@v1.3.0
+
       - name: Helm Lint
         run: |
           helm lint ./
@@ -25,11 +31,6 @@ jobs:
       - name: Helm Template
         run: |
           helm template my-release ./ > rendered.yaml
-
-      - name: Set up Kind
-        uses: helm/kind-action@v1
-        with:
-          kubectl_version: '1.27.3' 
 
       - name: Helm Install
         run: |
