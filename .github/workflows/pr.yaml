@@ -27,6 +27,7 @@ jobs:
       - name: Install Contour CRDs
         run: |
           kubectl apply -f https://projectcontour.io/quickstart/contour.yaml
+          kubectl wait --for=condition=Established --timeout=60s crd/httpproxies.projectcontour.io
 
       - name: Helm Lint
         run: |
@@ -34,8 +35,8 @@ jobs:
 
       - name: Helm Template
         run: |
-          helm template my-release ./ > rendered.yaml
+          helm template my-release ./ --namespace test --debug > rendered.yaml
 
       - name: Helm Install
         run: |
-          helm install my-release ./ --namespace test --create-namespace --wait
+          helm upgrade --install my-release ./ --namespace test --create-namespace --wait --timeout 15m
