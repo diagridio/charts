@@ -1,46 +1,63 @@
 {{/*
-Agent Helpers
+Common Naming Helpers
 */}}
-{{/*
-Expand the name of the chart.
-*/}}
-{{- define "agent.name" -}}
-{{- default "agent" .Values.agent.nameOverride | trunc 63 | trimSuffix "-" }}
-{{- end }}
 
 
 {{/*
-Create a default fully qualified app name.
-We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
-If release name contains chart name it will be used as a full name.
+Create a default name for the chart
+Priority:
+1. Resource-specific nameOverride
+2. Global nameOverride
+3. Default Name (e.g., "agent")
+4. Chart name
 */}}
-{{- define "agent.fullname" -}}
-{{- if .Values.agent.fullnameOverride }}
-{{- .Values.agent.fullnameOverride | trunc 63 | trimSuffix "-" }}
+{{- define "common.name" -}}
+{{- if .nameOverride }}
+  {{- .nameOverride | trunc 63 | trimSuffix "-" }}
+{{- else if .global.nameOverride }}
+  {{- .global.nameOverride | trunc 63 | trimSuffix "-" }}
+{{- else if .defaultName }}
+  {{- .defaultName | trunc 63 | trimSuffix "-" }}
 {{- else }}
-{{-     $name := default (include "agent.name" .) .Values.agent.nameOverride }}
-{{-     if contains $name .Release.Name }}
-{{-         .Release.Name | trunc 63 | trimSuffix "-" }}
-{{-     else }}
-{{-         printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
-{{-     end }}
+  {{- .Chart.Name | trunc 63 | trimSuffix "-" }}
 {{- end }}
 {{- end }}
-
 
 {{/*
-Create chart name and version as used by the chart label.
+Create a default fully qualified app name
+Priority:
+1. Resource-specific fullnameOverride
+2. Global fullnameOverride
+3. Release name + resource name, with special handling if release name contains resource name
 */}}
-{{- define "agent.chart" -}}
+{{- define "common.fullname" -}}
+{{- if .fullnameOverride }}
+  {{- .fullnameOverride | trunc 63 | trimSuffix "-" }}
+{{- else if .global.fullnameOverride }}
+  {{- .global.fullnameOverride | trunc 63 | trimSuffix "-" }}
+{{- else }}
+  {{- $name := .name }}
+  {{- if contains $name .Release.Name }}
+    {{- .Release.Name | trunc 63 | trimSuffix "-" }}
+  {{- else }}
+    {{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
+  {{- end }}
+{{- end }}
+{{- end }}
+
+{{/*
+Create chart name and version as used by the chart label
+*/}}
+{{- define "common.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
-Common labels
+Common Labels
 */}}
-{{- define "agent.labels" -}}
-helm.sh/chart: {{ include "agent.chart" . }}
-{{ include "agent.selectorLabels" . }}
+{{- define "common.labels" -}}
+helm.sh/chart: {{ include "common.chart" . }}
+{{ include "common.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
@@ -48,11 +65,60 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
 {{/*
+Selector Labels
+*/}}
+{{- define "common.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "common.name" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
+
+
+
+
+
+{{/*
+Agent Helpers
+*/}}
+{{/*
+Create the name of the agent resource
+*/}}
+{{- define "agent.name" -}}
+  {{- include "common.name" (dict 
+      "nameOverride" .Values.agent.nameOverride 
+      "global.nameOverride" .Values.global.nameOverride 
+      "defaultName" "agent" 
+      "Chart.Name" .Chart.Name) 
+  }}
+{{- end }}
+
+{{/*
+Create a fully qualified app name for agent
+*/}}
+{{- define "agent.fullname" -}}
+  {{- include "common.fullname" (dict 
+      "fullnameOverride" .Values.agent.fullnameOverride 
+      "global.fullnameOverride" .Values.global.fullnameOverride 
+      "Release.Name" .Release.Name 
+      "name" (include "agent.name" .) 
+  ) 
+  }}
+{{- end }}
+
+
+{{/*
+Common labels for agent
+*/}}
+{{- define "agent.labels" -}}
+{{- include "common.labels" . }}
+app.kubernetes.io/component: agent
+{{- end }}
+
+
+{{/*
 Selector labels
 */}}
 {{- define "agent.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "agent.name" . }}
-app.kubernetes.io/instance: {{ .Release.Name }}
+{{- include "common.selectorLabels" . }}
 app.kubernetes.io/component: agent
 {{- end }}
 
@@ -62,6 +128,50 @@ Create the name of the service account to use
 {{- define "agent.serviceAccountName" -}}
 {{- default (include "agent.fullname" .) .Values.agent.serviceAccount.name }}
 {{- end }}
+
+
+
+{{/*
+API Token Error Helpers
+*/}}
+
+{{/*
+Create the name of the api-token-error resource.
+*/}}
+{{- define "api-token-error.name" -}}
+  {{- include "common.name" (dict 
+      "nameOverride" .Values.apiTokenError.nameOverride 
+      "global.nameOverride" .Values.global.nameOverride 
+      "defaultName" "api-token-error" 
+      "Chart.Name" .Chart.Name) 
+  }}
+{{- end }}
+
+{{/*
+Create a fully qualified app name for api-token-error
+*/}}
+{{- define "api-token-error.fullname" -}}
+  {{- include "common.fullname" (dict 
+      "fullnameOverride" .Values.apiTokenError.fullnameOverride 
+      "global.fullnameOverride" .Values.global.fullnameOverride 
+      "Release.Name" .Release.Name 
+      "name" (include "api-token-error.name" .) 
+  ) 
+  }}
+{{- end }}
+
+
+{{- define "api-token-error.labels" -}}
+{{- include "common.labels" . }}
+app.kubernetes.io/component: api-token-error
+{{- end }}
+
+{{- define "api-token-error.selectorLabels" -}}
+{{- include "common.selectorLabels" . }}
+app.kubernetes.io/component: api-token-error
+{{- end }}
+
+
 
 {{/*
 Convert A suffixed (kMGTP or kiMiGiTiPi) memory values to bytes
@@ -125,44 +235,4 @@ Calculate GoLang GOMEMLIMIT From .Values.Resources.Limit.Memory provided as argu
 {{-         end }}
 {{-     end }}
 {{- end }}
-
-{{/*
-API Token Error Helpers
-*/}}
-{{- define "api-token-error.name" -}}
-{{- default "api-token-error" .Values.apiTokenError.nameOverride | trunc 63 | trimSuffix "-" }}
-{{- end }}
-
-{{- define "api-token-error.fullname" -}}
-{{- if .Values.apiTokenError.fullnameOverride }}
-  {{- .Values.apiTokenError.fullnameOverride | trunc 63 | trimSuffix "-" }}
-{{- else }}
-  {{- $name := default (include "api-token-error.name" .) .Values.apiTokenError.nameOverride }}
-  {{- if contains $name .Release.Name }}
-    {{- .Release.Name | trunc 63 | trimSuffix "-" }}
-  {{- else }}
-    {{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
-  {{- end }}
-{{- end }}
-{{- end }}
-
-{{- define "api-token-error.chart" -}}
-{{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
-{{- end }}
-
-{{- define "api-token-error.labels" -}}
-helm.sh/chart: {{ include "api-token-error.chart" . }}
-{{ include "api-token-error.selectorLabels" . }}
-{{- if .Chart.AppVersion }}
-app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
-{{- end }}
-app.kubernetes.io/managed-by: {{ .Release.Service }}
-{{- end }}
-
-{{- define "api-token-error.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "api-token-error.name" . }}
-app.kubernetes.io/instance: {{ .Release.Name }}
-app.kubernetes.io/component: api-token-error
-{{- end }}
-
 

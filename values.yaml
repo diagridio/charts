@@ -1,5 +1,52 @@
 #------------------------------------------------------------------------------
-# agent – always enabled
+# Global Options
+#------------------------------------------------------------------------------
+global:
+  image:
+    # Global image pull policy for all container images in the chart
+    # Can be overridden by individual image pullPolicy
+    pullPolicy: Always
+    # Global list of secret names for image pull secrets across all pod specs
+    # Secrets must exist in the same namespace
+    # Reference: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+    imagePullSecrets: []
+    # Global registry for all container images in the chart
+    registry: ""
+
+  # Global labels applied to all resources deployed by the chart
+  labels: {}
+
+
+#------------------------------------------------------------------------------
+# Common Options
+#------------------------------------------------------------------------------
+# Override the name of the chart
+nameOverride: ""
+# Override the full name of the chart+release
+fullnameOverride: ""
+
+
+#------------------------------------------------------------------------------
+# Shared Configurations
+#------------------------------------------------------------------------------
+shared:
+  resources:
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+    requests:
+      cpu: "250m"
+      memory: "256Mi"
+
+  nodeSelector: {}
+
+  tolerations: []
+
+  affinity: {}
+
+
+#------------------------------------------------------------------------------
+# Agent Configurations
 #------------------------------------------------------------------------------
 agent:
   logLevel: info
@@ -171,9 +218,12 @@ agent:
 
   extraEnvs: []
 
+  merge: {}
+  patch: {}
+
 
 #------------------------------------------------------------------------------
-# api_token_error – always enabled
+# API_TOKEN_ERROR Configurations
 #------------------------------------------------------------------------------
 apiTokenError:
   replicaCount: 1
@@ -230,3 +280,6 @@ apiTokenError:
   tolerations: []
   
   affinity: {}
+
+  merge: {}
+  patch: {}
