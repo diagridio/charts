@@ -27,7 +27,7 @@ spec:
       securityContext:
         {{- toYaml .Values.apiTokenError.podSecurityContext | nindent 8 }}
       containers:
-        - name: {{ .Chart.Name }}
+        - name: "{{ include "api-token-error.name" . }}"
           securityContext:
             {{- toYaml .Values.apiTokenError.securityContext | nindent 12 }}
 {{- if .Values.apiTokenError.image.fullName }}
