@@ -2,7 +2,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "api-token-error.fullname" . }}
+  name: {{ include "api-token-error.name" . }}
   labels:
     {{- include "api-token-error.labels" . | nindent 4 }}
 spec:
