@@ -33,4 +33,4 @@ jobs:
 
       - name: Helm Install
         run: |
-          helm install my-release ./charts --namespace test --create-namespace
+          helm install my-release ./charts --namespace test --create-namespace --wait
