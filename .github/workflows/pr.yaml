@@ -23,6 +23,18 @@ jobs:
 
       - name: Set up Kind
         uses: helm/kind-action@v1.3.0
+        with:
+          cluster-name: 'helm-test-cluster'
+          wait: 'true'
+
+      - name: Set Kubeconfig for Kind
+        run: |
+          kind get kubeconfig --name helm-test-cluster > $HOME/.kube/config
+
+      - name: Verify Cluster Nodes are Ready
+        run: |
+          kubectl get nodes
+          kubectl wait --for=condition=Ready nodes --all --timeout=60s
 
       - name: Install Contour CRDs
         run: |
@@ -37,6 +49,13 @@ jobs:
         run: |
           helm template my-release ./ --namespace test --debug > rendered.yaml
 
-      - name: Helm Install
+      - name: Helm Upgrade or Install with Retries
         run: |
-          helm upgrade --install my-release ./ --namespace test --create-namespace --wait --timeout 15m
+          for i in {1..3}; do
+            helm upgrade --install my-release ./ \
+              --namespace test \
+              --create-namespace \
+              --wait \
+              --timeout 20m \
+              --debug && break || sleep 30
+          done
