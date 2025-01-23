@@ -48,13 +48,12 @@ jobs:
         run: |
           helm template my-release ./ --namespace test --debug > rendered.yaml
 
+      # set to dry-run temporarily
+      # as image registry is not ready yet
       - name: Helm Upgrade or Install with Retries
         run: |
-          for i in {1..3}; do
-            helm upgrade --install my-release ./ \
-              --namespace test \
-              --create-namespace \
-              --wait \
-              --timeout 20m \
-              --debug && break || sleep 30
-          done
+          helm upgrade --install my-release ./ \
+            --namespace test \
+            --create-namespace \
+            --dry-run \
+            --debug 
