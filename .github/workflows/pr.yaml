@@ -18,19 +18,42 @@ jobs:
         with:
           version: 'v3.14.3'
 
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Set up Kind
+        uses: helm/kind-action@v1.3.0
+        with:
+          cluster_name: 'helm-test-cluster'
+
+      - name: Set Kubeconfig for Kind
+        run: |
+          kind get kubeconfig --name helm-test-cluster > $HOME/.kube/config
+
+      - name: Verify Cluster Nodes are Ready
+        run: |
+          kubectl get nodes
+          kubectl wait --for=condition=Ready nodes --all --timeout=60s
+
+      - name: Install Contour CRDs
+        run: |
+          kubectl apply -f https://projectcontour.io/quickstart/contour.yaml
+          kubectl wait --for=condition=Established --timeout=60s crd/httpproxies.projectcontour.io
+
       - name: Helm Lint
         run: |
-          helm lint ./charts
+          helm lint ./
 
       - name: Helm Template
         run: |
-          helm template my-release ./charts > rendered.yaml
+          helm template my-release ./ --namespace test --debug > rendered.yaml
 
-      - name: Set up Kind
-        uses: helm/kind-action@v1
-        with:
-          kubectl_version: '1.28.4' 
-
-      - name: Helm Install
+      # set to dry-run temporarily
+      # as image registry is not ready yet
+      - name: Helm Upgrade or Install with Retries
         run: |
-          helm install my-release ./charts --namespace test --create-namespace --wait
+          helm upgrade --install my-release ./ \
+            --namespace test \
+            --create-namespace \
+            --dry-run \
+            --debug 

@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "agent.name" . }}
+  annotations: 
+{{- with .Values.agent.podAnnotations }}
+{{ toYaml . | nindent 4 }}
+{{- end }}
+  labels:
+    {{- include "agent.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.agent.service.type }}
+  ports:
+    - name: cra-agent-metrics
+      port: {{ .Values.agent.service.port }}
+      protocol: TCP
+      targetPort: {{ .Values.agent.metrics.port }}
+  selector:
+    {{- include "agent.selectorLabels" . | nindent 6 }}

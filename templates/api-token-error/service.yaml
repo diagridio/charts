@@ -1,0 +1,21 @@
+{{- if .Values.apiTokenError.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-token-error
+  labels:
+    {{- include "api-token-error.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.apiTokenError.service.type }}
+  ports:
+    - name: http
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+    - name: grpc
+      port: 50001
+      protocol: TCP
+      targetPort: 50001
+  selector:
+    {{- include "api-token-error.selectorLabels" . | nindent 4 }}
+{{- end }}
