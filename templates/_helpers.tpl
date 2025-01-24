@@ -245,3 +245,22 @@ Calculate GoLang GOMEMLIMIT From .Values.Resources.Limit.Memory provided as argu
 {{-     end }}
 {{- end }}
 
+
+{{/*
+Merge two maps, with the second map overriding the first
+*/}}
+{{- define "merge.maps" -}}
+  {{- $base := .base | default dict }}
+  {{- $overrides := .overrides | default dict }}
+  {{- $merged := merge $base $overrides }}
+  {{- $merged | toYaml | trim | nindent 2 }}
+{{- end }}
+
+{{/*
+Inject additional YAML into a resource
+*/}}
+{{- define "inject.patch" -}}
+  {{- if .patch }}
+    {{- tpl .patch . | nindent .indent }}
+  {{- end }}
+{{- end }}
