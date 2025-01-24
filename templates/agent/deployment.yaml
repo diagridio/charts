@@ -103,5 +103,14 @@ spec:
       affinity:
         {{- include "merge.maps" (dict "base" .Values.agent.affinity "overrides" .Values.agent.merge.affinity) | nindent 8 }}
       tolerations:
-        {{- include "merge.maps" (dict "base" .Values.agent.tolerations "overrides" .Values.agent.merge.tolerations) | nindent 8 }}
+        {{- if or .Values.agent.tolerations .Values.agent.merge.tolerations }}
+        {{- if .Values.agent.tolerations }}
+        {{- toYaml .Values.agent.tolerations | nindent 8 }}
+        {{- end }}
+        {{- if .Values.agent.merge.tolerations }}
+        {{- toYaml .Values.agent.merge.tolerations | nindent 8 }}
+        {{- end }}
+        {{- else }}
+        []
+        {{- end }}
 
