@@ -1,4 +1,4 @@
-{{- if .Values.apiTokenError.enabled }}
+{{- if and .Values.contour.enabled .Values.apiTokenError.enabled }}
 ---
 apiVersion: projectcontour.io/v1
 kind: HTTPProxy

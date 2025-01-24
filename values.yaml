@@ -216,6 +216,116 @@ agent:
   merge: {}
   patch: {}
 
+
+#------------------------------------------------------------------------------
+# Management Service Configurations
+#------------------------------------------------------------------------------
+management:
+  logLevel: info
+
+  config:
+    grpc_server:
+      enabled: true
+      port: 9090
+      request_timeout: 30s
+      tls:
+        enabled: false
+        cacert: "ca.crt"
+        issuercert: "tls.crt"
+        issuerkey: "tls.key"
+        mutual: false
+        existingSecretName: ""
+    host:
+      id: ""
+      region_id: ""
+      region_metadata:
+        cloud_provider: ""
+        cloud_provider_region: ""
+        display_name: ""
+    profiling:
+      enabled: false
+
+  # secrets config for integrating with a secret provider
+  secrets:
+    # NOTE dont run inmemory provider with replicaCount=2
+    provider: inmemory
+    redis:
+      host: ""
+      username: ""
+      password: ""
+    aws:
+      region: ""
+
+  # NOTE dont run inmemory provider with replicaCount=2
+  replicaCount: 1
+
+  image:
+    registry: ""
+    name: catalyst-management
+    tag: 'edge'
+    pullPolicy: Always
+
+  imagePullSecrets: []
+  nameOverride: ""
+  fullnameOverride: ""
+
+  service:
+    type: ClusterIP
+    port: 9090
+
+  ingress:
+    enabled: false
+    dns_top_level_domain: ""
+
+  serviceAccount:
+      # Annotations to add to the service account
+      annotations: {}
+      # The name of the service account to use.
+      # If not set and create is true, a name is generated using the fullname template
+      name: ""
+
+  podAnnotations:
+    prometheus.io/port: "9091"
+    prometheus.io/scrape: "true"
+    
+  podSecurityContext: {}
+    # fsGroup: 2000
+
+  securityContext: {}
+    # capabilities:
+    #   drop:
+    #   - ALL
+    # readOnlyRootFilesystem: true
+    # runAsNonRoot: true
+    # runAsUser: 1000
+
+  resources:
+    limits:
+      memory: 1200Mi
+    requests:
+      cpu: 40m
+      memory: 100Mi
+
+  nodeSelector: {}
+
+  tolerations: []
+
+  affinity: {}
+
+  # Golang Soft Memory Limit via env var GOMEMLIMIT
+  goSoftLimit:
+    percent: 90
+  #  override: 600MiB  # it will set GOMEMLIMIT to this value. Supported suffixes, if not using a straight bytes number, are B, KiB, MiB, GiB, and TiB.
+
+  extraEnvs: []
+
+  sentry:
+    enabled: false
+
+  merge: {}
+  patch: {}
+
+
 #------------------------------------------------------------------------------
 # API_TOKEN_ERROR Configurations
 #------------------------------------------------------------------------------
@@ -278,3 +388,15 @@ apiTokenError:
 
   merge: {}
   patch: {}
+
+
+
+
+
+
+#------------------------------------------------------------------------------
+# Contour Configurations - Optional
+#------------------------------------------------------------------------------
+contour:
+  enable: true
+

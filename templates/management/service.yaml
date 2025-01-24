@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "management.name" . }}
+  annotations:
+{{- with .Values.agent.podAnnotations }}
+{{ toYaml . | nindent 4 }}
+{{- end }}
+  labels:
+    {{- include "management.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.management.service.type }}
+  ports:
+    - name: management-grpc
+      port: {{ .Values.management.service.port }}
+      protocol: TCP
+      targetPort: {{ .Values.management.config.grpc_server.port }}
+      {{- if .Values.management.service.nodePort }}
+      nodePort: {{ .Values.management.service.nodePort }}
+      {{- end }}
+  selector:
+    {{- include "management.selectorLabels" . | nindent 6 }}

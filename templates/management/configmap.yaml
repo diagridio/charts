@@ -1,0 +1,8 @@
+{{- $configMap := toYaml .Values.management.config -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "management.name" . }}-config
+data:
+  "config.yaml": |
+{{ tpl $configMap . | indent 4 }}
