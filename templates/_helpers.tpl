@@ -156,6 +156,13 @@ Inject additional YAML into a resource
 */}}
 {{- define "inject.patch" -}}
   {{- if .patch }}
-    {{- tpl .patch . | nindent .indent }}
+    {{- if kindIs "string" .patch }}
+      {{- tpl .patch . | nindent .indent }}
+    {{- else if kindIs "slice" .patch }}
+      {{- toYaml .patch | nindent .indent }}
+    {{- else }}
+      {{- fail (printf "inject.patch: unsupported type for patch: %s" (typeOf .patch)) }}
+    {{- end }}
   {{- end }}
 {{- end }}
+
