@@ -94,7 +94,11 @@ spec:
             protocol: TCP
           {{- include "inject.patch" (dict "patch" .Values.management.patch.ports "indent" 10) }}
           resources:
-            {{- include "merge.maps" (dict "base" .Values.management.resources "overrides" .Values.management.merge.resources) | nindent 12 }}
+            {{- if .Values.management.merge.resources }}
+              {{- toYaml .Values.management.merge.resources | nindent 12 }}
+            {{- else }}
+              {{- toYaml .Values.management.resources | nindent 12 }}
+            {{- end }}
           volumeMounts:
           - name: management-config
             mountPath: /etc/management
