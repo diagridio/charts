@@ -1,0 +1,157 @@
+{{- $gomemlimit := include "catalyst.GetGoLangGOMEMLIMITFromResourceLimits" (dict "limits" .Values.management.resources.limits "golimit" .Values.management.goSoftLimit) }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "management.name" . }}
+  labels:
+    {{- include "merge.maps" (dict "base" (fromYaml (include "management.labels" .)) "overrides" .Values.management.merge.labels) | nindent 4 }}
+spec:
+  replicas: {{ .Values.management.replicaCount }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+  selector:
+    matchLabels:
+      {{- include "management.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/management-config: {{ include (print $.Template.BasePath "/management/configmap.yaml") . | sha256sum }}
+        {{- with .Values.management.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- if .Values.management.sentry.enabled }}
+        dapr.io/app-id: management
+        dapr.io/config: management
+        {{- end }}
+      labels:
+        {{- include "merge.maps" (dict "base" (include "management.selectorLabels" . | fromYaml) "overrides" .Values.management.merge.selectorLabels) | nindent 8 }}
+    spec:
+      {{- with .Values.management.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      restartPolicy: Always
+      serviceAccountName: {{ include "management.serviceAccountName" . }}
+      securityContext:
+        {{- include "merge.maps" (dict "base" .Values.management.podSecurityContext "overrides" .Values.management.merge.podSecurityContext) | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- include "merge.maps" (dict "base" .Values.management.securityContext "overrides" .Values.management.merge.securityContext) | nindent 12 }}
+          image: "{{ .Values.management.image.registry }}/{{ .Values.management.image.name }}:{{ .Values.management.image.tag }}"
+          imagePullPolicy: {{ .Values.management.image.pullPolicy }}
+          command: ["./management"]
+          args:
+          - "--log-level={{ .Values.management.logLevel }}"
+          {{- if .Values.management.config.grpc_server.tls.enabled }}
+          - "--grpc_server.tls.enabled={{ .Values.management.config.grpc_server.tls.enabled }}"
+          - "--grpc_server.tls.mutual={{ .Values.management.config.grpc_server.tls.mutual }}"
+          - "--grpc_server.tls.cacert=/grpc-tls-certs/{{ required ".Values.management.config.grpc_server.tls.cacert is required" .Values.management.config.grpc_server.tls.cacert }}"
+          - "--grpc_server.tls.issuercert=/grpc-tls-certs/{{ required ".Values.management.config.grpc_server.tls.issuercert is required" .Values.management.config.grpc_server.tls.issuercert }}"
+          - "--grpc_server.tls.issuerkey=/grpc-tls-certs/{{ required ".Values.management.config.grpc_server.tls.issuerkey is required" .Values.management.config.grpc_server.tls.issuerkey }}"
+          {{- end }}
+          {{- if eq .Values.management.secrets.provider "redis" }}
+          - "--secretsprovider=redis"
+          - "--secrets_redis.host={{ required ".Values.management.secrets.redis.host entry required when .Values.management.secrets.provider is set to redis" .Values.management.secrets.redis.host }}"
+          - "--secrets_redis.username={{ .Values.management.secrets.redis.username }}"
+          - "--secrets_redis.password={{ .Values.management.secrets.redis.password }}"
+          {{- end }}
+          {{- if eq .Values.management.secrets.provider "aws" }}
+          - "--secretsprovider=aws.secretmanager"
+          - "--secrets_aws_secretmanager.region={{ required ".Values.management.secrets.aws.region entry required when .Values.management.secrets.provider is set to aws" .Values.management.secrets.aws.region }}"
+          {{- end }}
+          {{- if .Values.management.sentry.enabled }}
+          - "--sentry.enabled=true"
+          - "--sentry.endpoint={{ required ".Values.management.sentry.endpoint entry required" .Values.management.sentry.endpoint }}"
+          - "--sentry.trust_domain={{ required ".Values.management.sentry.trustDomain entry required" .Values.management.sentry.trustDomain }}"
+          - "--sentry.trust_anchors_file=/var/run/secrets/diagrid.io/trust/ca.crt"
+          - "--sentry.namespace={{ .Values.management.sentry.namespace | default "dapr-system" }}"
+          {{- end }}
+          {{- if not .Values.management.sentry.enabled }}
+          - "--sentry.enabled=false"
+          {{- end }}
+          env:
+          - name: CONFIG_FILE_DIR
+            value: /etc/management
+          - name: NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          {{- if (and $gomemlimit (ne $gomemlimit "0")) }}
+          - name: GOMEMLIMIT
+            value: {{ $gomemlimit }}
+          {{- end }}
+          {{- if .Values.management.extraEnvs }}
+          {{- toYaml .Values.management.extraEnvs | nindent 10 }}
+          {{- end }}
+          {{- include "inject.patch" (dict "patch" .Values.management.patch.env "indent" 10) }}
+          ports:
+          - name: grpc
+            containerPort: {{ .Values.management.config.grpc_server.port }}
+            protocol: TCP
+          {{- include "inject.patch" (dict "patch" .Values.management.patch.ports "indent" 10) }}
+          resources:
+            {{- if .Values.management.merge.resources }}
+              {{- toYaml .Values.management.merge.resources | nindent 12 }}
+            {{- else }}
+              {{- toYaml .Values.management.resources | nindent 12 }}
+            {{- end }}
+          volumeMounts:
+          - name: management-config
+            mountPath: /etc/management
+          {{- if .Values.management.sentry.enabled }}
+          - name: sentry-identity-token
+            mountPath: /var/run/secrets/dapr.io/sentrytoken
+            readOnly: true
+          - name: trust-bundle
+            mountPath: /var/run/secrets/diagrid.io/trust
+            readOnly: true
+          {{- end }}
+          {{- if .Values.management.config.grpc_server.tls.enabled }}
+          - name: grpc-tls-certs
+            mountPath: /grpc-tls-certs
+            readOnly: true
+          {{- end }}
+          {{- include "inject.patch" (dict "patch" .Values.management.patch.volumeMounts "indent" 10) }}
+        {{- include "inject.patch" (dict "patch" .Values.management.patch.containers "indent" 6) }}
+      volumes:
+      - name: management-config
+        configMap:
+          name: {{ include "management.name" . }}-config
+      {{- if .Values.management.sentry.enabled }}
+      - name: trust-bundle
+        configMap:
+          name: ca-certificates-bundle
+      - name: sentry-identity-token
+        projected:
+          defaultMode: 420
+          sources:
+          - serviceAccountToken:
+              audience: dapr.io/sentry
+              expirationSeconds: 7200
+              path: token
+      {{- end }}
+      {{- if .Values.management.config.grpc_server.tls.enabled }}
+      - name: grpc-tls-certs
+        secret:
+          secretName: {{ required ".Values.management.config.grpc_server.tls.existingSecretName is required" .Values.management.config.grpc_server.tls.existingSecretName }}
+      {{- end }}
+      {{- include "inject.patch" (dict "patch" .Values.management.patch.volumes "indent" 6) }}
+      nodeSelector:
+        {{- include "merge.maps" (dict "base" .Values.management.nodeSelector "overrides" .Values.management.merge.nodeSelector) | nindent 8 }}
+      affinity:
+        {{- include "merge.maps" (dict "base" .Values.management.affinity "overrides" .Values.management.merge.affinity) | nindent 8 }}
+      tolerations:
+        {{- if or .Values.management.tolerations .Values.management.merge.tolerations }}
+        {{- if .Values.management.tolerations }}
+        {{- toYaml .Values.management.tolerations | nindent 8 }}
+        {{- end }}
+        {{- if .Values.management.merge.tolerations }}
+        {{- toYaml .Values.management.merge.tolerations | nindent 8 }}
+        {{- end }}
+        {{- else }}
+        []
+        {{- end }}

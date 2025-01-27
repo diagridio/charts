@@ -84,7 +84,11 @@ spec:
             protocol: TCP
           {{- include "inject.patch" (dict "patch" .Values.agent.patch.ports "indent" 10) }}
           resources:
-            {{- include "merge.maps" (dict "base" .Values.agent.resources "overrides" .Values.agent.merge.resources) | nindent 12 }}
+            {{- if .Values.agent.merge.resources }}
+              {{- toYaml .Values.agent.merge.resources | nindent 12 }}
+            {{- else }}
+              {{- toYaml .Values.agent.resources | nindent 12 }}
+            {{- end }}
           volumeMounts:
           - name: agent-config
             mountPath: /etc/cra-agent

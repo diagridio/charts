@@ -48,7 +48,11 @@ spec:
               containerPort: 50001
               protocol: TCP
           resources:
-            {{- toYaml .Values.apiTokenError.resources | nindent 12 }}
+            {{- if .Values.apiTokenError.merge.resources }}
+              {{- toYaml .Values.apiTokenError.merge.resources | nindent 12 }}
+            {{- else }}
+              {{- toYaml .Values.apiTokenError.resources | nindent 12 }}
+            {{- end }}
       {{- with .Values.apiTokenError.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

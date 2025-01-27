@@ -77,111 +77,6 @@ app.kubernetes.io/name: {{ include "common.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
-
-
-
-
-{{/*
-Agent Helpers
-*/}}
-{{/*
-Create the name of the agent resource
-*/}}
-{{- define "agent.name" -}}
-  {{- include "common.name" (dict 
-      "nameOverride" .Values.agent.nameOverride 
-      "defaultName" "agent" 
-      "Chart.Name" .Chart.Name
-      "global" .Values.global
-  ) }}
-{{- end }}
-
-
-{{/*
-Create a fully qualified app name for agent
-*/}}
-{{- define "agent.fullname" -}}
-  {{- include "common.fullname" (dict 
-      "fullnameOverride" .Values.agent.fullnameOverride 
-      "Release" .Release 
-      "name" (include "agent.name" .) 
-      "global" .Values.global
-  ) }}
-{{- end }}
-
-
-{{/*
-Common labels for agent
-*/}}
-{{- define "agent.labels" -}}
-{{- include "common.labels" . }}
-app.kubernetes.io/component: agent
-{{- end }}
-
-{{/*
-Selector labels
-*/}}
-{{- define "agent.selectorLabels" -}}
-{{- include "common.selectorLabels" . }}
-app.kubernetes.io/component: agent
-{{- end }}
-
-{{/*
-Create the name of the service account to use for agent
-*/}}
-{{- define "agent.serviceAccountName" -}}
-  {{- if .Values.agent.serviceAccount.name }}
-    {{- .Values.agent.serviceAccount.name | trunc 63 | trimSuffix "-" }}
-  {{- else }}
-    {{- printf "%s-sa" (include "agent.fullname" .) | trunc 63 | trimSuffix "-" }}
-  {{- end }}
-{{- end }}
-
-
-
-
-
-{{/*
-API Token Error Helpers
-*/}}
-
-{{/*
-Create the name of the api-token-error resource
-*/}}
-{{- define "api-token-error.name" -}}
-  {{- include "common.name" (dict 
-      "nameOverride" .Values.apiTokenError.nameOverride 
-      "defaultName" "api-token-error" 
-      "Chart.Name" .Chart.Name
-      "global" .Values.global
-  ) }}
-{{- end }}
-
-
-{{/*
-Create a fully qualified app name for api-token-error
-*/}}
-{{- define "api-token-error.fullname" -}}
-  {{- include "common.fullname" (dict 
-      "fullnameOverride" .Values.apiTokenError.fullnameOverride 
-      "Release" .Release 
-      "name" (include "api-token-error.name" .) 
-      "global" .Values.global
-  ) }}
-{{- end }}
-
-{{- define "api-token-error.labels" -}}
-{{- include "common.labels" . }}
-app.kubernetes.io/component: api-token-error
-{{- end }}
-
-{{- define "api-token-error.selectorLabels" -}}
-{{- include "common.selectorLabels" . }}
-app.kubernetes.io/component: api-token-error
-{{- end }}
-
-
-
 {{/*
 Convert A suffixed (kMGTP or kiMiGiTiPi) memory values to bytes
 */}}
@@ -261,6 +156,13 @@ Inject additional YAML into a resource
 */}}
 {{- define "inject.patch" -}}
   {{- if .patch }}
-    {{- tpl .patch . | nindent .indent }}
+    {{- if kindIs "string" .patch }}
+      {{- tpl .patch . | nindent .indent }}
+    {{- else if kindIs "slice" .patch }}
+      {{- toYaml .patch | nindent .indent }}
+    {{- else }}
+      {{- fail (printf "inject.patch: unsupported type for patch: %s" (typeOf .patch)) }}
+    {{- end }}
   {{- end }}
 {{- end }}
+
