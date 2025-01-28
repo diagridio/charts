@@ -44,6 +44,9 @@ jobs:
         run: |
           helm lint ./
 
+      - name: Build Helm Dependencies
+        run: helm dependency update ./
+
       - name: Helm Template
         run: |
           helm template my-release ./ --namespace test --debug > rendered.yaml
