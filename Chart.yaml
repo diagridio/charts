@@ -4,3 +4,9 @@ description: Helm chart for Catalyst
 type: application
 version: '0.0.1'
 appVersion: '0.0.1'
+
+dependencies:
+  - name: contour
+    version: 19.4.0
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: contour.enabled

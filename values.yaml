@@ -391,12 +391,76 @@ apiTokenError:
 
 
 
-
-
-
 #------------------------------------------------------------------------------
-# Contour Configurations - Optional
+# Contour/Envoy Configurations - Optional
 #------------------------------------------------------------------------------
 contour:
-  enable: true
-
+  enabled: true
+  envoy:
+    kind: "deployment"
+    podAnnotations:
+      prometheus.io/port: '8002'
+      prometheus.io/envoyscrape: 'true'
+    service:
+      loadBalancerIP: ""
+      annotations:
+          service.beta.kubernetes.io/aws-load-balancer-proxy-protocol: '*'
+          service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout: '600'
+    autoscaling:
+      enabled: true
+      minReplicas: 2
+      behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 300
+          policies:
+            - type: Percent
+              value: 25
+              periodSeconds: 120
+        scaleUp:
+          stabilizationWindowSeconds: 120
+          policies:
+            - type: Pods
+              value: 1
+              periodSeconds: 60
+  
+    podAntiAffinityPreset: soft
+  
+    # resources settings for the envoy proxies deployed
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "1.5Gi"
+  
+    priorityClassName: "system-cluster-critical"
+  
+  contour:
+    podAnnotations:
+      prometheus.io/port: '8000'
+      prometheus.io/scrape: 'true'
+    replicaCount: 2
+    resources:
+      requests:
+        cpu: "1"
+        memory: "2Gi"
+    extraArgs:
+      - --use-proxy-protocol
+  
+    priorityClassName: "system-cluster-critical"
+  
+  configInline:
+    accesslog-format: envoy
+    disablePermitInsecure: false
+    tls:
+      fallback-certificate: { }
+    rateLimitService:
+      extensionService: contour/ratelimitext
+      domain: contour
+      enableXRateLimitHeaders: true
+      # true - will allow requests to pass even if there's an issue with RLS
+      # false - will block the request if there's an issue with RLS
+      failOpen: true
+    timeouts:
+      connection-idle-timeout: 10m
+      stream-idle-timeout: 1h
+      max-connection-duration: 6h
+  
