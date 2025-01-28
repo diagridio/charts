@@ -45,6 +45,7 @@ jobs:
           for crd in contourdeployments.projectcontour.io \
                      contourconfigurations.projectcontour.io \
                      httpproxies.projectcontour.io \
+                     tlscertificatedelegations.projectcontour.io \
                      extensionservices.projectcontour.io; do
             kubectl annotate crd $crd \
               meta.helm.sh/release-name=my-release \
