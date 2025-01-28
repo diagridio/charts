@@ -59,4 +59,5 @@ jobs:
             --namespace test \
             --create-namespace \
             --dry-run \
+            --skip-crds \
             --debug 
