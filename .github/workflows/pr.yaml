@@ -40,9 +40,27 @@ jobs:
           kubectl apply -f https://projectcontour.io/quickstart/contour.yaml
           kubectl wait --for=condition=Established --timeout=60s crd/httpproxies.projectcontour.io
 
+      - name: Annotate Contour CRDs
+        run: |
+          for crd in contourdeployments.projectcontour.io \
+                     contourconfigurations.projectcontour.io \
+                     httpproxies.projectcontour.io \
+                     tlscertificatedelegations.projectcontour.io \
+                     extensionservices.projectcontour.io; do
+            kubectl annotate crd $crd \
+              meta.helm.sh/release-name=my-release \
+              meta.helm.sh/release-namespace=test --overwrite
+            kubectl label crd $crd \
+              app.kubernetes.io/managed-by=Helm --overwrite
+          done
+
+
       - name: Helm Lint
         run: |
           helm lint ./
+
+      - name: Build Helm Dependencies
+        run: helm dependency update ./
 
       - name: Helm Template
         run: |
@@ -56,4 +74,5 @@ jobs:
             --namespace test \
             --create-namespace \
             --dry-run \
+            --skip-crds \
             --debug 
