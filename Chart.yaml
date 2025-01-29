@@ -10,3 +10,8 @@ dependencies:
     version: 19.4.0
     repository: "https://charts.bitnami.com/bitnami"
     condition: contour.enabled
+
+  - name: metrics-server
+    version: 3.10.0
+    repository: "https://kubernetes-sigs.github.io/metrics-server"
+    condition: metricsServer.enabled

@@ -395,7 +395,7 @@ apiTokenError:
 # Contour/Envoy Configurations - Optional
 #------------------------------------------------------------------------------
 contour:
-  enabled: true
+  enabled: false
   envoy:
     kind: "deployment"
     podAnnotations:
@@ -463,4 +463,30 @@ contour:
       connection-idle-timeout: 10m
       stream-idle-timeout: 1h
       max-connection-duration: 6h
-  
+
+#------------------------------------------------------------------------------
+# Metrics Server Configurations - Optional
+#------------------------------------------------------------------------------
+metricsServer:
+  enabled: false
+  replicas: 2
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+  updateStrategy:
+    rollingUpdate:
+      maxUnavailable: 1
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: metrics-server
+            app.kubernetes.io/instance: metrics-server
+        namespaces:
+        - metrics-server
+        topologyKey: kubernetes.io/hostname
+  resources:
+    requests:
+      cpu: 50m
+      memory: 100Mi
