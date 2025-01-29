@@ -395,7 +395,7 @@ apiTokenError:
 # Contour/Envoy Configurations - Optional
 #------------------------------------------------------------------------------
 contour:
-  enabled: true
+  enabled: false
   envoy:
     kind: "deployment"
     podAnnotations:
@@ -468,7 +468,7 @@ contour:
 # Metrics Server Configurations - Optional
 #------------------------------------------------------------------------------
 metricsServer:
-  enabled: true
+  enabled: false
   replicas: 2
   podDisruptionBudget:
     enabled: true
