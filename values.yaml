@@ -76,7 +76,7 @@ agent:
     otel:
       enabled: true
       # TODO: change to public registry?
-      image_repository: ""
+      image_repository: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/diagrid-otel-collector"
       image_tag: 'edge'
       metrics_endpoint: https://metrics.local.diagrid.io:443/api/v1/push
       metrics_tls_insecure: true
@@ -109,11 +109,10 @@ agent:
         keyFilename: "tls.key"
     upstream_dapr:
       # images wil be pulled from a dockerhub proxy so we don't hit ratelimits
-      # TODO: change to public registry?
-      container_registry: ""
+      container_registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/daprio"
     internal_dapr:
       # TODO: change to public registry?
-      container_registry: ""
+      container_registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker"
       sentry_resources:
         limits:
           memory: 100Mi
@@ -128,10 +127,8 @@ agent:
     artifacts:
       # make sure the k0s container image version works with the vcluster chart version when updating these, best is to copy the container image version from the vcluster release
       vcluster_k0s_chart_version: "0.15.2"
-      # TODO: change to public registry?
-      vcluster_k0s_container_image: ""
-      # TODO: change to public registry?
-      core_dns_container_image: ""
+      vcluster_k0s_container_image: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/k0sproject/k0s:v1.26.0-k0s.0"
+      core_dns_container_image: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/coredns/coredns:1.10.1"
       internal_registry_username: ""
       internal_registry_password: ""
     kubernetes:
@@ -156,7 +153,7 @@ agent:
 
   image:
     # TODO: change to public registry?
-    registry: ""
+    registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker"
     name: cra-agent
     # using single quotes so the script set_helm_version updates this value to the release version
     tag: 'edge'
@@ -260,7 +257,7 @@ management:
   replicaCount: 1
 
   image:
-    registry: ""
+    registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker"
     name: catalyst-management
     tag: 'edge'
     pullPolicy: Always
@@ -334,7 +331,7 @@ apiTokenError:
   replicaCount: 1
   
   image:
-    registry: ""
+    registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker"
     name: cra-agent
     tag: edge
     # optional full name of the container image to use

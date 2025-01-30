@@ -29,9 +29,14 @@ spec:
       labels:
         {{- include "merge.maps" (dict "base" (include "management.selectorLabels" . | fromYaml) "overrides" .Values.management.merge.selectorLabels) | nindent 8 }}
     spec:
-      {{- with .Values.management.imagePullSecrets }}
+      {{- if or .Values.global.image.imagePullSecrets .Values.management.imagePullSecrets }}
       imagePullSecrets:
+        {{- if .Values.global.image.imagePullSecrets }}
+        - name: {{ .Values.global.image.imagePullSecrets }}
+        {{- end }}
+        {{- with .Values.management.imagePullSecrets }}
         {{- toYaml . | nindent 8 }}
+        {{- end }}
       {{- end }}
       restartPolicy: Always
       serviceAccountName: {{ include "management.serviceAccountName" . }}

@@ -21,9 +21,14 @@ spec:
       labels:
         {{- include "api-token-error.selectorLabels" . | nindent 8 }}
     spec:
-      {{- with .Values.apiTokenError.imagePullSecrets }}
+      {{- if or .Values.global.image.imagePullSecrets .Values.apiTokenError.imagePullSecrets }}
       imagePullSecrets:
+        {{- if .Values.global.image.imagePullSecrets }}
+        - name: {{ .Values.global.image.imagePullSecrets }}
+        {{- end }}
+        {{- with .Values.apiTokenError.imagePullSecrets }}
         {{- toYaml . | nindent 8 }}
+        {{- end }}
       {{- end }}
       securityContext:
         {{- toYaml .Values.apiTokenError.podSecurityContext | nindent 8 }}
