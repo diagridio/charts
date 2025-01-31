@@ -79,7 +79,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 
 
 {{/*
-Imagr Pull Secrets
+Image Pull Secrets
 */}}
 {{- define "common.imagePullSecrets" -}}
   {{- if or .global.image.imagePullSecrets .imagePullSecrets }}
