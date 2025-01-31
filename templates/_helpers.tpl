@@ -77,6 +77,22 @@ app.kubernetes.io/name: {{ include "common.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
+
+{{/*
+Imagr Pull Secrets
+*/}}
+{{- define "common.imagePullSecrets" -}}
+  {{- if or .global.image.imagePullSecrets .imagePullSecrets }}
+  imagePullSecrets:
+    {{- if .global.image.imagePullSecrets }}
+    - name: {{ .global.image.imagePullSecrets }}
+    {{- end }}
+    {{- with .imagePullSecrets }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+
 {{/*
 Convert A suffixed (kMGTP or kiMiGiTiPi) memory values to bytes
 */}}

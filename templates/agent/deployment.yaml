@@ -20,19 +20,12 @@ spec:
       labels:
         {{- include "agent.selectorLabels" . | nindent 8 }}
     spec:
-      {{- if or .Values.global.image.imagePullSecrets .Values.agent.imagePullSecrets }}
-      imagePullSecrets:
-        {{- if .Values.global.image.imagePullSecrets }}
-        - name: {{ .Values.global.image.imagePullSecrets }}
-        {{- end }}
-        {{- with .Values.agent.imagePullSecrets }}
-        {{- toYaml . | nindent 8 }}
-        {{- end }}
-      {{- end }}
       restartPolicy: Always
       serviceAccountName: {{ include "agent.serviceAccountName" . }}
       securityContext:
         {{- include "merge.maps" (dict "base" .Values.agent.securityContext "overrides" .Values.agent.merge.securityContext) | nindent 6 }}
+      imagePullSecrets:
+        {{- include "common.imagePullSecrets" (dict "global" .Values.global "imagePullSecrets" .Values.agent.imagePullSecrets) | nindent 4 }}
       containers:
         - name: {{ .Chart.Name }}
           securityContext:
