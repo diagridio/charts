@@ -64,10 +64,15 @@ jobs:
 
       - name: Helm Template
         run: |
-          helm template my-release ./ --namespace test --debug > rendered.yaml
+          helm template my-release ./ \
+            --namespace test \
+            --debug \
+            --set global.image.imagePullSecrets[0].name=cra-pull-secret \
+            --set agent.config.host.join_token="fake_token" \
+            --set agent.config.host.control_plane_url="fake_url" \
+            --set agent.config.host.control_plane_http_url="fake_http_url" > rendered.yaml
 
       # set to dry-run temporarily
-      # as image registry is not ready yet
       - name: Helm Upgrade or Install with Retries
         run: |
           helm upgrade --install my-release ./ \
@@ -75,4 +80,8 @@ jobs:
             --create-namespace \
             --dry-run \
             --skip-crds \
-            --debug 
+            --debug \
+            --set global.image.imagePullSecrets[0].name=cra-pull-secret \
+            --set agent.config.host.join_token="fake_token" \
+            --set agent.config.host.control_plane_url="fake_url" \
+            --set agent.config.host.control_plane_http_url="fake_http_url"
