@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.gateway.envoy.service.name }}
+  annotations:
+{{- with .Values.gateway.envoy.podAnnotations }}
+{{ toYaml . | nindent 4 }}
+{{- end }}
+  labels:
+    {{- include "gateway.envoy.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "gateway.envoy.selectorLabels" . | nindent 6 }}
+  ports:
+    - name: http
+      port: {{ .Values.gateway.envoy.service.port }}
+      targetPort: {{ .Values.gateway.envoy.service.targetPort }}
+      protocol: TCP
+  type: {{ .Values.gateway.envoy.service.type }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.gateway.controlplane.service.name }}
+  annotations:
+{{- with .Values.gateway.controlplane.podAnnotations }}
+{{ toYaml . | nindent 4 }}
+{{- end }}
+  labels:
+    {{- include "gateway.controlplane.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "gateway.controlplane.selectorLabels" . | nindent 6 }}
+  ports:
+    - name: http
+      port: {{ .Values.gateway.controlplane.service.port }}
+      targetPort: {{ .Values.gateway.controlplane.service.targetPort }}
+      protocol: TCP
+  type: {{ .Values.gateway.controlplane.service.type }}
