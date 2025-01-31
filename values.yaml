@@ -3,7 +3,7 @@
 #------------------------------------------------------------------------------
 global:
   # Override the name of the chart
-  nameOverride: "catalyst"
+  nameOverride: ""
   # Override the full name of the chart+release
   fullnameOverride: ""
   image:
