@@ -29,14 +29,14 @@ spec:
       labels:
         {{- include "merge.maps" (dict "base" (include "management.selectorLabels" . | fromYaml) "overrides" .Values.management.merge.selectorLabels) | nindent 8 }}
     spec:
-      {{- with .Values.management.imagePullSecrets }}
-      imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
       restartPolicy: Always
       serviceAccountName: {{ include "management.serviceAccountName" . }}
       securityContext:
         {{- include "merge.maps" (dict "base" .Values.management.podSecurityContext "overrides" .Values.management.merge.podSecurityContext) | nindent 8 }}
+      {{- with .Values.global.image.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: {{ .Chart.Name }}
           securityContext:

@@ -3,7 +3,7 @@
 #------------------------------------------------------------------------------
 global:
   # Override the name of the chart
-  nameOverride: "catalyst"
+  nameOverride: ""
   # Override the full name of the chart+release
   fullnameOverride: ""
   image:
@@ -19,6 +19,9 @@ global:
 
   # Global labels applied to all resources deployed by the chart
   labels: {}
+
+
+
 
 
 #------------------------------------------------------------------------------
@@ -48,6 +51,7 @@ agent:
 
   config:
     host:
+      join_token: ""
       id: ""
       region_id: ""
       region_metadata:
@@ -56,6 +60,7 @@ agent:
       ingress_ip_addr: ""
       egress_addresses: []
     control_plane_url: ""
+    control_plane_http_url: ""
     inspection:
       enabled: false
     placement:
@@ -76,7 +81,7 @@ agent:
     otel:
       enabled: true
       # TODO: change to public registry?
-      image_repository: ""
+      image_repository: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/diagrid-otel-collector"
       image_tag: 'edge'
       metrics_endpoint: https://metrics.local.diagrid.io:443/api/v1/push
       metrics_tls_insecure: true
@@ -109,11 +114,10 @@ agent:
         keyFilename: "tls.key"
     upstream_dapr:
       # images wil be pulled from a dockerhub proxy so we don't hit ratelimits
-      # TODO: change to public registry?
-      container_registry: ""
+      container_registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/daprio"
     internal_dapr:
       # TODO: change to public registry?
-      container_registry: ""
+      container_registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker"
       sentry_resources:
         limits:
           memory: 100Mi
@@ -128,10 +132,8 @@ agent:
     artifacts:
       # make sure the k0s container image version works with the vcluster chart version when updating these, best is to copy the container image version from the vcluster release
       vcluster_k0s_chart_version: "0.15.2"
-      # TODO: change to public registry?
-      vcluster_k0s_container_image: ""
-      # TODO: change to public registry?
-      core_dns_container_image: ""
+      vcluster_k0s_container_image: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/k0sproject/k0s:v1.26.0-k0s.0"
+      core_dns_container_image: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/coredns/coredns:1.10.1"
       internal_registry_username: ""
       internal_registry_password: ""
     kubernetes:
@@ -139,6 +141,14 @@ agent:
       burst: 10
     denylist:
       enabled: false
+
+  sentry:
+    enabled: true
+    endpoint: dapr-sentry.root-dapr-system.svc.cluster.local:443
+    # TODO: enable when public sentry is available
+    # remote_endpoint: sentry.local.diagrid.io:443
+    trustDomain: prj-root.cra.diagrid.io
+    namespace: root-dapr-system
 
   # secrets config for integrating with a secret provider
   secrets:
@@ -156,14 +166,13 @@ agent:
 
   image:
     # TODO: change to public registry?
-    registry: ""
+    registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker"
     name: cra-agent
     # using single quotes so the script set_helm_version updates this value to the release version
     tag: 'edge'
     fullName: ""
     pullPolicy: Always
 
-  imagePullSecrets: []
   nameOverride: ""
   fullnameOverride: ""
 
@@ -260,12 +269,11 @@ management:
   replicaCount: 1
 
   image:
-    registry: ""
+    registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker"
     name: catalyst-management
     tag: 'edge'
     pullPolicy: Always
 
-  imagePullSecrets: []
   nameOverride: ""
   fullnameOverride: ""
 
@@ -324,71 +332,6 @@ management:
 
   merge: {}
   patch: {}
-
-
-#------------------------------------------------------------------------------
-# API_TOKEN_ERROR Configurations
-#------------------------------------------------------------------------------
-apiTokenError:
-  enabled: true
-  replicaCount: 1
-  
-  image:
-    registry: ""
-    name: cra-agent
-    tag: edge
-    # optional full name of the container image to use
-    fullName: ""
-    pullPolicy: Always
-  
-  imagePullSecrets: []
-  nameOverride: "api-token-error"
-  fullnameOverride: ""
-  
-  podAnnotations: {}
-  
-  podSecurityContext: {}
-    # fsGroup: 2000
-  
-  securityContext: {}
-    # capabilities:
-    #   drop:
-    #   - ALL
-    # readOnlyRootFilesystem: true
-    # runAsNonRoot: true
-    # runAsUser: 1000
-  
-  service:
-    type: ClusterIP
-  
-  resources: {}
-    # We usually recommend not to specify default resources and to leave this as a conscious
-    # choice for the user. This also increases chances charts run on environments with little
-    # resources, such as Minikube. If you do want to specify resources, uncomment the following
-    # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
-    # limits:
-    #   cpu: 100m
-    #   memory: 128Mi
-    # requests:
-    #   cpu: 100m
-    #   memory: 128Mi
-  
-  autoscaling:
-    enabled: false
-    minReplicas: 1
-    maxReplicas: 100
-    targetCPUUtilizationPercentage: 80
-    # targetMemoryUtilizationPercentage: 80
-  
-  nodeSelector: {}
-  
-  tolerations: []
-  
-  affinity: {}
-
-  merge: {}
-  patch: {}
-
 
 
 #------------------------------------------------------------------------------

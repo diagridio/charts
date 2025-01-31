@@ -1,4 +1,5 @@
 {{- $gomemlimit := include "catalyst.GetGoLangGOMEMLIMITFromResourceLimits" (dict "limits" .Values.agent.resources.limits "golimit" .Values.agent.goSoftLimit) }}
+{{- $joinToken := required "agent.config.host.join_token is required" .Values.agent.config.host.join_token }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -20,14 +21,14 @@ spec:
       labels:
         {{- include "agent.selectorLabels" . | nindent 8 }}
     spec:
-      {{- with .Values.agent.imagePullSecrets }}
-      imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
       restartPolicy: Always
       serviceAccountName: {{ include "agent.serviceAccountName" . }}
       securityContext:
         {{- include "merge.maps" (dict "base" .Values.agent.securityContext "overrides" .Values.agent.merge.securityContext) | nindent 6 }}
+      {{- with .Values.global.image.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: {{ .Chart.Name }}
           securityContext:
@@ -41,13 +42,11 @@ spec:
           command: ["./agent"]
           args:
           - "--log-level={{ .Values.agent.logLevel }}"
-          {{- if .Values.agent.config.tls.enabled }}
-          - "--tls.enabled=true"
-          - "--tls.mutual={{ .Values.agent.config.tls.mutual }}"
-          - "--tls.cacert=/grpc-tls-certs/{{ required ".Values.agent.config.tls.root.certFilename is required" .Values.agent.config.tls.root.certFilename }}"
-          - "--tls.clientcert=/grpc-tls-certs/{{ required ".Values.agent.config.tls.issuer.certFilename is required" .Values.agent.config.tls.issuer.certFilename }}"
-          - "--tls.clientkey=/grpc-tls-certs/{{ required ".Values.agent.config.tls.issuer.keyFilename is required" .Values.agent.config.tls.issuer.keyFilename }}"
-          {{- end }}
+          - "--tls.enabled=false"
+          - "--sentry.enabled=true"
+          - "--sentry.endpoint={{ required ".Values.agent.sentry.endpoint entry required" .Values.agent.sentry.endpoint }}"
+          - "--sentry.trust_domain={{ required ".Values.agent.sentry.trustDomain entry required" .Values.agent.sentry.trustDomain }}"
+          - "--sentry.namespace={{ .Values.agent.sentry.namespace | default "root-dapr-system" }}"
           {{- if eq .Values.agent.secrets.provider "redis" }}
           - "--secretsprovider=redis"
           - "--secrets_redis.host={{ required ".Values.agent.secrets.redis.host entry required when .Values.agent.secrets.provider is set to redis" .Values.agent.secrets.redis.host }}"
@@ -92,22 +91,23 @@ spec:
           volumeMounts:
           - name: agent-config
             mountPath: /etc/cra-agent
-          {{- if .Values.agent.config.tls.enabled }}
-          - name: grpc-client-tls
-            mountPath: /grpc-tls-certs
+          - name: sentry-identity-token
+            mountPath: /var/run/secrets/dapr.io/sentrytoken
             readOnly: true
-          {{- end }}
           {{- include "inject.patch" (dict "patch" .Values.agent.patch.volumeMounts "indent" 6) }}
         {{- include "inject.patch" (dict "patch" .Values.agent.patch.containers "indent" 6) }}
       volumes:
       - name: agent-config
         configMap:
           name: {{ include "agent.name" . }}-config
-      {{- if .Values.agent.config.tls.enabled }}
-      - name: grpc-client-tls
-        secret:
-          secretName: {{ required ".Values.agent.config.tls.existingSecretName is required" .Values.agent.config.tls.existingSecretName }}
-      {{- end }}
+      - name: sentry-identity-token
+        projected:
+          defaultMode: 420
+          sources:
+          - serviceAccountToken:
+              audience: dapr.io/sentry
+              expirationSeconds: 7200
+              path: token
       {{- include "inject.patch" (dict "patch" .Values.agent.patch.volumes "indent" 6) }}
       nodeSelector:
         {{- include "merge.maps" (dict "base" .Values.agent.nodeSelector "overrides" .Values.agent.merge.nodeSelector) | nindent 8 }}

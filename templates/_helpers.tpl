@@ -77,6 +77,7 @@ app.kubernetes.io/name: {{ include "common.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
+
 {{/*
 Convert A suffixed (kMGTP or kiMiGiTiPi) memory values to bytes
 */}}
