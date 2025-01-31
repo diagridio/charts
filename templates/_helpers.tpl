@@ -79,21 +79,6 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 
 
 {{/*
-Image Pull Secrets
-*/}}
-{{- define "common.imagePullSecrets" -}}
-  {{- if or .global.image.imagePullSecrets .imagePullSecrets }}
-  imagePullSecrets:
-    {{- if .global.image.imagePullSecrets }}
-    - name: {{ .global.image.imagePullSecrets }}
-    {{- end }}
-    {{- with .imagePullSecrets }}
-    {{- toYaml . | nindent 4 }}
-    {{- end }}
-  {{- end }}
-{{- end }}
-
-{{/*
 Convert A suffixed (kMGTP or kiMiGiTiPi) memory values to bytes
 */}}
 {{- define "catalyst.convertToBinaryPrefixFromK8S" -}}
