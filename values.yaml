@@ -59,14 +59,14 @@ agent:
         cloud_provider: ""
       ingress_ip_addr: ""
       egress_addresses: []
-    control_plane_url: ""
-    control_plane_http_url: ""
+    control_plane_url: cra.local.diagrid.io:443
+    control_plane_http_url: https://api.local.diagrid.io
     inspection:
       enabled: false
     placement:
       max_project_count: 15
     project:
-      dns_top_level_domain: ""
+      dns_top_level_domain: ".private.diagrid.io"
       ingress_tls_secret_name: ""
       default_workflow: namespace
       enable_scheduler_service: false
@@ -77,7 +77,7 @@ agent:
     sidecar:
       image_tag: 'edge'
     api_token_error:
-      image_tag: 'edge'
+      enabled: false
     otel:
       enabled: true
       # TODO: change to public registry?
@@ -103,15 +103,6 @@ agent:
         requests:
           cpu: 75m
           memory: 250Mi
-    tls:
-      enabled: true
-      existingSecretName: "tls"
-      mutual: true
-      root:
-        certFilename: "ca.crt"
-      issuer:
-        certFilename: "tls.crt"
-        keyFilename: "tls.key"
     upstream_dapr:
       # images wil be pulled from a dockerhub proxy so we don't hit ratelimits
       container_registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/daprio"
@@ -145,8 +136,9 @@ agent:
   sentry:
     enabled: true
     endpoint: dapr-sentry.root-dapr-system.svc.cluster.local:443
-    # TODO: enable when public sentry is available
-    # remote_endpoint: sentry.local.diagrid.io:443
+    remote_endpoint: sentry.local.diagrid.io:443
+    diagrid_trust_anchors_endpoint: https://trust-pem.local.diagrid.io
+    diagrid_trust_anchors_endpoint_insecure: true
     trustDomain: prj-root.cra.diagrid.io
     namespace: root-dapr-system
 
