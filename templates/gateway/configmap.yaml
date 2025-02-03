@@ -1,0 +1,51 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.gateway.envoy.configmap.name }}
+  labels:
+    app: envoy
+data:
+  bootstrap-envoy.yaml: |
+    {{- if .Values.gateway.envoy.admin.enabled }}
+    admin:
+      address:
+        socket_address: { address: {{ .Values.gateway.envoy.admin.address }}, port_value: {{ .Values.gateway.envoy.admin.port }} }
+    {{- end }}
+
+    dynamic_resources:
+      lds_config:
+        api_config_source:
+          api_type: GRPC
+          grpc_services:
+            - envoy_grpc:
+                cluster_name: controlplane
+      cds_config:
+        api_config_source:
+          api_type: GRPC
+          grpc_services:
+            - envoy_grpc:
+                cluster_name: controlplane
+
+    static_resources:
+      clusters:
+        - name: controlplane
+          connect_timeout: {{ .Values.gateway.envoy.xds.connect_timeout }}
+          type: LOGICAL_DNS
+          lb_policy: ROUND_ROBIN
+          typed_extension_protocol_options:
+            envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+              "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+              explicit_http_config:
+                http2_protocol_options:
+                  connection_keepalive:
+                    interval: {{ .Values.gateway.envoy.xds.connection_keepalive.interval }}
+                    timeout: {{ .Values.gateway.envoy.xds.connection_keepalive.timeout }}
+          load_assignment:
+            cluster_name: controlplane
+            endpoints:
+              - lb_endpoints:
+                  - endpoint:
+                      address:
+                        socket_address:
+                          address: {{ .Values.gateway.envoy.xds.hostname }}
+                          port_value: {{ .Values.gateway.envoy.xds.port }}

@@ -21,9 +21,6 @@ global:
   labels: {}
 
 
-
-
-
 #------------------------------------------------------------------------------
 # Shared Configurations
 #------------------------------------------------------------------------------
@@ -217,6 +214,95 @@ agent:
   merge: {}
   patch: {}
 
+#------------------------------------------------------------------------------
+# Gateway Configuration
+#------------------------------------------------------------------------------
+
+gateway:
+    namespace: gateway
+    envoy:
+      replicaCount: 1
+      image:
+        tag: distroless-v1.33.0
+        name: envoyproxy/envoy
+        registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy"
+      admin:
+        enabled: false
+        address: "127.0.0.1"
+        port: 9090
+      serviceAccount:
+        name: gateway-envoy
+        annotations: {}
+      configmap:
+        name: envoy-config
+      service:
+        name: gateway-envoy
+        appLabel: envoy
+        port: 8080
+        targetPort: 8080
+        type: ClusterIP
+      xds:
+        connect_timeout: 10s
+        connection_keepalive:
+          interval: 30s
+          timeout: 10s
+        hostname: gateway-controlplane
+        port: 57206
+      podAnnotations: {}
+      labels:
+        app: gateway-envoy
+      selectorLabels:
+        app: gateway-envoy
+      merge:
+        labels: {}
+        selectorLabels: {}
+      podSecurityContext:
+        runAsNonRoot: true
+        fsGroup: 2000
+      securityContext:
+        capabilities:
+          drop:
+            - ALL
+        readOnlyRootFilesystem: true
+        allowPrivilegeEscalation: false
+      nodeSelector: {}
+      affinity: {}
+      tolerations: []
+    controlplane:
+      replicaCount: 1
+      image:
+        tag: edge
+        name: catalyst-gateway
+        registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker"
+      serviceAccount:
+        name: gateway-controlplane
+        annotations: {}
+      service:
+        name: gateway-controlplane
+        appLabel: gateway-controlplane
+        port: 57206
+        targetPort: 57206
+        type: ClusterIP
+      podAnnotations: {}
+      labels:
+        app: gateway-controlplane
+      selectorLabels:
+        app: gateway-controlplane
+      merge:
+        labels: {}
+        selectorLabels: {}
+      podSecurityContext:
+        runAsNonRoot: true
+        fsGroup: 2000
+      securityContext:
+        capabilities:
+          drop:
+            - ALL
+        readOnlyRootFilesystem: true
+        allowPrivilegeEscalation: false
+      nodeSelector: {}
+      affinity: {}
+      tolerations: []
 
 #------------------------------------------------------------------------------
 # Management Service Configurations
@@ -324,80 +410,6 @@ management:
 
   merge: {}
   patch: {}
-
-
-#------------------------------------------------------------------------------
-# Contour/Envoy Configurations - Optional
-#------------------------------------------------------------------------------
-contour:
-  enabled: false
-  envoy:
-    kind: "deployment"
-    podAnnotations:
-      prometheus.io/port: '8002'
-      prometheus.io/envoyscrape: 'true'
-    service:
-      loadBalancerIP: ""
-      annotations:
-          service.beta.kubernetes.io/aws-load-balancer-proxy-protocol: '*'
-          service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout: '600'
-    autoscaling:
-      enabled: true
-      minReplicas: 2
-      behavior:
-        scaleDown:
-          stabilizationWindowSeconds: 300
-          policies:
-            - type: Percent
-              value: 25
-              periodSeconds: 120
-        scaleUp:
-          stabilizationWindowSeconds: 120
-          policies:
-            - type: Pods
-              value: 1
-              periodSeconds: 60
-  
-    podAntiAffinityPreset: soft
-  
-    # resources settings for the envoy proxies deployed
-    resources:
-      requests:
-        cpu: "500m"
-        memory: "1.5Gi"
-  
-    priorityClassName: "system-cluster-critical"
-  
-  contour:
-    podAnnotations:
-      prometheus.io/port: '8000'
-      prometheus.io/scrape: 'true'
-    replicaCount: 2
-    resources:
-      requests:
-        cpu: "1"
-        memory: "2Gi"
-    extraArgs:
-      - --use-proxy-protocol
-  
-    priorityClassName: "system-cluster-critical"
-  
-  configInline:
-    accesslog-format: envoy
-    disablePermitInsecure: false
-    tls:
-      fallback-certificate: { }
-    rateLimitService:
-      extensionService: contour/ratelimitext
-      domain: contour
-      enableXRateLimitHeaders: true
-      # true - will allow requests to pass even if there's an issue with RLS
-      # false - will block the request if there's an issue with RLS
-      failOpen: true
-    timeouts:
-      connection-idle-timeout: 10m
-      stream-idle-timeout: 1h
-      max-connection-duration: 6h
 
 #------------------------------------------------------------------------------
 # Metrics Server Configurations - Optional

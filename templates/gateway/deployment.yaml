@@ -1,0 +1,105 @@
+{{- $envoyImage := printf "%s/%s:%s" .Values.gateway.envoy.image.registry .Values.gateway.envoy.image.name .Values.gateway.envoy.image.tag }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catalyst-gateway
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    {{- with .Values.gateway.envoy.podAnnotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  labels:
+    {{- include "merge.maps" (dict "base" (fromYaml (include "gateway.envoy.labels" .)) "overrides" .Values.gateway.envoy.merge.labels) | nindent 4 }}
+spec:
+  replicas: {{ .Values.gateway.envoy.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "gateway.envoy.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/controlplane-config: {{ include (print $.Template.BasePath "/gateway/configmap.yaml") . | sha256sum }}
+      labels:
+        {{- include "merge.maps" (dict "base" (include "gateway.envoy.selectorLabels" . | fromYaml) "overrides" .Values.gateway.envoy.merge.selectorLabels) | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "gateway.envoy.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.gateway.envoy.podSecurityContext | nindent 8 }}
+      {{- with .Values.global.image.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: envoy
+          securityContext:
+            {{- toYaml .Values.gateway.envoy.securityContext | nindent 12 }}
+          image: "{{ $envoyImage }}"
+          args:
+            - "-c"
+            - "/etc/envoy/bootstrap-envoy.yaml"
+            - "--service-node"
+            - "catalyst-gateway"
+            - "--service-cluster"
+            - "catalyst-gateway"
+          ports:
+            - name: http
+              containerPort: {{ .Values.gateway.envoy.service.targetPort }}
+              protocol: TCP
+          volumeMounts:
+            - name: envoy-config
+              mountPath: /etc/envoy
+              readOnly: true
+      volumes:
+        - name: envoy-config
+          configMap:
+            name: envoy-config
+      nodeSelector:
+        {{- toYaml .Values.gateway.envoy.nodeSelector | nindent 8 }}
+      affinity:
+        {{- toYaml .Values.gateway.envoy.affinity | nindent 8 }}
+      tolerations:
+        {{- toYaml .Values.gateway.envoy.tolerations | nindent 8 }}
+---
+{{- $controlplaneImage := printf "%s/%s:%s" .Values.gateway.controlplane.image.registry .Values.gateway.controlplane.image.name .Values.gateway.controlplane.image.tag }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catalyst-gateway-controlplane
+  annotations:
+    {{- with .Values.gateway.controlplane.podAnnotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  labels:
+    {{- include "merge.maps" (dict "base" (fromYaml (include "gateway.controlplane.labels" .)) "overrides" .Values.gateway.controlplane.merge.labels) | nindent 4 }}
+spec:
+  replicas: {{ .Values.gateway.controlplane.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "gateway.controlplane.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "merge.maps" (dict "base" (include "gateway.controlplane.selectorLabels" . | fromYaml) "overrides" .Values.gateway.controlplane.merge.selectorLabels) | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "gateway.controlplane.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.gateway.controlplane.podSecurityContext | nindent 8 }}
+      {{- with .Values.global.image.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: catalyst-gateway-controlplane
+          securityContext:
+            {{- toYaml .Values.gateway.controlplane.securityContext | nindent 12 }}
+          image: "{{ $controlplaneImage }}"
+          ports:
+            - name: http
+              containerPort: {{ .Values.gateway.controlplane.service.targetPort }}
+              protocol: TCP
+      nodeSelector:
+        {{- toYaml .Values.gateway.controlplane.nodeSelector | nindent 8 }}
+      affinity:
+        {{- toYaml .Values.gateway.controlplane.affinity | nindent 8 }}
+      tolerations:
+        {{- toYaml .Values.gateway.controlplane.tolerations | nindent 8 }}
