@@ -212,107 +212,107 @@ agent:
 #------------------------------------------------------------------------------
 
 gateway:
-    namespace: gateway
-    envoy:
-      replicaCount: 1
-      image:
-        tag: distroless-v1.33.0
-        name: envoyproxy/envoy
-        registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy"
-      admin:
-        enabled: false
-        address: "127.0.0.1"
-        port: 9090
-      serviceAccount:
-        name: gateway-envoy
-        annotations: {}
-      configmap:
-        name: envoy-config
-      service:
-        name: gateway-envoy
-        appLabel: envoy
-        port: 8080
-        targetPort: 8080
-        type: ClusterIP
-      xds:
-        connect_timeout: 10s
-        health_check:
-          timeout: 5s
-          interval: 15s
-          unhealthy_threshold: 2
-          healthy_threshold: 1
-          path: /healthz
-          port: 57205
-        connection_keepalive:
-          interval: 30s
-          timeout: 10s
-        hostname: gateway-controlplane
+  namespace: gateway
+  envoy:
+    replicaCount: 1
+    image:
+      tag: distroless-v1.33.0
+      name: envoyproxy/envoy
+      registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy"
+    admin:
+      enabled: false
+      address: "127.0.0.1"
+      port: 9090
+    serviceAccount:
+      name: gateway-envoy
+      annotations: {}
+    configmap:
+      name: envoy-config
+    service:
+      name: gateway-envoy
+      appLabel: envoy
+      port: 8080
+      targetPort: 8080
+      type: ClusterIP
+    xds:
+      connect_timeout: 10s
+      health_check:
+        timeout: 5s
+        interval: 15s
+        unhealthy_threshold: 2
+        healthy_threshold: 1
+        path: /healthz
+        port: 57205
+      connection_keepalive:
+        interval: 30s
+        timeout: 10s
+      hostname: gateway-controlplane
+      port: 57206
+    podAnnotations: {}
+    labels:
+      app: gateway-envoy
+    selectorLabels:
+      app: gateway-envoy
+    merge:
+      labels: {}
+      selectorLabels: {}
+    podSecurityContext:
+      runAsNonRoot: true
+      fsGroup: 2000
+    securityContext:
+      capabilities:
+        drop:
+          - ALL
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
+    nodeSelector: {}
+    affinity: {}
+    tolerations: []
+  controlplane:
+    replicaCount: 1
+    image:
+      tag: edge
+      name: catalyst-gateway
+      registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public"
+    serviceAccount:
+      name: gateway-controlplane
+      annotations: {}
+    deployment:
+      httpHealthCheck:
+        containerPort: 57205
+      httpXDS:
+        containerPort: 57206
+    service:
+      name: gateway-controlplane
+      appLabel: gateway-controlplane
+      httpHealthCheck:
+        port: 57205
+        targetPort: 57205
+      httpXDS:
         port: 57206
-      podAnnotations: {}
-      labels:
-        app: gateway-envoy
-      selectorLabels:
-        app: gateway-envoy
-      merge:
-        labels: {}
-        selectorLabels: {}
-      podSecurityContext:
-        runAsNonRoot: true
-        fsGroup: 2000
-      securityContext:
-        capabilities:
-          drop:
-            - ALL
-        readOnlyRootFilesystem: true
-        allowPrivilegeEscalation: false
-      nodeSelector: {}
-      affinity: {}
-      tolerations: []
-    controlplane:
-      replicaCount: 1
-      image:
-        tag: edge
-        name: catalyst-gateway
-        registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public"
-      serviceAccount:
-        name: gateway-controlplane
-        annotations: {}
-      deployment:
-        httpHealthCheck:
-          containerPort: 57205
-        httpXDS:
-          containerPort: 57206
-      service:
-        name: gateway-controlplane
-        appLabel: gateway-controlplane
-        httpHealthCheck:
-          port: 57205
-          targetPort: 57205
-        httpXDS:
-          port: 57206
-          targetPort: 57206
-        type: ClusterIP
-        clusterIP: None
-      podAnnotations: {}
-      labels:
-        app: gateway-controlplane
-      selectorLabels:
-        app: gateway-controlplane
-      merge:
-        labels: {}
-        selectorLabels: {}
-      podSecurityContext:
-        runAsNonRoot: true
-        fsGroup: 2000
-      securityContext:
-        capabilities:
-          drop:
-            - ALL
-        readOnlyRootFilesystem: true
-        allowPrivilegeEscalation: false
-      nodeSelector: {}
-      affinity: {}
-      tolerations: []
+        targetPort: 57206
+      type: ClusterIP
+      clusterIP: None
+    podAnnotations: {}
+    labels:
+      app: gateway-controlplane
+    selectorLabels:
+      app: gateway-controlplane
+    merge:
+      labels: {}
+      selectorLabels: {}
+    podSecurityContext:
+      runAsNonRoot: true
+      fsGroup: 2000
+    securityContext:
+      capabilities:
+        drop:
+          - ALL
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
+    nodeSelector: {}
+    affinity: {}
+    tolerations: []
 
 #------------------------------------------------------------------------------
 # Management Service Configurations
