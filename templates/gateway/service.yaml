@@ -32,8 +32,13 @@ spec:
   selector:
     {{- include "gateway.controlplane.selectorLabels" . | nindent 6 }}
   ports:
-    - name: http
-      port: {{ .Values.gateway.controlplane.service.port }}
-      targetPort: {{ .Values.gateway.controlplane.service.targetPort }}
+    - name: httphealthcheck
+      port: {{ .Values.gateway.controlplane.service.httpHealthCheck.port }}
+      targetPort: {{ .Values.gateway.controlplane.service.httpHealthCheck.targetPort }}
+      protocol: TCP
+    - name: http-xds
+      port: {{ .Values.gateway.controlplane.service.httpXDS.port }}
+      targetPort: {{ .Values.gateway.controlplane.service.httpXDS.targetPort }}
       protocol: TCP
   type: {{ .Values.gateway.controlplane.service.type }}
+  clusterIP: {{ .Values.gateway.controlplane.service.clusterIP }}

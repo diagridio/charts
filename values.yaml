@@ -243,6 +243,13 @@ gateway:
         type: ClusterIP
       xds:
         connect_timeout: 10s
+        health_check:
+          timeout: 5s
+          interval: 15s
+          unhealthy_threshold: 2
+          healthy_threshold: 1
+          path: /healthz
+          port: 57205
         connection_keepalive:
           interval: 30s
           timeout: 10s
@@ -277,12 +284,22 @@ gateway:
       serviceAccount:
         name: gateway-controlplane
         annotations: {}
+      deployment:
+        httpHealthCheck:
+          containerPort: 57205
+        httpXDS:
+          containerPort: 57206
       service:
         name: gateway-controlplane
         appLabel: gateway-controlplane
-        port: 57206
-        targetPort: 57206
+        httpHealthCheck:
+          port: 57205
+          targetPort: 57205
+        httpXDS:
+          port: 57206
+          targetPort: 57206
         type: ClusterIP
+        clusterIP: none
       podAnnotations: {}
       labels:
         app: gateway-controlplane

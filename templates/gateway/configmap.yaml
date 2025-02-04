@@ -30,7 +30,7 @@ data:
       clusters:
         - name: controlplane
           connect_timeout: {{ .Values.gateway.envoy.xds.connect_timeout }}
-          type: LOGICAL_DNS
+          type: STRICT_DNS
           lb_policy: ROUND_ROBIN
           typed_extension_protocol_options:
             envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
@@ -40,11 +40,20 @@ data:
                   connection_keepalive:
                     interval: {{ .Values.gateway.envoy.xds.connection_keepalive.interval }}
                     timeout: {{ .Values.gateway.envoy.xds.connection_keepalive.timeout }}
+          health_checks:
+            - timeout: {{ .Values.gateway.envoy.xds.health_check.timeout }}
+              interval: {{ .Values.gateway.envoy.xds.health_check.interval }}
+              unhealthy_threshold: {{ .Values.gateway.envoy.xds.health_check.unhealthy_threshold }}
+              healthy_threshold: {{ .Values.gateway.envoy.xds.health_check.healthy_threshold }}
+              http_health_check:
+                path: {{ .Values.gateway.envoy.xds.health_check.path }}
           load_assignment:
             cluster_name: controlplane
             endpoints:
               - lb_endpoints:
                   - endpoint:
+                      health_check_config:
+                        port_value: {{ .Values.gateway.envoy.xds.health_check.port }}
                       address:
                         socket_address:
                           address: {{ .Values.gateway.envoy.xds.hostname }}
