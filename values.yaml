@@ -129,15 +129,14 @@ agent:
       burst: 10
     denylist:
       enabled: false
-
-  sentry:
-    enabled: true
-    endpoint: dapr-sentry.root-dapr-system.svc.cluster.local:443
-    remote_endpoint: sentry.local.diagrid.io:443
-    diagrid_trust_anchors_endpoint: https://trust-pem.local.diagrid.io
-    diagrid_trust_anchors_endpoint_insecure: true
-    trustDomain: prj-root.cra.diagrid.io
-    namespace: root-dapr-system
+    sentry:
+      enabled: true
+      endpoint: dapr-sentry.root-dapr-system.svc.cluster.local:443
+      remote_endpoint: sentry.local.diagrid.io:443
+      diagrid_trust_anchors_endpoint: https://trust-pem.local.diagrid.io
+      diagrid_trust_anchors_endpoint_insecure: true
+      trust_domain: prj-root.cra.diagrid.io
+      namespace: root-dapr-system
 
   # secrets config for integrating with a secret provider
   secrets:
@@ -312,30 +311,27 @@ management:
 
   config:
     grpc_server:
-      enabled: true
-      port: 9090
-      request_timeout: 30s
-      tls:
-        enabled: false
-        cacert: "ca.crt"
-        issuercert: "tls.crt"
-        issuerkey: "tls.key"
-        mutual: false
-        existingSecretName: ""
-    host:
-      id: ""
-      region_id: ""
-      region_metadata:
-        cloud_provider: ""
-        cloud_provider_region: ""
-        display_name: ""
+      enabled: false
     profiling:
       enabled: false
+    nats:
+      endpoint: tls://client.events.local.diagrid.io:443
+      trust_domain: cra.diagrid.io
+    featureflags:
+      nats_enabled: true
+    sentry:
+      enabled: true
+      endpoint: dapr-sentry.root-dapr-system.svc.cluster.local:443
+      remote_endpoint: sentry.local.diagrid.io:443
+      diagrid_trust_anchors_endpoint: https://trust-pem.local.diagrid.io
+      diagrid_trust_anchors_endpoint_insecure: true
+      trust_domain: prj-root.cra.diagrid.io
+      namespace: root-dapr-system
+      trust_anchors_file: "/var/run/secrets/diagrid.io/trust/ca.crt"
 
   # secrets config for integrating with a secret provider
   secrets:
-    # NOTE dont run inmemory provider with replicaCount=2
-    provider: inmemory
+    provider: kubernetes
     redis:
       host: ""
       username: ""
@@ -343,7 +339,6 @@ management:
     aws:
       region: ""
 
-  # NOTE dont run inmemory provider with replicaCount=2
   replicaCount: 1
 
   image:
@@ -404,9 +399,6 @@ management:
   #  override: 600MiB  # it will set GOMEMLIMIT to this value. Supported suffixes, if not using a straight bytes number, are B, KiB, MiB, GiB, and TiB.
 
   extraEnvs: []
-
-  sentry:
-    enabled: false
 
   merge: {}
   patch: {}

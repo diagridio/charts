@@ -45,11 +45,6 @@ spec:
           args:
           - "--log-level={{ .Values.agent.logLevel }}"
           - "--tls.enabled=false"
-          - "--sentry.enabled=true"
-          - "--sentry.endpoint={{ required ".Values.agent.sentry.endpoint entry required" .Values.agent.sentry.endpoint }}"
-          - "--sentry.remote_endpoint={{ required ".Values.agent.sentry.remote_endpoint entry required" .Values.agent.sentry.remote_endpoint }}"
-          - "--sentry.trust_domain={{ required ".Values.agent.sentry.trustDomain entry required" .Values.agent.sentry.trustDomain }}"
-          - "--sentry.namespace={{ .Values.agent.sentry.namespace | default "root-dapr-system" }}"
           {{- if eq .Values.agent.secrets.provider "redis" }}
           - "--secretsprovider=redis"
           - "--secrets_redis.host={{ required ".Values.agent.secrets.redis.host entry required when .Values.agent.secrets.provider is set to redis" .Values.agent.secrets.redis.host }}"
