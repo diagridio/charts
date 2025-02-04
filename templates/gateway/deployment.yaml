@@ -105,7 +105,7 @@ spec:
             {{- toYaml .Values.gateway.controlplane.securityContext | nindent 12 }}
           image: "{{ $controlplaneImage }}"
           ports:
-            - name: http-healthcheck
+            - name: httphealthcheck
               containerPort: {{ .Values.gateway.controlplane.deployment.httpHealthCheck.containerPort }}
               protocol: TCP
             - name: http-xds
