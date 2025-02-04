@@ -90,12 +90,26 @@ spec:
       {{- end }}
       containers:
         - name: catalyst-gateway-controlplane
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: LEADER_ELECTION_ENABLED
+              value: "true"
           securityContext:
             {{- toYaml .Values.gateway.controlplane.securityContext | nindent 12 }}
           image: "{{ $controlplaneImage }}"
           ports:
-            - name: http
-              containerPort: {{ .Values.gateway.controlplane.service.targetPort }}
+            - name: http-healthcheck
+              containerPort: {{ .Values.gateway.controlplane.deployment.httpHealthCheck.containerPort }}
+              protocol: TCP
+            - name: http-xds
+              containerPort: {{ .Values.gateway.controlplane.deployment.httpXDS.containerPort }}
               protocol: TCP
       nodeSelector:
         {{- toYaml .Values.gateway.controlplane.nodeSelector | nindent 8 }}
