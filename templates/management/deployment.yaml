@@ -22,10 +22,8 @@ spec:
         {{- with .Values.management.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
-        {{- if .Values.management.sentry.enabled }}
         dapr.io/app-id: management
         dapr.io/config: management
-        {{- end }}
       labels:
         {{- include "merge.maps" (dict "base" (include "management.selectorLabels" . | fromYaml) "overrides" .Values.management.merge.selectorLabels) | nindent 8 }}
     spec:
@@ -46,13 +44,6 @@ spec:
           command: ["./management"]
           args:
           - "--log-level={{ .Values.management.logLevel }}"
-          {{- if .Values.management.config.grpc_server.tls.enabled }}
-          - "--grpc_server.tls.enabled={{ .Values.management.config.grpc_server.tls.enabled }}"
-          - "--grpc_server.tls.mutual={{ .Values.management.config.grpc_server.tls.mutual }}"
-          - "--grpc_server.tls.cacert=/grpc-tls-certs/{{ required ".Values.management.config.grpc_server.tls.cacert is required" .Values.management.config.grpc_server.tls.cacert }}"
-          - "--grpc_server.tls.issuercert=/grpc-tls-certs/{{ required ".Values.management.config.grpc_server.tls.issuercert is required" .Values.management.config.grpc_server.tls.issuercert }}"
-          - "--grpc_server.tls.issuerkey=/grpc-tls-certs/{{ required ".Values.management.config.grpc_server.tls.issuerkey is required" .Values.management.config.grpc_server.tls.issuerkey }}"
-          {{- end }}
           {{- if eq .Values.management.secrets.provider "redis" }}
           - "--secretsprovider=redis"
           - "--secrets_redis.host={{ required ".Values.management.secrets.redis.host entry required when .Values.management.secrets.provider is set to redis" .Values.management.secrets.redis.host }}"
@@ -63,15 +54,8 @@ spec:
           - "--secretsprovider=aws.secretmanager"
           - "--secrets_aws_secretmanager.region={{ required ".Values.management.secrets.aws.region entry required when .Values.management.secrets.provider is set to aws" .Values.management.secrets.aws.region }}"
           {{- end }}
-          {{- if .Values.management.sentry.enabled }}
-          - "--sentry.enabled=true"
-          - "--sentry.endpoint={{ required ".Values.management.sentry.endpoint entry required" .Values.management.sentry.endpoint }}"
-          - "--sentry.trust_domain={{ required ".Values.management.sentry.trustDomain entry required" .Values.management.sentry.trustDomain }}"
-          - "--sentry.trust_anchors_file=/var/run/secrets/diagrid.io/trust/ca.crt"
-          - "--sentry.namespace={{ .Values.management.sentry.namespace | default "dapr-system" }}"
-          {{- end }}
-          {{- if not .Values.management.sentry.enabled }}
-          - "--sentry.enabled=false"
+          {{- if eq .Values.management.secrets.provider "kubernetes" }}
+          - "--secretsprovider=kubernetes"
           {{- end }}
           env:
           - name: CONFIG_FILE_DIR
@@ -89,9 +73,6 @@ spec:
           {{- end }}
           {{- include "inject.patch" (dict "patch" .Values.management.patch.env "indent" 10) }}
           ports:
-          - name: grpc
-            containerPort: {{ .Values.management.config.grpc_server.port }}
-            protocol: TCP
           {{- include "inject.patch" (dict "patch" .Values.management.patch.ports "indent" 10) }}
           resources:
             {{- if .Values.management.merge.resources }}
@@ -102,26 +83,18 @@ spec:
           volumeMounts:
           - name: management-config
             mountPath: /etc/management
-          {{- if .Values.management.sentry.enabled }}
           - name: sentry-identity-token
             mountPath: /var/run/secrets/dapr.io/sentrytoken
             readOnly: true
           - name: trust-bundle
             mountPath: /var/run/secrets/diagrid.io/trust
             readOnly: true
-          {{- end }}
-          {{- if .Values.management.config.grpc_server.tls.enabled }}
-          - name: grpc-tls-certs
-            mountPath: /grpc-tls-certs
-            readOnly: true
-          {{- end }}
           {{- include "inject.patch" (dict "patch" .Values.management.patch.volumeMounts "indent" 10) }}
         {{- include "inject.patch" (dict "patch" .Values.management.patch.containers "indent" 6) }}
       volumes:
       - name: management-config
         configMap:
           name: {{ include "management.name" . }}-config
-      {{- if .Values.management.sentry.enabled }}
       - name: trust-bundle
         configMap:
           name: ca-certificates-bundle
@@ -133,12 +106,6 @@ spec:
               audience: dapr.io/sentry
               expirationSeconds: 7200
               path: token
-      {{- end }}
-      {{- if .Values.management.config.grpc_server.tls.enabled }}
-      - name: grpc-tls-certs
-        secret:
-          secretName: {{ required ".Values.management.config.grpc_server.tls.existingSecretName is required" .Values.management.config.grpc_server.tls.existingSecretName }}
-      {{- end }}
       {{- include "inject.patch" (dict "patch" .Values.management.patch.volumes "indent" 6) }}
       nodeSelector:
         {{- include "merge.maps" (dict "base" .Values.management.nodeSelector "overrides" .Values.management.merge.nodeSelector) | nindent 8 }}
