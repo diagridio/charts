@@ -32,7 +32,7 @@ spec:
   selector:
     {{- include "gateway.controlplane.selectorLabels" . | nindent 6 }}
   ports:
-    - name: httphealthcheck
+    - name: http-healthz
       port: {{ .Values.gateway.controlplane.service.httpHealthCheck.port }}
       targetPort: {{ .Values.gateway.controlplane.service.httpHealthCheck.targetPort }}
       protocol: TCP

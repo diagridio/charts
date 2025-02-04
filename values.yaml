@@ -293,7 +293,7 @@ gateway:
           port: 57206
           targetPort: 57206
         type: ClusterIP
-        clusterIP: none
+        clusterIP: None
       podAnnotations: {}
       labels:
         app: gateway-controlplane
