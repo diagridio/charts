@@ -140,12 +140,7 @@ agent:
 
   # secrets config for integrating with a secret provider
   secrets:
-    provider: inmemory
-    redis:
-      host: ""
-      password: ""
-    aws:
-      region: ""
+    provider: kubernetes
 
   metrics:
     port: 9090

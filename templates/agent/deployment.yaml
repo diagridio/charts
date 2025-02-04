@@ -54,6 +54,9 @@ spec:
           - "--secretsprovider=aws.secretmanager"
           - "--secrets_aws_secretmanager.region={{ required ".Values.agent.secrets.aws.region entry required when .Values.agent.secrets.provider is set to aws" .Values.agent.secrets.aws.region }}"
           {{- end }}
+          {{- if eq .Values.agent.secrets.provider "kubernetes" }}
+          - "--secretsprovider=kubernetes"
+          {{- end }}
           env:
           - name: NAMESPACE
             valueFrom:
