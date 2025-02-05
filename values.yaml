@@ -68,6 +68,7 @@ agent:
       redis_kafka_cache:
         enabled: false
     sidecar:
+      image_registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public"
       image_tag: 'edge'
     api_token_error:
       enabled: false
