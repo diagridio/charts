@@ -1,4 +1,5 @@
 {{- $envoyImage := printf "%s/%s:%s" .Values.gateway.envoy.image.registry .Values.gateway.envoy.image.name .Values.gateway.envoy.image.tag }}
+{{- $identityInjectorImage := printf "%s/%s:%s" .Values.gateway.identityInjector.image.registry .Values.gateway.identityInjector.image.name .Values.gateway.identityInjector.image.tag }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -30,6 +31,44 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       containers:
+      {{- if .Values.gateway.controlplane.xds.mtls.enabled }}
+        - command:
+            - ./identity-injector
+          env:
+            - name: IDENTITY_TRUST_DOMAIN
+              value: prj-root.cra.diagrid.io
+            - name: IDENTITY_APPID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: IDENTITY_ROOT_DIR
+              value: /var/run/secrets/diagrid.io
+            - name: IDENTITY_CA_CERT
+              value: /var/run/secrets/diagrid.io/trust/ca.crt
+            - name: IDENTITY_TLS_DIR
+              value: /var/run/secrets/diagrid.io/tls
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
+          image: {{ $identityInjectorImage }}
+          imagePullPolicy: IfNotPresent
+          name: identity-injector
+          resources: { }
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /var/run/secrets/diagrid.io
+              name: tls-certs
+            - mountPath: /var/run/secrets/diagrid.io/trust/ca.crt
+              name: trust-bundle
+              readOnly: true
+              subPath: ca.crt
+            - mountPath: /var/run/secrets/dapr.io/sentrytoken
+              name: dapr-identity-token
+              readOnly: true
+      {{- end }}
         - name: envoy
           securityContext:
             {{- toYaml .Values.gateway.envoy.securityContext | nindent 12 }}
@@ -49,10 +88,37 @@ spec:
             - name: envoy-config
               mountPath: /etc/envoy
               readOnly: true
+            {{- if .Values.gateway.controlplane.xds.mtls.enabled }}
+            - mountPath: /var/run/secrets/diagrid.io
+              name: tls-certs
+            - mountPath: /var/run/secrets/diagrid.io/trust/ca.crt
+              name: trust-bundle
+              readOnly: true
+              subPath: ca.crt
+            - mountPath: /var/run/secrets/dapr.io/sentrytoken
+              name: dapr-identity-token
+              readOnly: true
+            {{- end }}
       volumes:
         - name: envoy-config
           configMap:
             name: envoy-config
+        {{- if .Values.gateway.controlplane.xds.mtls.enabled }}
+        - configMap:
+            defaultMode: 420
+            name: ca-certificates-bundle
+          name: trust-bundle
+        - name: tls-certs
+          emptyDir: {}
+        - name: dapr-identity-token
+          projected:
+            defaultMode: 420
+            sources:
+              - serviceAccountToken:
+                  audience: dapr.io/sentry
+                  expirationSeconds: 7200
+                  path: token
+        {{- end }}
       nodeSelector:
         {{- toYaml .Values.gateway.envoy.nodeSelector | nindent 8 }}
       affinity:
@@ -89,6 +155,44 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       containers:
+      {{- if .Values.gateway.controlplane.xds.mtls.enabled }}
+        - command:
+          - ./identity-injector
+          env:
+            - name: IDENTITY_TRUST_DOMAIN
+              value: prj-root.cra.diagrid.io
+            - name: IDENTITY_APPID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: IDENTITY_ROOT_DIR
+              value: /var/run/secrets/diagrid.io
+            - name: IDENTITY_CA_CERT
+              value: /var/run/secrets/diagrid.io/trust/ca.crt
+            - name: IDENTITY_TLS_DIR
+              value: /var/run/secrets/diagrid.io/tls
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
+          image: {{ $identityInjectorImage }}
+          imagePullPolicy: IfNotPresent
+          name: identity-injector
+          resources: { }
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /var/run/secrets/diagrid.io
+              name: tls-certs
+            - mountPath: /var/run/secrets/diagrid.io/trust/ca.crt
+              name: trust-bundle
+              readOnly: true
+              subPath: ca.crt
+            - mountPath: /var/run/secrets/dapr.io/sentrytoken
+              name: dapr-identity-token
+              readOnly: true
+      {{- end }}
         - name: catalyst-gateway-controlplane
           env:
             - name: NAMESPACE
@@ -101,6 +205,14 @@ spec:
                   fieldPath: metadata.name
             - name: LEADER_ELECTION_ENABLED
               value: "true"
+          {{- if .Values.gateway.controlplane.xds.mtls.enabled }}
+            - name: XDS_SERVER_TLS_CERT
+              value: "/var/run/secrets/diagrid.io/tls/tls.crt"
+            - name: XDS_SERVER_TLS_KEY
+              value: "/var/run/secrets/diagrid.io/tls/tls.key"
+            - name: XDS_SERVER_CA_CERT
+              value: "/var/run/secrets/diagrid.io/trust/ca.crt"
+          {{- end }}
           securityContext:
             {{- toYaml .Values.gateway.controlplane.securityContext | nindent 12 }}
           image: "{{ $controlplaneImage }}"
@@ -111,6 +223,31 @@ spec:
             - name: http-xds
               containerPort: {{ .Values.gateway.controlplane.deployment.httpXDS.containerPort }}
               protocol: TCP
+          volumeMounts:
+          {{- if .Values.gateway.controlplane.xds.mtls.enabled }}
+            - mountPath: /var/run/secrets/diagrid.io
+              name: tls-certs
+            - mountPath: /var/run/secrets/diagrid.io/trust/ca.crt
+              name: trust-bundle
+              subPath: ca.crt
+          {{- end }}
+      volumes:
+      {{- if .Values.gateway.controlplane.xds.mtls.enabled }}
+        - configMap:
+            defaultMode: 420
+            name: ca-certificates-bundle
+          name: trust-bundle
+        - emptyDir: {}
+          name: tls-certs
+        - name: dapr-identity-token
+          projected:
+            defaultMode: 420
+            sources:
+              - serviceAccountToken:
+                  audience: dapr.io/sentry
+                  expirationSeconds: 7200
+                  path: token
+      {{- end }}
       nodeSelector:
         {{- toYaml .Values.gateway.controlplane.nodeSelector | nindent 8 }}
       affinity:
