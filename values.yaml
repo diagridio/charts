@@ -136,7 +136,7 @@ agent:
       endpoint: tls://client.events.local.diagrid.io:443
       trust_domain: cra.diagrid.io
     featureflags:
-      nats_enabled: true
+      nats_enabled: false # TODO enable nats here will enable it in sidecars, troubleshoot it and enable it @lrascao
       agent_component_validation: false
 
   # secrets config for integrating with a secret provider
