@@ -1,0 +1,54 @@
+runners:
+  cheap:
+    ram: [2, 4, 8]
+    cpu: [2, 4]
+    family: ["t3", "t4", "m5n", "m5a", "m5zn"]
+    ssh: false
+    extras: s3-cache
+  regular:
+    cpu: 2
+    family: ["m6in", "m6i", "m6a", "m6ad", "m5n", "m5a", "m5ad", "m5zn", "m7i-flex", "m7a", "m7i", "c6in", "c6i", "c6a"]
+    ssh: false
+    extras: s3-cache
+  large:
+    cpu: 4
+    disk: large
+    family: ["m6in", "m6i", "m6a", "m6ad", "m7i-flex", "m7a", "m7i", "c6in", "c6i", "c6a"]
+    ssh: false
+    extras: s3-cache
+  xlarge:
+    cpu: 8
+    disk: large
+    family: ["c6in", "c6i", "c6a", "m7i-flex", "m7a", "m7i", "c7i", "c7a"]
+    ssh: false
+    extras: s3-cache
+  
+  # Static IP (using nat gateway) required to access kube API servers in GCP and AWS
+  cheap-static:
+    # Useful for workflows that do not require a lot of CPU / RAM.
+    ram: [2, 4, 8]
+    cpu: [2, 4]
+    family: ["t3", "t4", "m5n", "m5a", "m5zn"]
+    ssh: false
+    private: true
+    extras: s3-cache
+  regular-static:
+    cpu: 2
+    family: ["m6in", "m6i", "m6a", "m6ad", "m5n", "m5a", "m5ad", "m5zn", "m7i-flex", "m7a", "m7i", "c6in", "c6i", "c6a"]
+    ssh: false
+    private: true
+    extras: s3-cache
+  large-static:
+    cpu: 4
+    disk: large
+    family: ["m6in", "m6i", "m6a", "m6ad", "m7i-flex", "m7a", "m7i", "c6in", "c6i", "c6a"]
+    ssh: false
+    private: true
+    extras: s3-cache
+  xlarge-static:
+    cpu: 8
+    disk: large
+    family: ["c6in", "c6i", "c6a", "m7i-flex", "m7a", "m7i", "c7i", "c7a"]
+    ssh: false
+    private: true
+    extras: s3-cache
