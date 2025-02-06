@@ -101,7 +101,6 @@ agent:
       container_registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/daprio"
     internal_dapr:
       container_registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public"
-      image_tag: "1.15.0-rc.10-catalyst.2-linux-arm64"
       sentry_resources:
         limits:
           memory: 100Mi
@@ -215,6 +214,11 @@ agent:
 
 gateway:
   namespace: gateway
+  identityInjector:
+    image:
+      tag: edge
+      name: "identity-injector"
+      registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker"
   envoy:
     replicaCount: 1
     image:
@@ -272,6 +276,9 @@ gateway:
     tolerations: []
   controlplane:
     replicaCount: 1
+    xds:
+      mtls:
+        enabled: true
     image:
       tag: edge
       name: catalyst-gateway
