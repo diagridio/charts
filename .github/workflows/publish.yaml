@@ -46,7 +46,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        environment: [dev, prd]
+        environment: [dev] # TODO: add prd back?
         exclude:
           - environment: ${{ ( inputs.publish-edge-only == 'true' || inputs.update-chart-version == 'true' ) && 'prd' }} # exclude prd when publish-edge-only or update-chart-version is true
     env:
