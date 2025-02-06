@@ -59,11 +59,12 @@ jobs:
         run: make helm-dependency-update
 
       - name: Helm Lint
-        run: |
-          make helm-lint
+        run: make helm-lint
 
       - name: Helm Template
-        run: make helm-template
+        run: |
+          make helm-build
+          make helm-template
 
       # set to dry-run temporarily
       - name: Helm Upgrade or Install with Retries
