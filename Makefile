@@ -8,6 +8,10 @@ REGISTRY ?= $(GCP_CONTAINER_REGISTRY_HOST)
 helm-lint:
 	helm lint $(TARGET_PATH)
 
+.PHONY: helm-dependency-build
+helm-dependency-build:
+	helm dependency build
+
 .PHONY: helm-dependency-update
 helm-depedency-update:
 	helm dependency update ./
