@@ -1,4 +1,5 @@
 name: Lint & Validate Helm Charts
+description: Perform linting and validation on the public Diagrid chart.
 
 on:
   pull_request:
@@ -54,34 +55,17 @@ jobs:
               app.kubernetes.io/managed-by=Helm --overwrite
           done
 
+      - name: Build Helm Dependencies
+        run: make helm-dependency-update
 
       - name: Helm Lint
         run: |
-          helm lint ./
-
-      - name: Build Helm Dependencies
-        run: helm dependency update ./
+          make helm-lint
 
       - name: Helm Template
-        run: |
-          helm template my-release ./ \
-            --namespace test \
-            --debug \
-            --set global.image.imagePullSecrets[0].name=cra-pull-secret \
-            --set agent.config.host.join_token="fake_token" \
-            --set agent.config.host.control_plane_url="fake_url" \
-            --set agent.config.host.control_plane_http_url="fake_http_url" > rendered.yaml
+        run: make helm-template
 
       # set to dry-run temporarily
       - name: Helm Upgrade or Install with Retries
-        run: |
-          helm upgrade --install my-release ./ \
-            --namespace test \
-            --create-namespace \
-            --dry-run \
-            --skip-crds \
-            --debug \
-            --set global.image.imagePullSecrets[0].name=cra-pull-secret \
-            --set agent.config.host.join_token="fake_token" \
-            --set agent.config.host.control_plane_url="fake_url" \
-            --set agent.config.host.control_plane_http_url="fake_http_url"
+        run: make helm-upgrade
+          
