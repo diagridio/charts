@@ -276,6 +276,9 @@ gateway:
     tolerations: []
   controlplane:
     replicaCount: 1
+    xds:
+      mtls:
+        enabled: true
     image:
       tag: edge
       name: catalyst-gateway
