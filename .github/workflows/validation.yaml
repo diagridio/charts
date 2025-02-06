@@ -62,7 +62,7 @@ jobs:
         run: make helm-lint
 
       - name: Helm Template
-        run: |
+        run: |-
           make helm-build
           make helm-template
 
