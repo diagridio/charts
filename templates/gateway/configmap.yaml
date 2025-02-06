@@ -49,23 +49,6 @@ data:
                 path: {{ .Values.gateway.envoy.xds.health_check.path }}
           load_assignment:
             cluster_name: controlplane
-            {{- if .Values.gateway.controlplane.xds.mtls.enabled }}
-            transport_socket:
-              name: envoy.transport_sockets.tls
-              typed_config:
-                "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
-                common_tls_context:
-                  tls_params:
-                    tls_minimum_protocol_version:
-                  validation_context:
-                    trusted_ca:
-                      filename: /var/run/secrets/diagrid.io/trust/ca.crt
-                  tls_certificates:
-                    certificate_chain:
-                      filename: /var/run/secrets/diagrid.io/tls/tls.crt
-                    private_key:
-                      filename: /var/run/secrets/diagrid.io/tls/tls.key
-            {{- end }}
             endpoints:
               - lb_endpoints:
                   - endpoint:
@@ -75,3 +58,20 @@ data:
                         socket_address:
                           address: {{ .Values.gateway.envoy.xds.hostname }}
                           port_value: {{ .Values.gateway.envoy.xds.port }}
+          {{- if .Values.gateway.controlplane.xds.mtls.enabled }}
+          transport_socket:
+            name: envoy.transport_sockets.tls
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
+              common_tls_context:
+                tls_params:
+                  tls_minimum_protocol_version:
+                validation_context:
+                  trusted_ca:
+                    filename: /var/run/secrets/diagrid.io/trust/ca.crt
+                tls_certificates:
+                  certificate_chain:
+                    filename: /var/run/secrets/diagrid.io/tls/tls.crt
+                  private_key:
+                    filename: /var/run/secrets/diagrid.io/tls/tls.key
+          {{- end }}
