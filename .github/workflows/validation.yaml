@@ -63,7 +63,7 @@ jobs:
 
       - name: Helm Template
         run: |-
-          make helm-build
+          make helm-dependency-build
           make helm-template
 
       # set to dry-run temporarily
