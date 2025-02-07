@@ -74,4 +74,6 @@ data:
                     filename: /var/run/secrets/diagrid.io/tls/tls.crt
                   private_key:
                     filename: /var/run/secrets/diagrid.io/tls/tls.key
+                  watched_directory:
+                    path: /var/run/secrets/diagrid.io/tls
           {{- end }}
