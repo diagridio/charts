@@ -52,8 +52,8 @@ agent:
       join_token: ""
       ingress_ip_addr: ""
       egress_addresses: []
-    control_plane_url: cra.local.diagrid.io:443
-    control_plane_http_url: https://api.local.diagrid.io
+    control_plane_url: cra-cloudgrid.dev.d.diagrid.io:443
+    control_plane_http_url: https://api.dev.diagrid.io
     inspection:
       enabled: false
     placement:
@@ -76,13 +76,13 @@ agent:
       enabled: true
       image_repository: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/diagrid-otel-collector"
       image_tag: 'edge'
-      metrics_endpoint: https://metrics.local.diagrid.io:443/api/v1/push
+      metrics_endpoint: https://metrics.dev.diagrid.io:443/api/v1/push
       metrics_tls_insecure: true
       internal_cortex_enabled: false
       internal_cortex_endpoint: ""
       internal_cortex_org_id: common
       loki_enabled: false
-      loki_endpoint: https://logs.local.diagrid.io:443/loki/api/v1/push
+      loki_endpoint: https://logs.dev.diagrid.io:443/loki/api/v1/push
       loki_tls_insecure: true
       logs_resources:
         limits:
@@ -127,13 +127,13 @@ agent:
     sentry:
       enabled: true
       endpoint: dapr-sentry.root-dapr-system.svc.cluster.local:443
-      remote_endpoint: sentry.local.diagrid.io:443
-      diagrid_trust_anchors_endpoint: https://trust-pem.local.diagrid.io
-      diagrid_trust_anchors_endpoint_insecure: true
+      remote_endpoint: sentry.dev.d.diagrid.io:443
+      diagrid_trust_anchors_endpoint: https://trust-pem.dev.d.diagrid.io
+      # diagrid_trust_anchors_endpoint_insecure: true
       trust_domain: prj-root.cra.diagrid.io
       namespace: root-dapr-system
     nats:
-      endpoint: tls://client.events.local.diagrid.io:443
+      endpoint: tls://client.events.dev.d.diagrid.io:443
       trust_domain: cra.diagrid.io
     featureflags:
       nats_enabled: true
@@ -226,7 +226,7 @@ gateway:
       name: envoyproxy/envoy
       registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy"
     admin:
-      enabled: false
+      enabled: true
       address: "127.0.0.1"
       port: 9090
     serviceAccount:
@@ -335,15 +335,15 @@ management:
     profiling:
       enabled: false
     nats:
-      endpoint: tls://client.events.local.diagrid.io:443
+      endpoint: tls://client.events.dev.d.diagrid.io:443
       trust_domain: cra.diagrid.io
     featureflags:
       nats_enabled: true
     sentry:
       enabled: true
       endpoint: dapr-sentry.root-dapr-system.svc.cluster.local:443
-      remote_endpoint: sentry.local.diagrid.io:443
-      diagrid_trust_anchors_endpoint: https://trust-pem.local.diagrid.io
+      remote_endpoint: sentry.dev.d.diagrid.io:443
+      diagrid_trust_anchors_endpoint: https://trust-pem.dev.d.diagrid.io
       diagrid_trust_anchors_endpoint_insecure: true
       trust_domain: prj-root.cra.diagrid.io
       namespace: root-dapr-system
