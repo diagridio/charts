@@ -119,6 +119,7 @@ agent:
       core_dns_container_image: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/coredns/coredns:1.10.1"
       internal_registry_username: ""
       internal_registry_password: ""
+      internal_repo_url: oci://public.ecr.aws/diagrid
     kubernetes:
       qps: 25
       burst: 10
@@ -218,7 +219,7 @@ gateway:
     image:
       tag: edge
       name: "identity-injector"
-      registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker"
+      registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public"
   envoy:
     replicaCount: 1
     image:
