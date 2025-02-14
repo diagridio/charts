@@ -62,8 +62,8 @@ agent:
       dns_top_level_domain: ".private.diagrid.io"
       ingress_tls_secret_name: ""
       default_workflow: namespace
-      enable_scheduler_service: false
-      dapr_hot_reloading: false
+      enable_scheduler_service: true
+      dapr_hot_reloading: true
       sidecar_capture_init_errors: false
       redis_kafka_cache:
         enabled: false
