@@ -4,10 +4,14 @@ VERSION ?= "0.0.0-$(shell git rev-parse --short HEAD)"
 CHART_DIR ?= ./charts/catalyst
 
 .PHONY: helm-lint
-helm-lint: helm-dependency-build helm-depedency-update
+helm-lint: helm-add-repos helm-dependency-build helm-depedency-update
 	cd $(CHART_DIR) && \
 	helm lint $(TARGET_PATH) \
 	--set agent.config.host.join_token="fake_token"
+
+.PHONY: helm-add-repos
+helm-add-repos:
+	helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/ > /dev/null 2>&1 || true
 
 .PHONY: helm-dependency-build
 helm-dependency-build:
@@ -20,7 +24,7 @@ helm-depedency-update:
 	helm dependency update ./
 
 .PHONY: helm-template
-helm-template: helm-dependency-build helm-depedency-update
+helm-template: helm-add-repos helm-dependency-build helm-depedency-update
 	cd $(CHART_DIR) && \
 	helm template my-release ./ \
 		--namespace test \
