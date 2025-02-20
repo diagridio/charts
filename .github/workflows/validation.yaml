@@ -54,10 +54,6 @@ jobs:
               app.kubernetes.io/managed-by=Helm --overwrite
           done
 
-      - name: Build Helm Dependencies
-        working-directory: charts/catalyst
-        run: make helm-dependency-update
-
       - name: Helm Lint
         working-directory: charts/catalyst
         run: make helm-lint
@@ -65,7 +61,6 @@ jobs:
       - name: Helm Template
         working-directory: charts/catalyst
         run: |-
-          make helm-dependency-build
           make helm-template
 
       # set to dry-run temporarily

@@ -1,0 +1,4 @@
+Chart.lock
+charts/
+.idea/
+charts/catalyst/rendered.yaml

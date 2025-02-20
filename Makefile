@@ -3,21 +3,27 @@
 VERSION ?= $(if $(CHART_VERSION),$(CHART_VERSION),0.0.0-edge)
 REPO ?= $(GCP_PROJECT_ID)/$(GCP_DOCKER_REPOSITORY)
 REGISTRY ?= $(GCP_CONTAINER_REGISTRY_HOST)
+CHART_DIR ?= ./charts/catalyst
 
 .PHONY: helm-lint
-helm-lint:
-	helm lint $(TARGET_PATH)
+helm-lint: helm-dependency-build helm-depedency-update
+	cd $(CHART_DIR) && \
+	helm lint $(TARGET_PATH) \
+	--set agent.config.host.join_token="fake_token"
 
 .PHONY: helm-dependency-build
 helm-dependency-build:
+	cd $(CHART_DIR) && \
 	helm dependency build
 
 .PHONY: helm-dependency-update
 helm-depedency-update:
+	cd $(CHART_DIR) && \
 	helm dependency update ./
 
 .PHONY: helm-template
-helm-template:	
+helm-template: helm-dependency-build helm-depedency-update
+	cd $(CHART_DIR) && \
 	helm template my-release ./ \
 		--namespace test \
 		--debug \
@@ -28,10 +34,12 @@ helm-template:
 
 .PHONY: helm-package
 helm-package:
+	cd $(CHART_DIR) && \
 	helm package --version ${VERSION} --destination ./dist
 
 .PHONY: helm-upgrade
 helm-upgrade:
+	cd $(CHART_DIR) && \
 	helm upgrade --install my-release ./ \
 		--namespace test \
 		--create-namespace \
@@ -45,4 +53,5 @@ helm-upgrade:
 
 .PHONY: helm-push
 helm-push:
+	cd $(CHART_DIR) && \
 	helm push ./dist/diagrid-catalyst-$(VERSION).tgz oci://$(REGISTRY)/$(REPO)
