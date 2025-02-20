@@ -16,8 +16,7 @@ jobs:
   publish-helm-chart:
     runs-on: ubuntu-latest
     environment: shared-production
-    permissions:
-      contents: write-all # Needed to create GitHub releases and tags
+    permissions: write-all # Needed to create GitHub releases and tags
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
