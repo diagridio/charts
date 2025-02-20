@@ -48,8 +48,8 @@ jobs:
         env:
           BRANCH: ${{ github.event.pull_request.base.ref }}
         run: |
-          chmod +x scripts/package-helm-chart.sh
-          ./scripts/package-helm-chart.sh
+          chmod +x .github/scripts/package-helm-chart.sh
+          ./.github/scripts/package-helm-chart.sh
 
       - name: Create GitHub Release
         if: github.event.pull_request.base.ref != 'main' # Skip for main branch
