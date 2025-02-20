@@ -14,12 +14,12 @@ command -v git >/dev/null 2>&1 || { echo "Error: git is required but not install
 # Check required environment variables
 [ -z "$BRANCH" ] && { echo "Error: BRANCH environment variable is required."; exit 1; }
 [ -z "$CHART_NAME" ] && { echo "Error: CHART_NAME environment variable is required."; exit 1; }
-[ -z "$ECR_HOST" ] && { echo "Error: ECR_HOST environment variable is required."; exit 1; }
-[ -z "$ECR_ALIAS" ] && { echo "Error: ECR_ALIAS environment variable is required."; exit 1; }
+[ -z "$CHART_REGISTRY" ] && { echo "Error: CHART_REGISTRY environment variable is required."; exit 1; }
+[ -z "$CHART_ALIAS" ] && { echo "Error: CHART_ALIAS environment variable is required."; exit 1; }
 
 # Set up variables
 REPO_NAME="catalyst"
-ECR_URI="${ECR_HOST}/${ECR_ALIAS}/${REPO_NAME}"
+OCI_URI="oci://${CHART_REGISTRY}/${CHART_ALIAS}/${REPO_NAME}"
 
 # Temporary file for Chart.yaml diff
 TEMP_CHART_YAML=$(mktemp)
@@ -67,7 +67,7 @@ fi
 if [ "$DRY_RUN" = "true" ]; then
   echo "Dry run: Showing diff for Chart.yaml"
   diff "$CHART_DIR/Chart.yaml" "$TEMP_CHART_YAML" || true
-  echo "Dry run: Would package $CHART_NAME-$VERSION and push to $ECR_URI"
+  echo "Dry run: Would package $CHART_NAME-$VERSION and push to $OCI_URI"
   exit 0
 fi
 
@@ -77,10 +77,10 @@ mv "$TEMP_CHART_YAML" "$CHART_DIR/Chart.yaml"
 # Package the Helm chart
 helm package "$CHART_DIR" --destination ./packaged
 
-# Push the chart to ECR
+# Push the chart to OCI
 CHART_FILE="./packaged/${CHART_NAME}-${VERSION}.tgz"
-echo "Pushing $CHART_FILE to $ECR_URI"
-helm push "$CHART_FILE" "oci://${ECR_URI}"
+echo "Pushing $CHART_FILE to $OCI_URI"
+helm push "$CHART_FILE" "$OCI_URI"
 
 # If it's a release branch, set an output variable for the version
 if [ "$BRANCH" != "main" ]; then

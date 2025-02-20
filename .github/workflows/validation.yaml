@@ -5,6 +5,9 @@ on:
     branches:
       - main
 
+env:
+  CHART_DIR: charts/catalyst
+
 jobs:
   lint-and-validate:
     runs-on: ubuntu-latest
@@ -55,15 +58,12 @@ jobs:
           done
 
       - name: Helm Lint
-        working-directory: charts/catalyst
         run: make helm-lint
 
       - name: Helm Template
-        working-directory: charts/catalyst
         run: |-
           make helm-template
 
       # set to dry-run temporarily
       - name: Helm Upgrade or Install with Retries
-        working-directory: charts/catalyst
         run: make helm-upgrade

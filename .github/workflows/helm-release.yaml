@@ -8,6 +8,11 @@ on:
       - main
       - 'release-[0-9]+.[0-9]+'
 
+env:
+  CHART_DIR: charts/catalyst
+  CHART_REGISTRY: ${{ vars.AWS_PUBLIC_ECR_HOST }}
+  CHART_ALIAS: ${{ vars.AWS_PUBLIC_ECR_ALIAS }}
+
 jobs:
   publish-helm-chart:
     if: github.event.pull_request.merged == true # Only run on merged PRs
@@ -44,9 +49,6 @@ jobs:
       - name: Package and Push Helm Chart
         env:
           BRANCH: ${{ github.event.pull_request.base.ref }}
-          CHART_DIR: charts/catalyst
-          ECR_HOST: ${{ vars.AWS_PUBLIC_ECR_HOST }}
-          ECR_ALIAS: ${{ vars.AWS_PUBLIC_ECR_ALIAS }}
         run: |
           chmod +x scripts/package-helm-chart.sh
           ./scripts/package-helm-chart.sh

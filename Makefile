@@ -1,8 +1,6 @@
 -include .env
 
-VERSION ?= $(if $(CHART_VERSION),$(CHART_VERSION),0.0.0-edge)
-REPO ?= $(GCP_PROJECT_ID)/$(GCP_DOCKER_REPOSITORY)
-REGISTRY ?= $(GCP_CONTAINER_REGISTRY_HOST)
+VERSION ?= "0.0.0-$(shell git rev-parse --short HEAD)"
 CHART_DIR ?= ./charts/catalyst
 
 .PHONY: helm-lint
