@@ -1,4 +1,5 @@
-### Catalyst BYOC Helm Chart 
+### Diagrid Helm Charts
+This repo contains the public Helm charts published by Diagrid.
 
-This repository contains the public Helm chart for Catalyst BYOC (Bring Your Own Cloud).
-Although it will be public eventually, we’re currently keeping it private while it's under development and construction.
+## Catalyst
+The Catalyst Helm Chart is available under `charts/catalyst`.

@@ -1,5 +1,6 @@
 apiVersion: v2
 name: catalyst
+icon: https://storage.googleapis.com/bkt-n-assets-common-us-central1/Diagrid_Logos/Diagrid.png
 description: Helm chart for Catalyst
 type: application
 version: '0.0.1'
