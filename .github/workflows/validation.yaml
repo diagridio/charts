@@ -1,14 +1,13 @@
-name: Lint & Validate Helm Charts
-description: Perform linting and validation on the public Diagrid chart.
+name: Catalyst Helm Chart CI
 
 on:
   pull_request:
     branches:
-      - main  
+      - main
 
 jobs:
   lint-and-validate:
-    runs-on: [runs-on,runner=cheap,"run-id=${{ github.run_id }}"]
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
@@ -55,18 +54,37 @@ jobs:
               app.kubernetes.io/managed-by=Helm --overwrite
           done
 
-      - name: Build Helm Dependencies
-        run: make helm-dependency-update
-
       - name: Helm Lint
-        run: make helm-lint
+        working-directory: charts/catalyst
+        run: |
+          helm lint ./
+
+      - name: Build Helm Dependencies
+        working-directory: charts/catalyst
+        run: helm dependency update ./
 
       - name: Helm Template
-        run: |-
-          make helm-dependency-build
-          make helm-template
+        working-directory: charts/catalyst
+        run: |
+          helm template my-release ./ \
+            --namespace test \
+            --debug \
+            --set global.image.imagePullSecrets[0].name=cra-pull-secret \
+            --set agent.config.host.join_token="fake_token" \
+            --set agent.config.host.control_plane_url="fake_url" \
+            --set agent.config.host.control_plane_http_url="fake_http_url" > rendered.yaml
 
       # set to dry-run temporarily
       - name: Helm Upgrade or Install with Retries
-        run: make helm-upgrade
-          
+        working-directory: charts/catalyst
+        run: |
+          helm upgrade --install my-release ./ \
+            --namespace test \
+            --create-namespace \
+            --dry-run \
+            --skip-crds \
+            --debug \
+            --set global.image.imagePullSecrets[0].name=cra-pull-secret \
+            --set agent.config.host.join_token="fake_token" \
+            --set agent.config.host.control_plane_url="fake_url" \
+            --set agent.config.host.control_plane_http_url="fake_http_url"
