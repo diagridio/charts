@@ -1,9 +1,8 @@
 name: Release Catalyst Helm Chart
 
 on:
-  pull_request:
-    # Only trigger when a PR into main or a release branch is closed (merged or not)
-    types: [closed]
+  # Only trigger on main branch and release branches
+  push:
     branches:
       - main
       - 'release-[0-9]+.[0-9]+'
@@ -15,7 +14,6 @@ env:
 
 jobs:
   publish-helm-chart:
-    if: github.event.pull_request.merged == true # Only run on merged PRs
     runs-on: ubuntu-latest
     environment: shared-production
     permissions:
