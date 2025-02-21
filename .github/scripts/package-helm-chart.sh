@@ -18,8 +18,7 @@ command -v git >/dev/null 2>&1 || { echo "Error: git is required but not install
 [ -z "$CHART_ALIAS" ] && { echo "Error: CHART_ALIAS environment variable is required."; exit 1; }
 
 # Set up variables
-REPO_NAME="catalyst"
-OCI_URI="oci://${CHART_REGISTRY}/${CHART_ALIAS}/${REPO_NAME}"
+OCI_URI="oci://${CHART_REGISTRY}/${CHART_ALIAS}/"
 
 # Temporary file for Chart.yaml diff
 TEMP_CHART_YAML=$(mktemp)
