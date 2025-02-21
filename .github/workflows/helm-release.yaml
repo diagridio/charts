@@ -71,7 +71,7 @@ jobs:
         run: |
           VERSION="${{ env.VERSION }}"
           CHART_NAME=$(yq '.name' "$CHART_DIR/Chart.yaml")
-          CHART_FILE="./packaged/${CHART_NAME}-${VERSION}.tgz"
+          CHART_FILE="$CHART_DIR/dist/${CHART_NAME}-${VERSION}.tgz"
           if [ -f "$CHART_FILE" ]; then
             echo "Uploading $CHART_FILE to release $VERSION"
             gh release upload "$VERSION" "$CHART_FILE"
