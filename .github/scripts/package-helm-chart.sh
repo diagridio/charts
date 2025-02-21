@@ -75,10 +75,13 @@ fi
 mv "$TEMP_CHART_YAML" "$CHART_DIR/Chart.yaml"
 
 # Package the Helm chart
-helm package "$CHART_DIR" --destination ./packaged
+make helm-add-repos
+make helm-dependency-build
+make helm-depedency-update
+make helm-package
 
 # Push the chart to OCI
-CHART_FILE="./packaged/${CHART_NAME}-${VERSION}.tgz"
+CHART_FILE="./dist/${CHART_NAME}-${VERSION}.tgz"
 echo "Pushing $CHART_FILE to $OCI_URI"
 helm push "$CHART_FILE" "$OCI_URI"
 
