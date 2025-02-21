@@ -45,7 +45,7 @@ jobs:
 
       - name: Package and Push Helm Chart
         env:
-          BRANCH: ${{ github.event.pull_request.base.ref }}
+          BRANCH: ${{ github.event.pull_request.base.ref || github.ref_name }}
         run: |
           chmod +x .github/scripts/package-helm-chart.sh
           ./.github/scripts/package-helm-chart.sh
