@@ -18,8 +18,7 @@ command -v git >/dev/null 2>&1 || { echo "Error: git is required but not install
 [ -z "$CHART_ALIAS" ] && { echo "Error: CHART_ALIAS environment variable is required."; exit 1; }
 
 # Set up variables
-REPO_NAME="catalyst"
-OCI_URI="oci://${CHART_REGISTRY}/${CHART_ALIAS}/${REPO_NAME}"
+OCI_URI="oci://${CHART_REGISTRY}/${CHART_ALIAS}/"
 
 # Temporary file for Chart.yaml diff
 TEMP_CHART_YAML=$(mktemp)
@@ -75,10 +74,17 @@ fi
 mv "$TEMP_CHART_YAML" "$CHART_DIR/Chart.yaml"
 
 # Package the Helm chart
-helm package "$CHART_DIR" --destination ./packaged
+export VERSION=$VERSION
+export CHART_NAME=$CHART_NAME
+export CHART_DIR=$CHART_DIR
+
+make helm-add-repos
+make helm-dependency-build
+make helm-depedency-update
+make helm-package
 
 # Push the chart to OCI
-CHART_FILE="./packaged/${CHART_NAME}-${VERSION}.tgz"
+CHART_FILE="./${CHART_DIR}/dist/${CHART_NAME}-${VERSION}.tgz"
 echo "Pushing $CHART_FILE to $OCI_URI"
 helm push "$CHART_FILE" "$OCI_URI"
 

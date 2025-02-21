@@ -16,8 +16,7 @@ jobs:
   publish-helm-chart:
     runs-on: ubuntu-latest
     environment: shared-production
-    permissions:
-      contents: write # Needed to create GitHub releases and tags
+    permissions: write-all # Needed to create GitHub releases and tags
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -40,13 +39,15 @@ jobs:
           role-to-assume: ${{ vars.AWS_CI_ROLE }}
           aws-region: ${{ vars.AWS_CI_REGION }}
 
-      - name: Login to Public ECR
-        run: |
-          aws ecr-public get-login-password --region ${{ vars.AWS_CI_REGION }} | helm registry login --username AWS --password-stdin ${{ vars.AWS_PUBLIC_ECR_HOST }}
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+          registry-type: public
 
       - name: Package and Push Helm Chart
         env:
-          BRANCH: ${{ github.event.pull_request.base.ref }}
+          BRANCH: ${{ github.event.pull_request.base.ref || github.ref_name }}
         run: |
           chmod +x .github/scripts/package-helm-chart.sh
           ./.github/scripts/package-helm-chart.sh
@@ -70,7 +71,7 @@ jobs:
         run: |
           VERSION="${{ env.VERSION }}"
           CHART_NAME=$(yq '.name' "$CHART_DIR/Chart.yaml")
-          CHART_FILE="./packaged/${CHART_NAME}-${VERSION}.tgz"
+          CHART_FILE="$CHART_DIR/dist/${CHART_NAME}-${VERSION}.tgz"
           if [ -f "$CHART_FILE" ]; then
             echo "Uploading $CHART_FILE to release $VERSION"
             gh release upload "$VERSION" "$CHART_FILE"

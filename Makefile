@@ -2,6 +2,7 @@
 
 VERSION ?= "0.0.0-$(shell git rev-parse --short HEAD)"
 CHART_DIR ?= ./charts/catalyst
+CHART_NAME ?= catalyst
 
 .PHONY: helm-lint
 helm-lint: helm-add-repos helm-dependency-build helm-depedency-update
@@ -35,9 +36,9 @@ helm-template: helm-add-repos helm-dependency-build helm-depedency-update
 		--set agent.config.host.control_plane_http_url="fake_http_url" > rendered.yaml
 
 .PHONY: helm-package
-helm-package:
+helm-package: 
 	cd $(CHART_DIR) && \
-	helm package --version ${VERSION} --destination ./dist
+	helm package . --version $(VERSION) --destination ./dist
 
 .PHONY: helm-upgrade
 helm-upgrade:
@@ -56,4 +57,4 @@ helm-upgrade:
 .PHONY: helm-push
 helm-push:
 	cd $(CHART_DIR) && \
-	helm push ./dist/diagrid-catalyst-$(VERSION).tgz oci://$(REGISTRY)/$(REPO)
+	helm push ./dist/$(CHART_NAME)-$(VERSION).tgz oci://$(REGISTRY)/$(REPO)
