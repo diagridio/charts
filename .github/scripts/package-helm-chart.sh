@@ -85,7 +85,7 @@ make helm-depedency-update
 make helm-package
 
 # Push the chart to OCI
-CHART_FILE="./dist/${CHART_NAME}-${VERSION}.tgz"
+CHART_FILE="./${CHART_DIR}/dist/${CHART_NAME}-${VERSION}.tgz"
 echo "Pushing $CHART_FILE to $OCI_URI"
 helm push "$CHART_FILE" "$OCI_URI"
 
