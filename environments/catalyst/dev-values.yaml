@@ -1,0 +1,17 @@
+agent:
+  config:
+    control_plane_url: cra-cloudgrid.dev.d.diagrid.io:443
+    control_plane_http_url: https://api.dev.diagrid.io
+    nats:
+      endpoint: tls://client.events.dev.d.diagrid.io:443
+    sentry:
+      remote_endpoint: sentry.dev.d.diagrid.io:443
+      diagrid_trust_anchors_endpoint: https://trust-pem.dev.d.diagrid.io
+    # TODO add cortex and loki endpoints
+management:
+  config:
+    nats:
+      endpoint: tls://client.events.dev.d.diagrid.io:443
+    sentry:
+      remote_endpoint: sentry.dev.d.diagrid.io:443
+      diagrid_trust_anchors_endpoint: https://trust-pem.dev.d.diagrid.io

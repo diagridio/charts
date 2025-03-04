@@ -60,6 +60,8 @@ agent:
       max_project_count: 15
     project:
       dns_top_level_domain: ".private.diagrid.io"
+      default_managed_pubsub_type: kafka-shared-disabled
+      default_managed_state_store_type: postgresql-shared-disabled
       ingress_tls_secret_name: ""
       default_workflow: namespace
       enable_scheduler_service: true
@@ -101,6 +103,8 @@ agent:
       container_registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/daprio"
     internal_dapr:
       container_registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public"
+      ca:
+        trust_anchors_config_map_name: ca-certificates-bundle
       sentry_resources:
         limits:
           memory: 100Mi
@@ -130,7 +134,6 @@ agent:
       endpoint: dapr-sentry.root-dapr-system.svc.cluster.local:443
       remote_endpoint: sentry.dev.d.diagrid.io:443
       diagrid_trust_anchors_endpoint: https://trust-pem.dev.d.diagrid.io
-      # diagrid_trust_anchors_endpoint_insecure: true
       trust_domain: prj-root.cra.diagrid.io
       namespace: root-dapr-system
     nats:
