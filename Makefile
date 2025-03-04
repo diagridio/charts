@@ -5,7 +5,7 @@ CHART_DIR ?= ./charts/catalyst
 CHART_NAME ?= catalyst
 
 .PHONY: helm-lint
-helm-lint: helm-add-repos helm-dependency-build helm-depedency-update
+helm-lint: helm-prereqs
 	cd $(CHART_DIR) && \
 	helm lint $(TARGET_PATH) \
 	--set agent.config.host.join_token="fake_token"
@@ -24,8 +24,11 @@ helm-depedency-update:
 	cd $(CHART_DIR) && \
 	helm dependency update ./
 
+.PHONY: helm-prereqs
+helm-prereqs: helm-add-repos helm-dependency-build helm-depedency-update
+
 .PHONY: helm-template
-helm-template: helm-add-repos helm-dependency-build helm-depedency-update
+helm-template: helm-prereqs
 	cd $(CHART_DIR) && \
 	helm template my-release ./ \
 		--namespace test \
@@ -40,8 +43,11 @@ helm-package:
 	cd $(CHART_DIR) && \
 	helm package . --version $(VERSION) --destination ./dist
 
+.PHONY: helm-install
+helm-install: helm-upgrade
+
 .PHONY: helm-upgrade
-helm-upgrade:
+helm-upgrade: helm-prereqs
 	cd $(CHART_DIR) && \
 	helm upgrade --install my-release ./ \
 		--namespace test \

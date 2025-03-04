@@ -78,9 +78,7 @@ export VERSION=$VERSION
 export CHART_NAME=$CHART_NAME
 export CHART_DIR=$CHART_DIR
 
-make helm-add-repos
-make helm-dependency-build
-make helm-depedency-update
+make prereqs
 make helm-package
 
 # Push the chart to OCI
