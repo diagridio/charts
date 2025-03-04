@@ -134,7 +134,6 @@ agent:
       endpoint: dapr-sentry.root-dapr-system.svc.cluster.local:443
       remote_endpoint: sentry.dev.d.diagrid.io:443
       diagrid_trust_anchors_endpoint: https://trust-pem.dev.d.diagrid.io
-      # diagrid_trust_anchors_endpoint_insecure: true
       trust_domain: prj-root.cra.diagrid.io
       namespace: root-dapr-system
     nats:
