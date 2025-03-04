@@ -10,6 +10,8 @@ Diagrid Catalyst is a collection of API-based programming patterns for messaging
 For more information on how Catalyst can turbo charge your development, please visit the [docs](https://docs.diagrid.io/catalyst).
 
 ### Prerequisites
+- [Diagrid CLI](https://docs.diagrid.io/catalyst/references/cli-reference/intro)
+- [Diagrid Account](https://catalyst.diagrid.io)
 - [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
 - [Helm](https://helm.sh/)
 - A Kubernetes cluster
