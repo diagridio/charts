@@ -17,7 +17,7 @@ For more information on how Catalyst can turbo charge your development, please v
 - A Kubernetes cluster
 
 ### Installation
-> NOTE: this steps are currently targeting our test environment
+> NOTE: the default helm values are currently targeting our dev environment
 
 To install the Catalyst Helm Chart you must first create a `Region`.
 
@@ -35,10 +35,22 @@ aws ecr-public get-login-password \
      --username AWS \
      --password-stdin public.ecr.aws
 
-helm install catalyst oci://public.ecr.aws/diagrid/catalyst -n cra-agent --create-namespace -f environments/catalyst/dev-values.yaml --set "agent.config.host.join_token=${JOIN_TOKEN}" --version 0.0.0-edge
+helm install catalyst oci://public.ecr.aws/diagrid/catalyst -n cra-agent --create-namespace --set "agent.config.host.join_token=${JOIN_TOKEN}" --version 0.0.0-edge
 ```
 
 From this repository:
 ```
-helm install catalyst ./charts/catalyst/ -n cra-agent --create-namespace -f environments/catalyst/dev-values.yaml --set "agent.config.host.join_token=${JOIN_TOKEN}" 
+helm install catalyst ./charts/catalyst/ -n cra-agent --create-namespace --set "agent.config.host.join_token=${JOIN_TOKEN}"
 ```
+
+### Advanced configurations
+
+#### Configuring ingress
+To configure the DNS wildcard domain that will be used as the base for routing requests to sidecars from the gateway use the helm value:
+```
+agent.config.project.wildcard_domain=my-domain.com
+```
+
+#### Configuring secrets provider
+The default secrets provider is kubernetes, but AWS Secrets Manager can be configured.
+// TODO unify helm values for secrets provider under global....

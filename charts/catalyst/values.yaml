@@ -23,16 +23,9 @@ global:
 
 #------------------------------------------------------------------------------
 # Shared Configurations
+# TODO not implemented yet
 #------------------------------------------------------------------------------
 shared:
-  resources:
-    limits:
-      cpu: "500m"
-      memory: "512Mi"
-    requests:
-      cpu: "250m"
-      memory: "256Mi"
-
   nodeSelector: {}
 
   tolerations: []
@@ -57,9 +50,9 @@ agent:
     inspection:
       enabled: false
     placement:
-      max_project_count: 15
+      max_project_count: 50
     project:
-      dns_top_level_domain: ".private.diagrid.io"
+      wildcard_domain: "private.diagrid.io"
       default_managed_pubsub_type: kafka-shared-disabled
       default_managed_state_store_type: postgresql-shared-disabled
       ingress_tls_secret_name: ""
@@ -67,28 +60,35 @@ agent:
       enable_scheduler_service: true
       dapr_hot_reloading: true
       sidecar_capture_init_errors: false
-      redis_kafka_cache:
-        enabled: false
+      expensive_operations_worker_pool_max_workers: 256
+      expensive_operations_worker_pool_capacity: 256
     sidecar:
       image_registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public"
       image_tag: 'edge'
+      resources:
+        limits:
+          cpu: 300m
+          memory: 256Mi
+        requests:
+          cpu: 10m
+          memory: 25Mi
     api_token_error:
       enabled: false
     otel:
       enabled: true
       image_repository: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/diagrid-otel-collector"
       image_tag: 'edge'
-      metrics_endpoint: https://metrics.dev.diagrid.io:443/api/v1/push
-      metrics_tls_insecure: true
+      metrics_endpoint: https://cra-metrics.dev.d.diagrid.io/api/v1/push
+      loki_endpoint: https://cra-logs.dev.d.diagrid.io/loki/api/v1/push
+      metrics_tls_insecure: false
+      loki_tls_insecure: false
       internal_cortex_enabled: false
       internal_cortex_endpoint: ""
       internal_cortex_org_id: common
       loki_enabled: false
-      loki_endpoint: https://logs.dev.diagrid.io:443/loki/api/v1/push
-      loki_tls_insecure: true
       logs_resources:
         limits:
-          memory: 500Mi
+          memory: 750Mi
         requests:
           cpu: 50m
           memory: 500Mi
@@ -97,7 +97,7 @@ agent:
           memory: 1100Mi
         requests:
           cpu: 75m
-          memory: 250Mi
+          memory: 500Mi
     upstream_dapr:
       # images wil be pulled from a dockerhub proxy so we don't hit ratelimits
       container_registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/daprio"
@@ -146,6 +146,8 @@ agent:
   # secrets config for integrating with a secret provider
   secrets:
     provider: kubernetes
+    aws:
+      region: ""
 
   metrics:
     port: 9090
@@ -194,7 +196,7 @@ agent:
       memory: 1200Mi
     requests:
       cpu: 40m
-      memory: 100Mi
+      memory: 500Mi
 
   nodeSelector: {}
 
@@ -348,7 +350,7 @@ management:
       endpoint: dapr-sentry.root-dapr-system.svc.cluster.local:443
       remote_endpoint: sentry.dev.d.diagrid.io:443
       diagrid_trust_anchors_endpoint: https://trust-pem.dev.d.diagrid.io
-      diagrid_trust_anchors_endpoint_insecure: true
+      diagrid_trust_anchors_endpoint_insecure: false
       trust_domain: prj-root.cra.diagrid.io
       namespace: root-dapr-system
       trust_anchors_file: "/var/run/secrets/diagrid.io/trust/ca.crt"
@@ -356,14 +358,10 @@ management:
   # secrets config for integrating with a secret provider
   secrets:
     provider: kubernetes
-    redis:
-      host: ""
-      username: ""
-      password: ""
     aws:
       region: ""
 
-  replicaCount: 1
+  replicaCount: 2
 
   image:
     registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public"
@@ -426,30 +424,3 @@ management:
 
   merge: {}
   patch: {}
-
-#------------------------------------------------------------------------------
-# Metrics Server Configurations - Optional
-#------------------------------------------------------------------------------
-metricsServer:
-  enabled: false
-  replicas: 2
-  podDisruptionBudget:
-    enabled: true
-    minAvailable: 1
-  updateStrategy:
-    rollingUpdate:
-      maxUnavailable: 1
-  affinity:
-    podAntiAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution:
-      - labelSelector:
-          matchLabels:
-            app.kubernetes.io/name: metrics-server
-            app.kubernetes.io/instance: metrics-server
-        namespaces:
-        - metrics-server
-        topologyKey: kubernetes.io/hostname
-  resources:
-    requests:
-      cpu: 50m
-      memory: 100Mi
