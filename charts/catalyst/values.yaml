@@ -47,8 +47,6 @@ agent:
       egress_addresses: []
     control_plane_url: cra-cloudgrid.dev.d.diagrid.io:443
     control_plane_http_url: https://api.dev.diagrid.io
-    inspection:
-      enabled: false
     placement:
       max_project_count: 50
     project:
@@ -57,11 +55,6 @@ agent:
       default_managed_state_store_type: postgresql-shared-disabled
       ingress_tls_secret_name: ""
       default_workflow: namespace
-      enable_scheduler_service: true
-      dapr_hot_reloading: true
-      sidecar_capture_init_errors: false
-      expensive_operations_worker_pool_max_workers: 256
-      expensive_operations_worker_pool_capacity: 256
     sidecar:
       image_registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public"
       image_tag: 'edge'
