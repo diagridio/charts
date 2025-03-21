@@ -78,7 +78,7 @@ export VERSION=$VERSION
 export CHART_NAME=$CHART_NAME
 export CHART_DIR=$CHART_DIR
 
-make prereqs
+make helm-prereqs
 make helm-package
 
 # Push the chart to OCI
