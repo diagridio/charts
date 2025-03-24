@@ -1,62 +1,107 @@
-### Diagrid Helm Charts
-This repo contains the public Helm charts published by Diagrid.
+# Diagrid Helm Charts Repository
 
-> ⚠️ This repository is under active development and some of these instructions may be aspirational or stale.
+This repository contains official Helm charts published by Diagrid for deploying Diagrid products on Kubernetes.
 
-## Catalyst
+> ⚠️ This repository is under active development. Documentation may be updated frequently.
 
-Diagrid Catalyst is a collection of API-based programming patterns for messaging, data, and workflow that is fully compliant with the Dapr open source project.
+## Available Charts
 
-For more information on how Catalyst can turbo charge your development, please visit the [docs](https://docs.diagrid.io/catalyst).
+### Catalyst ⚡️
 
-### Prerequisites
+Diagrid Catalyst is a collection of API-based programming patterns for messaging, data, and workflow that is fully compliant with the Dapr open source project. It provides managed components and runtime that streamline cloud-native application development.
+
+## Prerequisites
+
+Before installing any charts, ensure you have the following tools:
+
 - [Diagrid CLI](https://docs.diagrid.io/catalyst/references/cli-reference/intro)
 - [Diagrid Account](https://catalyst.diagrid.io)
 - [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
-- [Helm](https://helm.sh/)
-- A Kubernetes cluster
+- [Helm](https://helm.sh/) (version 3.x or later)
+- A Kubernetes cluster (1.20+ recommended)
 
-### Installation
-> NOTE: the default helm values are currently targeting our dev environment
+## Installation
+> NOTE: the default helm values are currently targeting the Diagrid dev environment.
 
-To install the Catalyst Helm Chart you must first create a `Region`.
+### Step 1: Create a Region
 
-```
+First, create a Diagrid Region using the Diagrid CLI:
+
+```bash
+# Login to Diagrid
 diagrid login
+
+# Create a new region and capture the join token
 export JOIN_TOKEN=$(diagrid region create myregion | jq .joinToken)
 ```
 
-Once you have created a `Region`, you can install the Catalyst Helm Chart.
+### Step 2: Install the Catalyst Helm Chart
 
-From our public OCI registry:
-```
+#### Option A: Install from Diagrid's public OCI registry (recommended)
+
+```bash
+# Authenticate with the registry
 aws ecr-public get-login-password \
      --region us-east-1 | helm registry login \
      --username AWS \
      --password-stdin public.ecr.aws
 
-helm install catalyst oci://public.ecr.aws/diagrid/catalyst -n cra-agent --create-namespace --set "agent.config.host.join_token=${JOIN_TOKEN}" --version 0.0.0-edge
+# Install the chart
+helm install catalyst oci://public.ecr.aws/diagrid/catalyst \
+     -n cra-agent \
+     --create-namespace \
+     --set "agent.config.host.join_token=${JOIN_TOKEN}" \
+     --version 0.0.0-edge
 ```
 
-From this repository:
-```
-helm install catalyst ./charts/catalyst/ -n cra-agent --create-namespace --set "agent.config.host.join_token=${JOIN_TOKEN}"
+#### Option B: Install from this repository
+
+```bash
+# Clone the repository (if you haven't already)
+git clone https://github.com/diagridio/charts.git
+cd charts
+
+# Install the chart
+helm install catalyst ./charts/catalyst/ \
+     -n cra-agent \
+     --create-namespace \
+     --set "agent.config.host.join_token=${JOIN_TOKEN}"
 ```
 
-### Advanced configurations
+The Catalyst installation will take a few minutes to onboard itself. During this time you may see pods restart but it will stabilize.
 
-#### Configuring ingress
-To configure the DNS wildcard domain that will be used as the base for routing requests to sidecars from the gateway use the helm value:
+You can confirm the region exists in the CLI or web console.
+
+```bash
+diagrid region list
+```
+
+### Step 3: Create a Project in your Region
+Your Region will now be available as a deployment option when creating Projects. For example:
+
+```bash
+diagrid project create --region myregion
+```
+
+Now you're ready to start building you very first application. Head over to our [quickstarts](https://docs.diagrid.io/catalyst/quickstarts) to get started 🚀!
+
+### Networking
+
+#### Ingress 
+Dapr Sidecars in a Catalyst region are made available to applications via their projects network address. For a private Catalyst installation, you must configure a wildcard DNS rule (`*.apps.myinternal.net`) so that your application's can resolve all project network addresses (e.g. `https://http-prj123.apps.myinternal.net`) to the IP address of the Catalyst gateway. You must also provide your wildcard domain when installing the Catalyst Helm Chart by setting the following Helm Value:
 ```
 agent.config.project.wildcard_domain=my-domain.com
 ```
 
-#### Configuring secrets provider
+### Secrets
 The secrets provider allows Diagrid Catalyst to store and manage sensitive data specific to the resources hosted in a Region.
 
-The default secrets provider is kubernetes, but AWS Secrets Manager can be configured, below is the basic configuration for AWS Secrets Manager.
+The default secrets provider is Kubernetes but you can also configure AWS Secrets Manager.
 
-Authentication can use an access key and secret key, read more about AWS Access Keys [here](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html).
+#### AWS Secrets Manager
+Authentication to AWS can be configured using an access key and secret key, read more about AWS Access Keys [here](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html).
+
+You can then provide the following Helm values:
 ```
 global:
   secrets:
@@ -67,12 +112,12 @@ global:
       secret_access_key: "key-secret"
 ```
 
-#### Pre-requisites for Dapr Workflows support
-To be able to support the Dapr Workflows API the Catalyst agent needs to be configured with a PostgreSQL instance, which will be used to enhance the Dapr Workflows experience and to support the Workflows visualizer in [catalyst.diagrid.io](https://catalyst.diagrid.io).
+#### Dapr Workflows
+To be able to support the Dapr Workflows API the Catalyst agent needs to be configured with a connection to a PostgreSQL instance. Catalyst uses this PostgreSQL instance to store and retrieve metadata about the workflow to provide a features such as the Workflow Visualizer which is available at [catalyst.diagrid.io](https://catalyst.diagrid.io).
 
 > NOTE: for testing purposes you can install a [PostgreSQL](https://github.com/bitnami/charts/tree/main/bitnami/postgresql) Helm Chart in the same Kubernetes cluster
 
-To do that its nececessary to provide the following helm values:
+You can configure the agent to use a PostgreSQL instance using the following Helm values:
 ```
 agent:
   config:
@@ -86,3 +131,20 @@ agent:
         connection_string_username: root
         connection_string_password: postgres
 ```
+
+## Docs
+
+For more information about Diagrid Catalyst, including detailed usage instructions and examples, please visit:
+
+- [Catalyst Documentation](https://docs.diagrid.io/catalyst)
+- [Catalyst Support](https://docs.diagrid.io/catalyst/support)
+- [Diagrid Website](https://www.diagrid.io/)
+- [Diagrid Support](https://diagrid.io/support)
+
+## Contributing
+
+We welcome contributions to our Helm charts. Please feel free to submit issues or pull requests.
+
+## License
+
+Copyright © Diagrid, Inc.
