@@ -45,16 +45,18 @@ spec:
           args:
           - "--log-level={{ .Values.agent.logLevel }}"
           - "--tls.enabled=false"
-          {{- if eq .Values.agent.secrets.provider "redis" }}
+          {{- if eq .Values.global.secrets.provider "redis" }}
           - "--secretsprovider=redis"
-          - "--secrets_redis.host={{ required ".Values.agent.secrets.redis.host entry required when .Values.agent.secrets.provider is set to redis" .Values.agent.secrets.redis.host }}"
-          - "--secrets_redis.password={{ .Values.agent.secrets.redis.password }}"
+          - "--secrets_redis.host={{ required ".Values.global.secrets.redis.host entry required when .Values.global.secrets.provider is set to redis" .Values.global.secrets.redis.host }}"
+          - "--secrets_redis.password={{ .Values.global.secrets.redis.password }}"
           {{- end }}
-          {{- if eq .Values.agent.secrets.provider "aws" }}
+          {{- if eq .Values.global.secrets.provider "aws" }}
           - "--secretsprovider=aws.secretmanager"
-          - "--secrets_aws_secretmanager.region={{ required ".Values.agent.secrets.aws.region entry required when .Values.agent.secrets.provider is set to aws" .Values.agent.secrets.aws.region }}"
+          - "--secrets_aws_secretmanager.region={{ required ".Values.global.secrets.aws.region entry required when .Values.global.secrets.provider is set to aws" .Values.global.secrets.aws.region }}"
+          - "--secrets_aws_secretmanager.access_key={{ .Values.global.secrets.aws.access_key }}"
+          - "--secrets_aws_secretmanager.secret_access_key={{ .Values.global.secrets.aws.secret_access_key }}"
           {{- end }}
-          {{- if eq .Values.agent.secrets.provider "kubernetes" }}
+          {{- if eq .Values.global.secrets.provider "kubernetes" }}
           - "--secretsprovider=kubernetes"
           {{- end }}
           env:

@@ -52,5 +52,37 @@ agent.config.project.wildcard_domain=my-domain.com
 ```
 
 #### Configuring secrets provider
-The default secrets provider is kubernetes, but AWS Secrets Manager can be configured.
-// TODO unify helm values for secrets provider under global....
+The secrets provider allows Diagrid Catalyst to store and manage sensitive data specific to the resources hosted in a Region.
+
+The default secrets provider is kubernetes, but AWS Secrets Manager can be configured, below is the basic configuration for AWS Secrets Manager.
+
+Authentication can use an access key and secret key, read more about AWS Access Keys [here](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html).
+```
+global:
+  secrets:
+    provider: aws
+    aws:
+      region: us-west-1
+      access_key: "mykey"
+      secret_access_key: "key-secret"
+```
+
+#### Pre-requisites for Dapr Workflows support
+To be able to support the Dapr Workflows API the Catalyst agent needs to be configured with a PostgreSQL instance, which will be used to enhance the Dapr Workflows experience and to support the Workflows visualizer in [catalyst.diagrid.io](https://catalyst.diagrid.io).
+
+> NOTE: for testing purposes you can install a [PostgreSQL](https://github.com/bitnami/charts/tree/main/bitnami/postgresql) Helm Chart in the same Kubernetes cluster
+
+To do that its nececessary to provide the following helm values:
+```
+agent:
+  config:
+    project:
+      default_managed_state_store_type: postgresql-shared-external
+      external_postgresql:
+        enabled: true
+        auth_type: connectionString
+        connection_string_host: postgres.postgres.svc.cluster.local
+        connection_string_port: 5432
+        connection_string_username: root
+        connection_string_password: postgres
+```
