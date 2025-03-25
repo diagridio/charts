@@ -1,34 +1,55 @@
+################################################################################
+# Target: Help                                                                 #
+################################################################################
+help: ## Show this help message.
+	@echo "\nDiagrd Helm Chart Makefile"
+	@echo "--------------------------"
+	@echo "The following parameters are available:"
+	@echo ""
+	@echo "CHART_DIR:  The directory of the helm chart (default: ./charts/catalyst)"
+	@echo "CHART_NAME: The name of the helm chart (default: catalyst)"
+	@echo "VERSION:    The version of the helm chart (default: 0.0.0-<git sha>)"
+	@echo "REGISTRY:   The OCI registry to push the helm chart to"
+	@echo "REPO:       The repository to push the helm chart to"
+	@echo ""
+	@echo "The following targets are available:"
+	@awk 'BEGIN {FS = ":.*##"; printf "\n  make \033[36m\033[0m\n"} \
+		/^[a-zA-Z0-9\-_]+:.*?##/ { if ($$1 != "help") printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2 } \
+		/##\@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+
+.DEFAULT_GOAL := help
+
 -include .env
 
 VERSION ?= "0.0.0-$(shell git rev-parse --short HEAD)"
 CHART_DIR ?= ./charts/catalyst
 CHART_NAME ?= catalyst
 
-.PHONY: helm-lint
+.PHONY: helm-lint ## Lint the helm chart
 helm-lint: helm-prereqs
 	cd $(CHART_DIR) && \
 	helm lint $(TARGET_PATH) \
 	--set agent.config.host.join_token="fake_token"
 
 .PHONY: helm-add-repos
-helm-add-repos:
+helm-add-repos: ## Add helm repos
 	helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/ > /dev/null 2>&1 || true
 
 .PHONY: helm-dependency-build
-helm-dependency-build:
+helm-dependency-build: ## Build helm dependencies
 	cd $(CHART_DIR) && \
 	helm dependency build
 
 .PHONY: helm-dependency-update
-helm-depedency-update:
+helm-depedency-update: ## Update helm dependencies
 	cd $(CHART_DIR) && \
 	helm dependency update ./
 
-.PHONY: helm-prereqs
+.PHONY: helm-prereqs ## Install helm dependencies
 helm-prereqs: helm-add-repos helm-dependency-build helm-depedency-update
 
 .PHONY: helm-template
-helm-template: helm-prereqs
+helm-template: helm-prereqs ## Render helm chart
 	cd $(CHART_DIR) && \
 	helm template my-release ./ \
 		--namespace test \
@@ -36,15 +57,20 @@ helm-template: helm-prereqs
 		--set agent.config.host.join_token="fake_token" > rendered.yaml
 
 .PHONY: helm-package
-helm-package: 
+helm-package: ## Package helm chart
 	cd $(CHART_DIR) && \
 	helm package . --version $(VERSION) --destination ./dist
 
+.PHONY: helm-push
+helm-push: helm-package ## Push the Helm chart to the OCI registry
+	cd $(CHART_DIR) && \
+	helm push ./dist/$(CHART_NAME)-$(VERSION).tgz oci://$(REGISTRY)/$(REPO)
+
 .PHONY: helm-install
-helm-install: helm-upgrade
+helm-install: helm-upgrade ## Install the Helm chart
 
 .PHONY: helm-upgrade
-helm-upgrade: helm-prereqs
+helm-upgrade: helm-prereqs ## Upgrade the Helm chart
 	cd $(CHART_DIR) && \
 	helm upgrade --install my-release ./ \
 		--namespace test \
@@ -55,8 +81,3 @@ helm-upgrade: helm-prereqs
 		--set agent.config.host.join_token="fake_token" \
 		--set agent.config.host.control_plane_url="fake_url" \
 		--set agent.config.host.control_plane_http_url="fake_http_url"
-
-.PHONY: helm-push
-helm-push:
-	cd $(CHART_DIR) && \
-	helm push ./dist/$(CHART_NAME)-$(VERSION).tgz oci://$(REGISTRY)/$(REPO)
