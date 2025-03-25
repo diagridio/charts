@@ -34,7 +34,7 @@ First, create a Diagrid Region using the Diagrid CLI:
 diagrid login
 
 # Create a new region and capture the join token
-export JOIN_TOKEN=$(diagrid region create myregion | jq .joinToken)
+export JOIN_TOKEN=$(diagrid region create myregion | jq -r .joinToken)
 ```
 
 ### Step 2: Install the Catalyst Helm Chart
