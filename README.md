@@ -10,6 +10,8 @@ This repository contains official Helm charts published by Diagrid for deploying
 
 Diagrid Catalyst is a collection of API-based programming patterns for messaging, data, and workflow that is fully compliant with the Dapr open source project. It provides managed components and runtime that streamline cloud-native application development.
 
+![Catalyst](./assets/img/catalyst.svg)
+
 ## Prerequisites
 
 Before installing any charts, ensure you have the following tools:
