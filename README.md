@@ -88,7 +88,7 @@ diagrid region list
 Your Region will now be available as a deployment option when creating Projects. For example:
 
 ```bash
-diagrid project create --region myregion
+diagrid project create myproject --region myregion
 ```
 
 Now you're ready to start building you very first application. Head over to our [quickstarts](https://docs.diagrid.io/catalyst/quickstarts) to get started 🚀!
