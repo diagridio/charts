@@ -12,6 +12,12 @@ Diagrid Catalyst is a collection of API-based programming patterns for messaging
 
 ![Catalyst](./assets/img/catalyst.svg)
 
+A Catalyst installation consists of the following components:
+- *Agent*: Manages the configuration of Dapr projects.
+- *Management*: Provides access to service providers such as secrets stores.
+- *Gateway*: Provides routing to Dapr runtime instances.
+- *Telemetry*: Collectors export telemetry from Dapr.
+
 ## Prerequisites
 
 Before installing any charts, ensure you have the following tools:
@@ -90,7 +96,7 @@ Now you're ready to start building you very first application. Head over to our 
 ### Networking
 
 #### Ingress 
-Dapr Sidecars in a Catalyst region are made available to applications via their projects network address. For a private Catalyst installation, you must configure a wildcard DNS rule (`*.apps.myinternal.net`) so that your application's can resolve all project network addresses (e.g. `https://http-prj123.apps.myinternal.net`) to the IP address of the Catalyst gateway. You must also provide your wildcard domain when installing the Catalyst Helm Chart by setting the following Helm Value:
+Dapr runtime instances in a Catalyst region are made available to applications via their project's network address. For a private Catalyst installation, you must configure a wildcard DNS rule (`*.apps.myinternal.net`) so that your application's can resolve all project network addresses (e.g. `https://http-prj123.apps.myinternal.net`) to the IP address of the Catalyst gateway. You must also provide your wildcard domain when installing the Catalyst Helm Chart by setting the following Helm value:
 ```
 agent.config.project.wildcard_domain=my-domain.com
 ```
@@ -114,7 +120,7 @@ global:
       secret_access_key: "key-secret"
 ```
 
-#### Dapr Workflows
+### Workflows
 To be able to support the Dapr Workflows API the Catalyst agent needs to be configured with a connection to a PostgreSQL instance. Catalyst uses this PostgreSQL instance to store and retrieve metadata about the workflow to provide features such as the Workflow Visualizer which is available at [catalyst.diagrid.io](https://catalyst.diagrid.io).
 
 > NOTE: for testing purposes you can install a [PostgreSQL](https://github.com/bitnami/charts/tree/main/bitnami/postgresql) Helm Chart in the same Kubernetes cluster
