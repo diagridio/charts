@@ -7,7 +7,9 @@ agent:
     sentry:
       remote_endpoint: sentry.dev.d.diagrid.io:443
       diagrid_trust_anchors_endpoint: https://trust-pem.dev.d.diagrid.io
-    # TODO add cortex and loki endpoints
+    otel:
+      metrics_endpoint: https://cra-metrics.dev.d.diagrid.io/api/v1/push
+      loki_endpoint: https://cra-logs.dev.d.diagrid.io/loki/api/v1/push
 management:
   config:
     nats:

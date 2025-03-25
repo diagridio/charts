@@ -33,10 +33,7 @@ helm-template: helm-prereqs
 	helm template my-release ./ \
 		--namespace test \
 		--debug \
-		--set global.image.imagePullSecrets[0].name=cra-pull-secret \
-		--set agent.config.host.join_token="fake_token" \
-		--set agent.config.host.control_plane_url="fake_url" \
-		--set agent.config.host.control_plane_http_url="fake_http_url" > rendered.yaml
+		--set agent.config.host.join_token="fake_token" > rendered.yaml
 
 .PHONY: helm-package
 helm-package: 
@@ -55,7 +52,6 @@ helm-upgrade: helm-prereqs
 		--dry-run \
 		--skip-crds \
 		--debug \
-		--set global.image.imagePullSecrets[0].name=cra-pull-secret \
 		--set agent.config.host.join_token="fake_token" \
 		--set agent.config.host.control_plane_url="fake_url" \
 		--set agent.config.host.control_plane_http_url="fake_http_url"
