@@ -13,10 +13,10 @@ Diagrid Catalyst is a collection of API-based programming patterns for messaging
 ![Catalyst](./assets/img/catalyst.svg)
 
 A Catalyst installation consists of the following components:
-- *Agent*: Manages the configuration of Dapr projects.
-- *Management*: Provides access to service providers such as secrets stores.
-- *Gateway*: Provides routing to Dapr runtime instances.
-- *Telemetry*: Collectors export telemetry from Dapr.
+- **Agent**: Manages the configuration of Dapr projects.
+- **Management**: Provides access to service providers such as secrets stores.
+- **Gateway**: Provides routing to Dapr runtime instances.
+- **Telemetry**: Collectors export telemetry from Dapr.
 
 ## Prerequisites
 
