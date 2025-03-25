@@ -101,7 +101,7 @@ The secrets provider allows Diagrid Catalyst to store and manage sensitive data 
 The default secrets provider is Kubernetes but you can also configure AWS Secrets Manager.
 
 #### AWS Secrets Manager
-Authentication to AWS can be configured using an access key and secret key, read more about AWS Access Keys [here](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html).
+Authentication to AWS Secret Manager can be configured using an access key and secret key, read more about AWS Access Keys [here](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html).
 
 You can then provide the following Helm values:
 ```
@@ -115,7 +115,7 @@ global:
 ```
 
 #### Dapr Workflows
-To be able to support the Dapr Workflows API the Catalyst agent needs to be configured with a connection to a PostgreSQL instance. Catalyst uses this PostgreSQL instance to store and retrieve metadata about the workflow to provide a features such as the Workflow Visualizer which is available at [catalyst.diagrid.io](https://catalyst.diagrid.io).
+To be able to support the Dapr Workflows API the Catalyst agent needs to be configured with a connection to a PostgreSQL instance. Catalyst uses this PostgreSQL instance to store and retrieve metadata about the workflow to provide features such as the Workflow Visualizer which is available at [catalyst.diagrid.io](https://catalyst.diagrid.io).
 
 > NOTE: for testing purposes you can install a [PostgreSQL](https://github.com/bitnami/charts/tree/main/bitnami/postgresql) Helm Chart in the same Kubernetes cluster
 
