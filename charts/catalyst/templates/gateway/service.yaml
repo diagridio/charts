@@ -17,6 +17,7 @@ spec:
       targetPort: {{ .Values.gateway.envoy.service.targetPort }}
       protocol: TCP
   type: {{ .Values.gateway.envoy.service.type }}
+  externalTrafficPolicy: {{ .Values.gateway.envoy.service.externalTrafficPolicy }}
 ---
 apiVersion: v1
 kind: Service

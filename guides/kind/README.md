@@ -1,0 +1,202 @@
+# Deploying Catalyst to a KinD Cluster
+
+This guide shows how to deploy [Diagrid Catalyst](https://docs.diagrid.io/catalyst/) to a local [Kubernetes](https://kubernetes.io/) cluster using [KinD](https://kind.sigs.k8s.io/).
+
+## KinD
+[KinD](https://kind.sigs.k8s.io/) (Kubernetes in Docker) is a tool for running local Kubernetes clusters using [Docker](https://www.docker.com/) container nodes.
+
+## Prerequisites
+
+- [Docker](https://docs.docker.com/get-docker/)
+- [Kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation)
+- [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
+- [Diagrid CLI](https://docs.diagrid.io/catalyst/references/cli-reference/intro)
+- [Helm](https://helm.sh/)
+- [jq](https://stedolan.github.io/jq/download/)
+- [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) (for OCI registry login)
+
+> [!WARNING]
+> Some commands in this guide rely on using the `BETA_MODE` environment variable for the Diagrid CLI. This will be removed once these features graduate to stable.
+
+## Step 1: Create a Kind Cluster 📦
+
+Create a Kind cluster:
+
+```bash
+kind create cluster --name catalyst
+```
+
+## Step 2: Install cloud-provider-kind for LoadBalancer Support 📡
+
+Follow the [cloud-provider-kind installation instructions](https://github.com/kubernetes-sigs/cloud-provider-kind#install) to setup local support for Kubernetes load balancers.
+
+Once the `cloud-provider-kind` is installed, ensure your Kind cluster's control plane nodes do not have the `node.kubernetes.io/exclude-from-external-load-balancers` label.
+
+```bash
+# Remove load balancer exclusion from control plane nodes, this may fail if not present.
+kubectl label node catalyst-control-plane node.kubernetes.io/exclude-from-external-load-balancers-
+```
+
+Run the cloud provider locally.
+
+> [!WARNING]
+> Depending on your installation, cloud-provider-kind may require SUDO.
+
+```bash
+# cloud-provider-kind installed in $PATH
+cloud-provider-kind
+```
+
+## Step 3: Create a Catalyst Region 🏢
+
+Use the [Diagrid CLI](https://docs.diagrid.io/catalyst/references/cli-reference/intro) to create a new Region:
+
+```bash
+# --api is only required when running against a none production environment.
+diagrid login [--api https://api.dev.diagrid.io]
+
+# Create a new region and capture the join token
+export JOIN_TOKEN=$(BETA_MODE=true diagrid region create kind-region | jq -r .joinToken)
+```
+
+## Step 4: Install PostgreSQL (Optional, for Workflow Support) 💿
+
+If you want to use the [Dapr Workflow API](https://docs.dapr.io/developing-applications/building-blocks/workflow/workflow-overview/), install [PostgreSQL](https://www.postgresql.org/):
+
+```bash
+# Add Bitnami chart repository
+helm repo add bitnami https://charts.bitnami.com/bitnami
+helm repo update
+
+# Install PostgreSQL
+helm install postgres bitnami/postgresql \
+  --set auth.postgresPassword=postgres \
+  --set auth.username=diagrid \
+  --set auth.password=diagrid \
+  --set auth.database=catalyst \
+  --create-namespace \
+  --namespace postgres
+```
+
+## Step 5: Configure and Install Catalyst ⚡️
+
+Create a Helm values file for the Catalyst installation:
+
+```bash
+# Write Helm values to catalyst-values.yaml
+cat > catalyst-values.yaml << EOF
+agent:
+  config:
+    host:
+      private_region: true
+    project:
+      wildcard_domain: "PLACEHOLDER"
+      default_managed_state_store_type: postgresql-shared-external
+      external_postgresql:
+        enabled: true
+        auth_type: connectionString
+        connection_string_host: postgres.postgres.svc.cluster.local
+        connection_string_port: 5432
+        connection_string_username: diagrid
+        connection_string_password: diagrid
+        connection_string_database: catalyst
+gateway:
+  envoy:
+    service:
+      type: LoadBalancer
+      externalTrafficPolicy: Local
+EOF
+```
+
+Install the Catalyst Helm chart:
+
+```bash
+# Authenticate with the public AWS registry
+aws ecr-public get-login-password \
+     --region us-east-1 | helm registry login \
+     --username AWS \
+     --password-stdin public.ecr.aws
+
+# Install Catalyst using the Helm chart
+helm install catalyst oci://public.ecr.aws/diagrid/catalyst \
+     -n cra-agent \
+     --create-namespace \
+     -f catalyst-values.yaml \
+     --set agent.config.host.join_token="${JOIN_TOKEN}" \
+     --version 0.0.0-edge
+```
+
+## Step 6: Verify the Installation ✅
+
+Wait for all the Kubernetes pods to be ready:
+
+> [!NOTE]
+> This may take several minutes
+
+```bash
+kubectl -n cra-agent wait --for=condition=ready pod --all --timeout=5m
+
+# Verify the region exists and is connected
+diagrid region list
+```
+
+Get the Kubernetes LoadBalancer IP for the Catalyst gateway service:
+
+```bash
+export GATEWAY_IP=$(kubectl -n cra-agent get service gateway-envoy -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+echo "Catalyst Gateway IP: $GATEWAY_IP"
+```
+
+## Step 7. Update Catalyst ⬆️
+
+Update the Catalyst Helm installation with a [nip.io](https://nip.io/) address resolving to the Catalyst gateway IP.
+
+```bash
+helm upgrade \
+    --install catalyst oci://public.ecr.aws/diagrid/catalyst \
+     -n cra-agent \
+     --create-namespace \
+     -f catalyst-values.yaml \
+     --set agent.config.host.join_token="${JOIN_TOKEN}" \
+     --set agent.config.project.wildcard_domain="$GATEWAY_IP.nip.io" \
+     --version 0.0.0-edge
+```
+
+## Step 8: Create a Project and Deploy App Identities 🚀
+
+Create a Project in your Region
+
+```bash
+# Create the project
+BETA_MODE=true diagrid project create kind-project --region kind-region
+
+# Use the project
+diagrid project use kind-project
+```
+
+Create [App Identities](https://docs.diagrid.io/catalyst/concepts/appids)
+```bash
+diagrid appid create app1
+diagrid appid create app2
+
+# Wait until the appids are ready
+diagrid appid list
+```
+
+Send messages between your App Identities
+
+> [!WARNING]
+> The Catalyst Gateway currently does not support TLS and expects it to be terminated externally. This will be fixed soon.
+
+```bash
+# Start a listener for app1, wait until a log line like:
+# ✅ Connected App ID "app1" to http://localhost:61016 ⚡️
+diagrid listen -a app1
+
+# Call app1 from app2
+TLS_INSECURE=true diagrid call invoke get app1.hello -a app2
+```
+
+## Step 9: Write your applications 🎩
+
+Now that you've demonstrated how to deploy a Project to your Catalyst Region along with 2 App Identities. You can head over to our [local development docs](https://docs.diagrid.io/catalyst/how-to-guides/develop-locally) to see how to start writing applications that can leverage App Identities to easily build distributed systems.
