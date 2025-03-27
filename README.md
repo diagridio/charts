@@ -29,7 +29,7 @@ Before installing any charts, ensure you have the following tools:
 - A Kubernetes cluster (1.20+ recommended)
 
 ## Installation
-> NOTE: the default helm values are currently targeting the Diagrid dev environment.
+> NOTE: the default helm values are currently targeting the Diagrid stage environment.
 
 ### Step 1: Create a Region
 
