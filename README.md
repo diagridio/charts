@@ -8,6 +8,8 @@ This repository contains official Helm charts published by Diagrid for deploying
 
 ### Catalyst ⚡️
 
+https://catalyst.diagrid.io
+
 Diagrid Catalyst is a collection of API-based programming patterns for messaging, data, and workflow that is fully compliant with the Dapr open source project. It provides managed components and runtime that streamline cloud-native application development.
 
 ![Catalyst](./assets/img/catalyst.svg)
@@ -87,9 +89,12 @@ diagrid region list
 ### Step 3: Create a Project in your Region
 Your Region will now be available as a deployment option when creating Projects. For example:
 
+> [!WARNING]
+> Catalyst Private does not currently support using [Diagrid's Managed Services](https://docs.diagrid.io/catalyst/concepts/diagrid-services).
 ```bash
 diagrid project create myproject --region myregion
 ```
+
 
 Now you're ready to start building you very first application. Head over to our [quickstarts](https://docs.diagrid.io/catalyst/quickstarts) to get started 🚀!
 
