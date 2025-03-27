@@ -20,6 +20,14 @@ A Catalyst installation consists of the following components:
 - **Gateway**: Provides routing to Dapr runtime instances.
 - **Telemetry**: Collectors export telemetry from Dapr.
 
+## Guides
+
+- [Deploying Catalyst to Kubernetes](#deploying-catalyst-to-kubernetes)
+- [Deploying Catalyst to a KinD Cluster](./guides/kind/README.md)
+
+# Deploying Catalyst to Kubernetes
+This guide is a general purpose guide for deploying Catalyst on a [Kubernetes](https://kubernetes.io/) cluster.
+
 ## Prerequisites
 
 Before installing any charts, ensure you have the following tools:

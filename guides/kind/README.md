@@ -157,6 +157,13 @@ diagrid listen -a app1
 GATEWAY_TLS_INSECURE=true GATEWAY_PORT=9082 diagrid call invoke get app1.hello -a app2
 ```
 
+View your project in the Catalyst web console
+
+```bash
+# Open the Catalyst console in your web browser
+diagrid web
+```
+
 ## Step 8: Write your applications 🎩
 
 Now that you've demonstrated how to deploy a Project to your Catalyst Region along with 2 App Identities. You can head over to our [local development docs](https://docs.diagrid.io/catalyst/how-to-guides/develop-locally) to see how to start writing applications that can leverage App Identities to easily build distributed systems.
