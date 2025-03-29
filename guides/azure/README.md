@@ -1,6 +1,6 @@
 # Deploying Catalyst to Azure
 
-> ![WARNING] This guide has not been adapted to run on Windows.
+> [!WARNING] This guide has not been adapted to run on Windows.
 
 This guide demonstrates how to deploy Catalyst Private on an AKS cluster within a custom Azure Virtual Network (VNet).
 
