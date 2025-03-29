@@ -158,9 +158,11 @@ diagrid listen -a app1
 
 # Call app1 from app2
 GATEWAY_TLS_INSECURE=true GATEWAY_PORT=9082 diagrid call invoke get app1.hello -a app2
+
+# You will now see the requests being received on your app 1 listener
 ```
 
-View your project in the Catalyst web console
+To see more details, you can view your Project in the Catalyst web console
 
 ```bash
 # Open the Catalyst console in your web browser

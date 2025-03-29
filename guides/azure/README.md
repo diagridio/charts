@@ -220,9 +220,11 @@ Send messages to from one App ID to another
 ```bash
 # From the original SSH session, call app1 from app2
 GATEWAY_TLS_INSECURE=true GATEWAY_PORT=8080 diagrid call invoke get app1.hello -a app2
+
+# You will now see the requests being received on your app 1 listener
 ```
 
-From your host machine (not in Azure), view your project in the Catalyst web console
+From your host machine (not in Azure), you can view your Project in the Catalyst web console
 
 ```bash
 # Open the Catalyst console in your web browser
