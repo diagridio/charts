@@ -72,7 +72,7 @@ source .env
 
 ## Step 5: Create a Kubernetes Storage Class 🗄️
 
-Create a `standard` storage class for Dapr
+Create a `standard` Kubernetes storage class for Dapr
 
 ```bash
 cat > storage.yaml << EOF
@@ -212,7 +212,7 @@ Open a new SSH connection to the Azure VM to start a listener
 diagrid listen -a app1
 ```
 
-Send messages to from one App ID to another
+Send messages between your App Identities
 
 > [!WARNING]
 > The Catalyst Gateway currently does not support TLS and expects it to be terminated externally. This will be fixed soon.
@@ -222,9 +222,18 @@ Send messages to from one App ID to another
 GATEWAY_TLS_INSECURE=true GATEWAY_PORT=8080 diagrid call invoke get app1.hello -a app2
 
 # You will now see the requests being received on your app 1 listener
+# ...
+# {
+#   "method": "GET",
+#   "url": "/hello"
+# }
 ```
 
-From your host machine (not in Azure), you can view your Project in the Catalyst web console
+This proves that you are able to use [Dapr's service invocation API](https://docs.dapr.io/developing-applications/building-blocks/service-invocation/service-invocation-overview/) by calling your App Identity over a private IP.
+
+In this scenario, we have used the Diagrid CLI to act as both the sending and receiving applications.
+
+To view more details, from your host machine (not in Azure), open the Catalyst web console by running:
 
 ```bash
 # Open the Catalyst console in your web browser

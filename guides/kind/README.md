@@ -160,9 +160,18 @@ diagrid listen -a app1
 GATEWAY_TLS_INSECURE=true GATEWAY_PORT=9082 diagrid call invoke get app1.hello -a app2
 
 # You will now see the requests being received on your app 1 listener
+# ...
+# {
+#   "method": "GET",
+#   "url": "/hello"
+# }
 ```
 
-To see more details, you can view your Project in the Catalyst web console
+This proves that you are able to use [Dapr's service invocation API](https://docs.dapr.io/developing-applications/building-blocks/service-invocation/service-invocation-overview/) by calling your App Identity via the forwarded port.
+
+In this scenario, we have used the Diagrid CLI to act as both the sending and receiving applications.
+
+To view more details, open the Catalyst web console by running:
 
 ```bash
 # Open the Catalyst console in your web browser
