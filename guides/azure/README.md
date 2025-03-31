@@ -140,12 +140,12 @@ agent:
         connection_string_password: diagrid
         connection_string_database: catalyst
 gateway:
-    envoy:
-        service:
-            type: LoadBalancer
-        podAnnotations:
-            service.beta.kubernetes.io/azure-load-balancer-internal: "true"
-            service.beta.kubernetes.io/azure-load-balancer-ipv4: 10.42.1.180
+  envoy:
+    service:
+      type: LoadBalancer
+      podAnnotations:
+        service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+        service.beta.kubernetes.io/azure-load-balancer-ipv4: 10.42.1.180
 EOF
 ```
 
@@ -243,3 +243,8 @@ diagrid web
 ## Step 8: Write your applications 🎩
 
 Now that you've demonstrated how to deploy a Project to your Catalyst Region along with 2 App Identities. You can head over to our [local development docs](https://docs.diagrid.io/catalyst/how-to-guides/develop-locally) to see how to start writing applications that can leverage App Identities to easily build distributed systems.
+
+
+## Secrets
+
+Currently we only support storing secrets in Kubernetes or AWS Secrets Manager. Support for Azure Key Vault is on the roadmap.
