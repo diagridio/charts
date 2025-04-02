@@ -160,69 +160,6 @@ FW_PUBLIC_IP=$(az network public-ip show \
   --name "$FIREWALL_NAME" \
   --query ipAddress -o tsv)
 
-# Create a route table to route AKS outbound traffic via the firewall
-FW_RT_NAME="catalyst-firewall-route-table"
-if ! az network route-table show --resource-group "$RESOURCE_GROUP" --name "$FW_RT_NAME" &>/dev/null; then
-
-  echo "> Creating route table $FW_RT_NAME..."
-  az network route-table create \
-    --resource-group "$RESOURCE_GROUP" \
-    --location "$LOCATION" \
-    --name "$FW_RT_NAME"
-
-  echo "✅ Route table $FW_RT_NAME created."
-else
-  echo "✅ Route table $FW_RT_NAME already exists."
-fi
-
-# Create a default route to forward traffic to the firewall if it doesn't exist
-if ! az network route-table route show --resource-group "$RESOURCE_GROUP" --route-table-name "$FW_RT_NAME" --name "DefaultRoute" &>/dev/null; then
-
-  echo "> Creating default route to forward traffic to the firewall..."
-  az network route-table route create \
-    --resource-group "$RESOURCE_GROUP" \
-    --route-table-name "$FW_RT_NAME" \
-    --name "DefaultRoute" \
-    --address-prefix "0.0.0.0/0" \
-    --next-hop-type "VirtualAppliance" \
-    --next-hop-ip-address "$FW_PUBLIC_IP"
-
-  echo "✅ Default route created."
-else
-  echo "✅ Default route already exists."
-fi
-
-# Create a route to forward internet traffic to the firewall if it doesn't exist
-if ! az network route-table route show --resource-group "$RESOURCE_GROUP" --route-table-name "$FW_RT_NAME" --name "InternetRoute" &>/dev/null; then
-
-    echo "> Creating internet route to forward traffic to the internet..."
-    az network route-table route create \
-        --resource-group "$RESOURCE_GROUP" \
-        --route-table-name "$FW_RT_NAME" \
-        --name "InternetRoute" \
-        --address-prefix "$FW_PUBLIC_IP/32" \
-        --next-hop-type "Internet"
-
-    echo "✅ Internet route created."
-else
-    echo "✅ Internet route already exists."
-fi
-
-# Associate the route table with the subnet if it doesn't exist
-if ! az network vnet subnet show --resource-group "$RESOURCE_GROUP" --vnet-name "$VNET_NAME" --name "$SUBNET_NAME" --query routeTable.id -o tsv | grep -q "$FW_RT_NAME"; then
-
-  echo "> Associating $FW_RT_NAME with subnet $SUBNET_NAME..."
-  az network vnet subnet update \
-    --resource-group "$RESOURCE_GROUP" \
-    --vnet-name "$VNET_NAME" \
-    --name "$SUBNET_NAME" \
-    --route-table "$FW_RT_NAME"
-
-  echo "✅ Route table $FW_RT_NAME associated with subnet $SUBNET_NAME."
-else
-  echo "✅ Route table $FW_RT_NAME already associated with subnet $SUBNET_NAME."
-fi
-
 # Create time network rule collection if it doesn't exist
 if ! az network firewall network-rule list \
     --firewall-name "$FIREWALL_NAME" \
@@ -340,7 +277,7 @@ if ! az network firewall network-rule list \
     --priority 104 \
     --action "Allow" \
     --source-addresses "*" \
-    --destination-addresses "*" \
+    --destination-addresses "AzureCloud.$LOCATION" \
     --destination-ports 1194
 
   echo "✅ Network rules (apiudp) configured for the firewall."
@@ -497,18 +434,6 @@ else
   echo "✅ NAT Gateway already exists."
 fi
 
-# IMPORTANT: Remove the route table from the subnet when using NAT Gateway
-# The route table and NAT Gateway can conflict for outbound connections
-echo "> Removing route table association from subnet for NAT Gateway compatibility..."
-az network vnet subnet update \
-  --resource-group "$RESOURCE_GROUP" \
-  --vnet-name "$VNET_NAME" \
-  --name "$SUBNET_NAME" \
-  --remove routeTable
-
-# Check if NAT Gateway is associated with subnet
-echo "> Associating NAT Gateway with AKS subnet..."
-  
 # Wait for NAT Gateway to be fully provisioned
 echo "> Waiting for NAT Gateway to be fully provisioned..."
 until az network nat gateway show \
@@ -611,27 +536,61 @@ fi
 
 AZURE_SUBSCRIPTION=$(az account show --query id -o tsv)
 
-# Create a VM if it doesn't exist
-if ! az vm show --resource-group "$RESOURCE_GROUP" --name "$VM_NAME" >/dev/null 2>&1; then
-  echo "> Creating VM $VM_NAME..."
-  az vm create \
-    --resource-group "$RESOURCE_GROUP" \
-    --name "$VM_NAME" \
-    --image Ubuntu2404 \
-    --vnet-name "$VNET_NAME" \
-    --subnet "$SUBNET_NAME" \
-    --admin-username "$ADMIN_USERNAME" \
-    --authentication-type ssh \
-    --size "$VM_SIZE" \
-    --ssh-key-values "$SSH_KEY_PATH.pub" \
-    --assign-identity \
-    --role contributor \
-    --public-ip-address "" \
-    --scope "/subscriptions/$AZURE_SUBSCRIPTION/resourceGroups/$RESOURCE_GROUP"
+# Create NSG before VM creation
+echo "Creating NSG for VM to allow SSH access from Firewall subnet..."
+NSG_NAME="${VM_NAME}-nsg"
 
-  echo "✅ VM $VM_NAME created."
+# Create NSG if it doesn't exist
+if ! az network nsg show --resource-group "$RESOURCE_GROUP" --name "$NSG_NAME" &>/dev/null; then
+    echo "> Creating Network Security Group ${NSG_NAME}..."
+    az network nsg create --resource-group "$RESOURCE_GROUP" --name "$NSG_NAME" --location "$LOCATION"
+
+    echo "✅ Network Security Group created."
 else
-  echo "✅ VM $VM_NAME already exists."
+    echo "✅ Network Security Group already exists."
+fi
+
+# Create NSG rule to allow SSH from the Azure Firewall subnet
+if ! az network nsg rule show --resource-group "$RESOURCE_GROUP" --nsg-name "$NSG_NAME" --name "AllowSSH_FromFirewall" &>/dev/null; then
+    echo "> Creating NSG rule to allow SSH from Firewall subnet..."
+    az network nsg rule create \
+        --resource-group "$RESOURCE_GROUP" \
+        --nsg-name "$NSG_NAME" \
+        --name "AllowSSH_FromFirewall" \
+        --priority 100 \
+        --access Allow \
+        --protocol Tcp \
+        --direction Inbound \
+        --source-address-prefixes "10.42.2.0/24" \
+        --destination-port-ranges 22
+
+    echo "✅ NSG rule to allow SSH from Firewall subnet created."
+else
+    echo "✅ NSG rule for SSH already exists."
+fi
+
+# Create a VM if it doesn't exist (with NSG attached)
+if ! az vm show --resource-group "$RESOURCE_GROUP" --name "$VM_NAME" >/dev/null 2>&1; then
+    echo "> Creating VM $VM_NAME..."
+    az vm create \
+        --resource-group "$RESOURCE_GROUP" \
+        --name "$VM_NAME" \
+        --image Ubuntu2404 \
+        --vnet-name "$VNET_NAME" \
+        --subnet "$SUBNET_NAME" \
+        --admin-username "$ADMIN_USERNAME" \
+        --authentication-type ssh \
+        --size "$VM_SIZE" \
+        --ssh-key-values "$SSH_KEY_PATH.pub" \
+        --assign-identity \
+        --role contributor \
+        --public-ip-address "" \
+        --nsg "$NSG_NAME" \
+        --scope "/subscriptions/$AZURE_SUBSCRIPTION/resourceGroups/$RESOURCE_GROUP"
+    
+    echo "✅ VM $VM_NAME created with NSG attached."
+else
+    echo "✅ VM $VM_NAME already exists."
 fi
 
 # Get the private IP of the VM
