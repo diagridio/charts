@@ -160,6 +160,12 @@ FW_PUBLIC_IP=$(az network public-ip show \
   --name "$FIREWALL_NAME" \
   --query ipAddress -o tsv)
 
+# Get Firewall's private IP for routing
+FW_PRIVATE_IP=$(az network firewall show \
+  --resource-group "$RESOURCE_GROUP" \
+  --name "$FIREWALL_NAME" \
+  --query "ipConfigurations[0].privateIPAddress" -o tsv)
+
 # Create a route table to route AKS outbound traffic via the firewall
 FW_RT_NAME="catalyst-firewall-route-table"
 if ! az network route-table show --resource-group "$RESOURCE_GROUP" --name "$FW_RT_NAME" &>/dev/null; then
@@ -185,27 +191,11 @@ if ! az network route-table route show --resource-group "$RESOURCE_GROUP" --rout
     --name "DefaultRoute" \
     --address-prefix "0.0.0.0/0" \
     --next-hop-type "VirtualAppliance" \
-    --next-hop-ip-address "$FW_PUBLIC_IP"
+    --next-hop-ip-address "$FW_PRIVATE_IP"
 
   echo "✅ Default route created."
 else
   echo "✅ Default route already exists."
-fi
-
-# Create a route to forward internet traffic to the firewall if it doesn't exist
-if ! az network route-table route show --resource-group "$RESOURCE_GROUP" --route-table-name "$FW_RT_NAME" --name "InternetRoute" &>/dev/null; then
-
-    echo "> Creating internet route to forward traffic to the internet..."
-    az network route-table route create \
-        --resource-group "$RESOURCE_GROUP" \
-        --route-table-name "$FW_RT_NAME" \
-        --name "InternetRoute" \
-        --address-prefix "$FW_PUBLIC_IP/32" \
-        --next-hop-type "Internet"
-
-    echo "✅ Internet route created."
-else
-    echo "✅ Internet route already exists."
 fi
 
 # Associate the route table with the subnet if it doesn't exist
@@ -360,6 +350,7 @@ if ! az network firewall application-rule list \
     # diagrid
     "*.diagrid.io"
     # kubenetes
+    "*.dl.k8s.io"
     "dl.k8s.io"
     # github
     "github.com"
@@ -393,6 +384,7 @@ if ! az network firewall application-rule list \
     "data.policy.core.windows.net"
     "store.policy.core.windows.net"
     "dc.services.visualstudio.com"
+    "aks.ms"
     # aws
     "*.amazonaws.com"
     "*.s3.amazonaws.com"
@@ -400,6 +392,12 @@ if ! az network firewall application-rule list \
     # gcp
     "gcr.io"
     "storage.googleapis.com"
+    "us-central1-docker.pkg.dev"
+    # helm
+    "get.helm.sh"
+    "charts.bitnami.com"
+    "*.cloudfront.net"
+    "repo.broadcom.com"
     # docker
     "*.docker.io"
     "*.docker.com"
@@ -407,6 +405,9 @@ if ! az network firewall application-rule list \
     "production.cloudflare.docker.com"
     # ngrok
     "*.ngrok.io"
+    "*.ngrok.com"
+    "*.ngrok-agent.com"
+    "*.equinox.io"
     # ubuntu
     "archive.ubuntu.com"
     "security.ubuntu.com"
@@ -428,7 +429,7 @@ if ! az network firewall application-rule list \
     --resource-group "$RESOURCE_GROUP" \
     --collection-name "AllowApplicationRuleCollectionGroup" \
     --name "AllowRuleApplication" \
-    --protocols "https=443" \
+    --protocols "https=443" "http=80" \
     --priority 100 \
     --action "Allow" \
     --source-addresses "*" \
@@ -464,88 +465,7 @@ else
   echo "✅ Application rules (aks) already exist for the firewall."
 fi
 
-# Create a NAT Gateway for outbound connectivity
-NAT_GATEWAY_NAME="catalyst-nat-gateway"
-
-# Create a public IP for the NAT Gateway if it doesn't exist
-if ! az network public-ip show --resource-group "$RESOURCE_GROUP" --name "$NAT_GATEWAY_NAME-ip" &>/dev/null; then
-  echo "> Creating NAT Gateway public IP..."
-  az network public-ip create \
-    --resource-group "$RESOURCE_GROUP" \
-    --name "$NAT_GATEWAY_NAME-ip" \
-    --location "$LOCATION" \
-    --sku Standard \
-    --allocation-method Static
-
-  echo "✅ NAT Gateway public IP created."
-else
-  echo "✅ NAT Gateway public IP already exists."
-fi
-
-# Create the NAT Gateway if it doesn't exist
-if ! az network nat gateway show --resource-group "$RESOURCE_GROUP" --name "$NAT_GATEWAY_NAME" &>/dev/null; then
-  echo "> Creating NAT Gateway..."
-  az network nat gateway create \
-    --resource-group "$RESOURCE_GROUP" \
-    --name "$NAT_GATEWAY_NAME" \
-    --location "$LOCATION" \
-    --public-ip-addresses "$NAT_GATEWAY_NAME-ip" \
-    --idle-timeout 10
-
-  echo "✅ NAT Gateway created."
-else
-  echo "✅ NAT Gateway already exists."
-fi
-
-# IMPORTANT: Remove the route table from the subnet when using NAT Gateway
-# The route table and NAT Gateway can conflict for outbound connections
-echo "> Removing route table association from subnet for NAT Gateway compatibility..."
-az network vnet subnet update \
-  --resource-group "$RESOURCE_GROUP" \
-  --vnet-name "$VNET_NAME" \
-  --name "$SUBNET_NAME" \
-  --remove routeTable
-
-# Check if NAT Gateway is associated with subnet
-echo "> Associating NAT Gateway with AKS subnet..."
-  
-# Wait for NAT Gateway to be fully provisioned
-echo "> Waiting for NAT Gateway to be fully provisioned..."
-until az network nat gateway show \
-  --name "$NAT_GATEWAY_NAME" \
-  --resource-group "$RESOURCE_GROUP" \
-  --query provisioningState -o tsv | grep -q "Succeeded"; do
-  echo "Waiting for NAT Gateway provisioning to complete..."
-  sleep 15
-done
-
-# Associate NAT Gateway with subnet
-az network vnet subnet update \
-  --resource-group "$RESOURCE_GROUP" \
-  --vnet-name "$VNET_NAME" \
-  --name "$SUBNET_NAME" \
-  --nat-gateway "$NAT_GATEWAY_NAME"
-
-# Verify association was successful
-echo "> Verifying NAT Gateway association..."
-for i in {1..5}; do
-  NAT_CHECK=$(az network vnet subnet show \
-    --resource-group "$RESOURCE_GROUP" \
-    --vnet-name "$VNET_NAME" \
-    --name "$SUBNET_NAME" \
-    --query "natGateway.id" -o tsv 2>/dev/null || echo "")
-  
-  if [[ -n "$NAT_CHECK" && "$NAT_CHECK" != "null" ]]; then
-    echo "✅ NAT Gateway successfully associated with subnet."
-    break
-  fi
-  
-  echo "> Waiting for NAT Gateway association to propagate... (attempt $i/5)"
-  sleep 30
-done
-
-# Updated AKS cluster creation to specify the NAT gateway ID for outbound connectivity
-
+# Create AKS cluster if it doesn't exist
 if ! az aks show --resource-group "$RESOURCE_GROUP" --name "$AKS_NAME" &>/dev/null; then
   echo "> Creating AKS cluster $AKS_NAME..."
   
@@ -554,18 +474,8 @@ if ! az aks show --resource-group "$RESOURCE_GROUP" --name "$AKS_NAME" &>/dev/nu
     --vnet-name "$VNET_NAME" \
     --name "$SUBNET_NAME" \
     --query id -o tsv)
-
-  # Verify the subnet is correctly associated with the NAT Gateway
-  if ! az network vnet subnet show \
-       --resource-group "$RESOURCE_GROUP" \
-       --vnet-name "$VNET_NAME" \
-       --name "$SUBNET_NAME" \
-       --query "natGateway.id" -o tsv | grep -q "$NAT_GATEWAY_NAME"; then
-    echo "❌ Subnet is not properly configured with NAT Gateway. Aborting AKS creation."
-    exit 1
-  fi
   
-  # Create AKS with NAT Gateway using the --nat-gateway-id parameter
+  # Create AKS with User Defined Routing for outbound traffic through Firewall
   az aks create \
     --resource-group "$RESOURCE_GROUP" \
     --name "$AKS_NAME" \
@@ -578,7 +488,7 @@ if ! az aks show --resource-group "$RESOURCE_GROUP" --name "$AKS_NAME" &>/dev/nu
     --enable-private-cluster \
     --node-count 3 \
     --ssh-key-value "$SSH_KEY_PATH.pub" \
-    --outbound-type userAssignedNATGateway
+    --outbound-type userDefinedRouting
 
   echo "✅ AKS cluster $AKS_NAME created."
 else
@@ -627,6 +537,7 @@ if ! az vm show --resource-group "$RESOURCE_GROUP" --name "$VM_NAME" >/dev/null 
     --assign-identity \
     --role contributor \
     --public-ip-address "" \
+    --nsg-rule NONE \
     --scope "/subscriptions/$AZURE_SUBSCRIPTION/resourceGroups/$RESOURCE_GROUP"
 
   echo "✅ VM $VM_NAME created."
@@ -708,8 +619,6 @@ echo ""
 # Create copy of setup.sh
 cp setup.sh __setup.sh
 
-echo "Updating setup.sh script..."
-
 # Write to the setup script
 echo "az aks get-credentials --name $AKS_NAME --overwrite-existing --resource-group $RESOURCE_GROUP" >> __setup.sh
 echo "" >> __setup.sh
@@ -717,8 +626,6 @@ echo "" >> __setup.sh
 # Export variables
 echo "echo \"export JOIN_TOKEN=${JOIN_TOKEN}\" > .env" >> __setup.sh
 echo "echo \"export API_KEY=${API_KEY}\" >> .env" >> __setup.sh
-
-echo "Writing connect.sh script..."
 
 # Copy the setup script to the VM
 echo "scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ${SSH_KEY_PATH} ./__setup.sh ${ADMIN_USERNAME}@${FW_PUBLIC_IP}:~/setup.sh" > connect.sh
