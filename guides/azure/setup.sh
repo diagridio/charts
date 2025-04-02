@@ -20,7 +20,7 @@ if [ "$CHECKSUM" != "kubectl: OK" ]; then
   echo "Kubectl checksum verification failed!"
   exit 1
 fi
-install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 
 echo "✅ Installed kubectl"
 
@@ -29,7 +29,7 @@ echo "> Installing Helm"
 
 curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
 chmod 700 get_helm.sh
-./get_helm.sh
+sudo ./get_helm.sh
 
 echo "✅ Installed Helm"
 
@@ -37,14 +37,14 @@ echo "✅ Installed Helm"
 echo "> Installing Diagrid CLI"
 curl -o- https://downloads.diagrid.io/cli/install.sh | bash
 
-mv ./diagrid /usr/local/bin/diagrid
-chmod +x /usr/local/bin/diagrid
+sudo mv ./diagrid /usr/local/bin/diagrid
+sudo chmod +x /usr/local/bin/diagrid
 
 # Install AWS CLI
 echo "> Installing AWS CLI"
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
 unzip awscliv2.zip
-./aws/install
+sudo ./aws/install
 aws --version
 echo "✅ Installed AWS CLI"
 
@@ -53,7 +53,7 @@ echo "✅ Installed Diagrid CLI"
 # Install Azure CLI
 echo "> Installing Azure CLI"
 
-curl -sL https://aka.ms/InstallAzureCLIDeb | bash
+curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
 
 echo "✅ Installed Azure CLI"
 
