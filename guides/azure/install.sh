@@ -536,40 +536,7 @@ fi
 
 AZURE_SUBSCRIPTION=$(az account show --query id -o tsv)
 
-# Create NSG before VM creation
-echo "Creating NSG for VM to allow SSH access from Firewall subnet..."
-NSG_NAME="${VM_NAME}-nsg"
-
-# Create NSG if it doesn't exist
-if ! az network nsg show --resource-group "$RESOURCE_GROUP" --name "$NSG_NAME" &>/dev/null; then
-    echo "> Creating Network Security Group ${NSG_NAME}..."
-    az network nsg create --resource-group "$RESOURCE_GROUP" --name "$NSG_NAME" --location "$LOCATION"
-
-    echo "✅ Network Security Group created."
-else
-    echo "✅ Network Security Group already exists."
-fi
-
-# Create NSG rule to allow SSH from the Azure Firewall subnet
-if ! az network nsg rule show --resource-group "$RESOURCE_GROUP" --nsg-name "$NSG_NAME" --name "AllowSSH_FromFirewall" &>/dev/null; then
-    echo "> Creating NSG rule to allow SSH from Firewall subnet..."
-    az network nsg rule create \
-        --resource-group "$RESOURCE_GROUP" \
-        --nsg-name "$NSG_NAME" \
-        --name "AllowSSH_FromFirewall" \
-        --priority 100 \
-        --access Allow \
-        --protocol Tcp \
-        --direction Inbound \
-        --source-address-prefixes "10.42.2.0/24" \
-        --destination-port-ranges 22
-
-    echo "✅ NSG rule to allow SSH from Firewall subnet created."
-else
-    echo "✅ NSG rule for SSH already exists."
-fi
-
-# Create a VM if it doesn't exist (with NSG attached)
+# Create a VM if it doesn't exist
 if ! az vm show --resource-group "$RESOURCE_GROUP" --name "$VM_NAME" >/dev/null 2>&1; then
     echo "> Creating VM $VM_NAME..."
     az vm create \
@@ -585,10 +552,10 @@ if ! az vm show --resource-group "$RESOURCE_GROUP" --name "$VM_NAME" >/dev/null 
         --assign-identity \
         --role contributor \
         --public-ip-address "" \
-        --nsg "$NSG_NAME" \
+        --nsg-rule "NONE" \
         --scope "/subscriptions/$AZURE_SUBSCRIPTION/resourceGroups/$RESOURCE_GROUP"
-    
-    echo "✅ VM $VM_NAME created with NSG attached."
+
+    echo "✅ VM $VM_NAME created."
 else
     echo "✅ VM $VM_NAME already exists."
 fi
