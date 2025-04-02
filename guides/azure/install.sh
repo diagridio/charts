@@ -538,26 +538,26 @@ AZURE_SUBSCRIPTION=$(az account show --query id -o tsv)
 
 # Create a VM if it doesn't exist
 if ! az vm show --resource-group "$RESOURCE_GROUP" --name "$VM_NAME" >/dev/null 2>&1; then
-    echo "> Creating VM $VM_NAME..."
-    az vm create \
-        --resource-group "$RESOURCE_GROUP" \
-        --name "$VM_NAME" \
-        --image Ubuntu2404 \
-        --vnet-name "$VNET_NAME" \
-        --subnet "$SUBNET_NAME" \
-        --admin-username "$ADMIN_USERNAME" \
-        --authentication-type ssh \
-        --size "$VM_SIZE" \
-        --ssh-key-values "$SSH_KEY_PATH.pub" \
-        --assign-identity \
-        --role contributor \
-        --public-ip-address "" \
-        --nsg-rule "NONE" \
-        --scope "/subscriptions/$AZURE_SUBSCRIPTION/resourceGroups/$RESOURCE_GROUP"
+  echo "> Creating VM $VM_NAME..."
+  az vm create \
+    --resource-group "$RESOURCE_GROUP" \
+    --name "$VM_NAME" \
+    --image Ubuntu2404 \
+    --vnet-name "$VNET_NAME" \
+    --subnet "$SUBNET_NAME" \
+    --admin-username "$ADMIN_USERNAME" \
+    --authentication-type ssh \
+    --size "$VM_SIZE" \
+    --ssh-key-values "$SSH_KEY_PATH.pub" \
+    --assign-identity \
+    --role contributor \
+    --public-ip-address "" \
+    --nsg-rule "NONE" \
+    --scope "/subscriptions/$AZURE_SUBSCRIPTION/resourceGroups/$RESOURCE_GROUP"
 
-    echo "✅ VM $VM_NAME created."
+  echo "✅ VM $VM_NAME created."
 else
-    echo "✅ VM $VM_NAME already exists."
+  echo "✅ VM $VM_NAME already exists."
 fi
 
 # Get the private IP of the VM
