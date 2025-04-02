@@ -38,7 +38,7 @@ diagrid login [--api https://api.stg.diagrid.io]
 export JOIN_TOKEN=$(BETA_MODE=true diagrid region create kind-region | jq -r .joinToken)
 ```
 
-## Step 3: Install PostgreSQL (Optional, for Workflow Support) 💿
+## Step 3: Install PostgreSQL (Optional) 💿
 
 If you want to use the [Dapr Workflow API](https://docs.dapr.io/developing-applications/building-blocks/workflow/workflow-overview/), install [PostgreSQL](https://www.postgresql.org/):
 
@@ -60,6 +60,9 @@ helm install postgres bitnami/postgresql \
 ## Step 4: Configure and Install Catalyst ⚡️
 
 Create a Helm values file for the Catalyst installation:
+
+> [!NOTE]
+> If you do not want to use the Dapr Workflow API remove the `default_managed_state_store_type` and `external_postgresql` config properties.
 
 ```bash
 # Write Helm values to catalyst-values.yaml
@@ -105,7 +108,7 @@ helm install catalyst oci://public.ecr.aws/diagrid/catalyst \
 Wait for all the Kubernetes pods to be ready:
 
 > [!NOTE]
-> This may take several minutes
+> This may take several minutes  ⏳
 
 ```bash
 kubectl -n cra-agent wait --for=condition=ready pod --all --timeout=5m
@@ -155,9 +158,20 @@ diagrid listen -a app1
 
 # Call app1 from app2
 GATEWAY_TLS_INSECURE=true GATEWAY_PORT=9082 diagrid call invoke get app1.hello -a app2
+
+# You will now see the requests being received on your app 1 listener
+# ...
+# {
+#   "method": "GET",
+#   "url": "/hello"
+# }
 ```
 
-View your project in the Catalyst web console
+This proves that you are able to use [Dapr's service invocation API](https://docs.dapr.io/developing-applications/building-blocks/service-invocation/service-invocation-overview/) by calling your App Identity via the forwarded port.
+
+In this scenario, we have used the Diagrid CLI to act as both the sending and receiving applications.
+
+To view more details, open the Catalyst web console by running:
 
 ```bash
 # Open the Catalyst console in your web browser
