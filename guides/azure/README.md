@@ -1,8 +1,11 @@
 # Deploying Catalyst to Azure
 
-> [!WARNING] This guide has not been adapted to run on Windows.
 
-This guide demonstrates how to deploy Catalyst Private on an AKS cluster within a custom Azure Virtual Network (VNet).
+This guide demonstrates how to deploy Catalyst Private in a private Azure Virtual Network.
+
+![azure](../../assets/img/azure.svg)
+
+> [!WARNING] This guide has not been adapted to run on Windows.
 
 ## Prerequisites
 
@@ -63,11 +66,14 @@ From this point on, commands will be executed on the Azure VM
 ```bash
 # Setup the VM
 chmod +x "$HOME/setup.sh"
-sudo "$HOME/setup.sh"
+"$HOME/setup.sh"
 rm "$HOME/setup.sh"
 
 # Source the environment
 source .env
+
+# Login to Diagrid CLI
+diagrid login --api-key="$API_KEY" [--api https://api.stg.diagrid.io]
 ```
 
 ## Step 5: Create a Kubernetes Storage Class 🗄️
@@ -143,7 +149,7 @@ gateway:
   envoy:
     service:
       type: LoadBalancer
-      podAnnotations:
+    podAnnotations:
         service.beta.kubernetes.io/azure-load-balancer-internal: "true"
         service.beta.kubernetes.io/azure-load-balancer-ipv4: 10.42.1.180
 EOF

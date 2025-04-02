@@ -1,10 +1,14 @@
 #!/bin/bash
 
+# -------------------------------------------------------
+# This script runs on the Azure VM to setup the environment
+# -------------------------------------------------------
+
 # Update package list
 sudo apt update
 
 # Install dependencies
-sudo apt install -y apt-transport-https ca-certificates curl
+sudo apt install -y apt-transport-https ca-certificates curl gnupg lsb-release unzip
 
 # Install kubectl
 echo "> Installing kubectl"
@@ -35,7 +39,14 @@ curl -o- https://downloads.diagrid.io/cli/install.sh | bash
 
 mv ./diagrid /usr/local/bin/diagrid
 chmod +x /usr/local/bin/diagrid
-diagrid login --api-key "$API_KEY" --api https://api.stg.diagrid.io
+
+# Install AWS CLI
+echo "> Installing AWS CLI"
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+./aws/install
+aws --version
+echo "✅ Installed AWS CLI"
 
 echo "✅ Installed Diagrid CLI"
 
@@ -47,11 +58,8 @@ curl -sL https://aka.ms/InstallAzureCLIDeb | bash
 echo "✅ Installed Azure CLI"
 
 # Login to Azure
-echo "------------------------------------------"
-echo ""
-echo "🔑 Please login to Azure"
-echo ""
-echo "------------------------------------------"
-az login
+az login --identity
+
+echo "✅ Azure login with MSI successful"
 
 # ---

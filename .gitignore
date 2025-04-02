@@ -5,3 +5,4 @@ charts/catalyst/dist
 charts/catalyst/rendered.yaml
 catalyst-values.yaml
 guides/azure/connect.sh
+guides/azure/__setup.sh
