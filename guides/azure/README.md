@@ -24,7 +24,7 @@ Use the [Diagrid CLI](https://docs.diagrid.io/catalyst/references/cli-reference/
 
 ```bash
 # The --api flag is only required when running against a none production environment.
-./diagrid login [--api https://api.stg.diagrid.io]
+diagrid login [--api https://api.stg.diagrid.io]
 
 # Create a new region and capture the join token
 export JOIN_TOKEN=$(BETA_MODE=true diagrid region create azure-region | jq -r .joinToken)
