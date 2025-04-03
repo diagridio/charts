@@ -5,7 +5,8 @@ This guide demonstrates how to deploy Catalyst Private in a private Azure Virtua
 
 ![azure](../../assets/img/azure.svg)
 
-> [!WARNING] This guide has not been adapted to run on Windows.
+> [!WARNING]
+> This guide has not been adapted to run on Windows.
 
 ## Prerequisites
 
