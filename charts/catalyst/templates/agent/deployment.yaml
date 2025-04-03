@@ -1,5 +1,5 @@
 {{- $gomemlimit := include "catalyst.GetGoLangGOMEMLIMITFromResourceLimits" (dict "limits" .Values.agent.resources.limits "golimit" .Values.agent.goSoftLimit) }}
-{{- $joinToken := required "agent.config.host.join_token is required" .Values.agent.config.host.join_token }}
+{{- $joinToken := required "join_token is required" .Values.join_token }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:

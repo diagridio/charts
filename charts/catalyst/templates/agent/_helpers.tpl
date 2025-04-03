@@ -53,3 +53,12 @@ Create the name of the service account to use for agent
     {{- printf "%s-sa" (include "agent.fullname" .) | trunc 63 | trimSuffix "-" }}
   {{- end }}
 {{- end }}
+
+{{/*
+Validate values
+*/}}
+{{- define "agent.validateValues" -}}
+    {{- if not .Values.join_token -}}
+        {{- fail "A valid join_token value is required to deploy this chart!" -}}
+    {{- end -}}
+{{- end -}}

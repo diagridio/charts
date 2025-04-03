@@ -1,3 +1,10 @@
+---
+#-----------------------------------------------------------------------------
+# JOIN_TOKEN: Required value for the agent to register with catalyst.
+#-----------------------------------------------------------------------------
+
+join_token: ""
+
 #------------------------------------------------------------------------------
 # Global Options
 #------------------------------------------------------------------------------
@@ -31,6 +38,24 @@ global:
       # Optional, access key and secret key par to access AWS Secrets Manager
       access_key: ""
       secret_access_key: ""
+  # Global sentry configuration
+  sentry:
+    enabled: true
+    endpoint: dapr-sentry.root-dapr-system.svc.cluster.local:443
+    remote_endpoint: sentry.prd.p.diagrid.io:443
+    diagrid_trust_anchors_endpoint: https://pem.trust.diagrid.io
+    diagrid_trust_anchors_endpoint_insecure: false
+    trust_domain: prj-root.cra.diagrid.io
+    namespace: root-dapr-system
+    trust_anchors_file: "/var/run/secrets/diagrid.io/trust/ca.crt"
+  # Global nats configuration
+  nats:
+    endpoint: tls://client.events.prd.p.diagrid.io:443
+    trust_domain: cra.diagrid.io
+  # Global feature flags
+  featureflags:
+    nats_enabled: true
+    agent_component_validation: false
 
 #------------------------------------------------------------------------------
 # Shared Configurations
@@ -52,7 +77,6 @@ agent:
   config:
     host:
       private_region: true
-      join_token: ""
       ingress_ip_addr: ""
       egress_addresses: []
     control_plane_url: cra-cloudgrid.prd.p.diagrid.io:443
@@ -60,7 +84,6 @@ agent:
     placement:
       max_project_count: 50
     project:
-      wildcard_domain: "private.diagrid.io"
       default_managed_pubsub_type: kafka-shared-disabled
       default_managed_state_store_type: postgresql-shared-disabled
       ingress_tls_secret_name: ""
@@ -135,19 +158,8 @@ agent:
       burst: 10
     denylist:
       enabled: false
-    sentry:
-      enabled: true
-      endpoint: dapr-sentry.root-dapr-system.svc.cluster.local:443
-      remote_endpoint: sentry.prd.p.diagrid.io:443
-      diagrid_trust_anchors_endpoint: https://pem.trust.diagrid.io
-      trust_domain: prj-root.cra.diagrid.io
-      namespace: root-dapr-system
-    nats:
-      endpoint: tls://client.events.prd.p.diagrid.io:443
-      trust_domain: cra.diagrid.io
     featureflags:
-      nats_enabled: true
-      agent_component_validation: false
+      {}
 
   metrics:
     port: 9090
@@ -370,20 +382,8 @@ management:
       enabled: false
     profiling:
       enabled: false
-    nats:
-      endpoint: tls://client.events.prd.p.diagrid.io:443
-      trust_domain: cra.diagrid.io
     featureflags:
-      nats_enabled: true
-    sentry:
-      enabled: true
-      endpoint: dapr-sentry.root-dapr-system.svc.cluster.local:443
-      remote_endpoint: sentry.prd.p.diagrid.io:443
-      diagrid_trust_anchors_endpoint: https://pem.trust.diagrid.io
-      diagrid_trust_anchors_endpoint_insecure: false
-      trust_domain: prj-root.cra.diagrid.io
-      namespace: root-dapr-system
-      trust_anchors_file: "/var/run/secrets/diagrid.io/trust/ca.crt"
+      {}
 
   replicaCount: 2
 

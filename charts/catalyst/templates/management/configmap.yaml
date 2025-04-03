@@ -1,8 +1,12 @@
-{{- $configMap := toYaml .Values.management.config -}}
+{{- $configMap := deepCopy .Values.management.config -}}
+{{- $_ := set $configMap.sentry .Values.global.sentry -}}
+{{- $_ := set $configMap.nats .Values.global.nats -}}
+{{- $_ := set $configMap.featureflags "nats_enabled" .Values.global.featureflags.nats_enabled -}}
+{{- $_ := set $configMap.featureflags "agent_component_validation" .Values.global.featureflags.agent_component_validation -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ include "management.name" . }}-config
 data:
   "config.yaml": |
-{{ tpl $configMap . | indent 4 }}
+{{ tpl (toYaml $configMap) . | indent 4 }}

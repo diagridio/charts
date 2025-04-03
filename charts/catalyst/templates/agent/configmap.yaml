@@ -1,8 +1,14 @@
-{{- $configMap := toYaml .Values.agent.config -}}
+{{- include "agent.validateValues" . -}}
+{{- $agentConfig := deepCopy .Values.agent.config -}}
+{{- $_ := set $agentConfig.host "join_token" .Values.join_token -}}
+{{- $_ := set $agentConfig.sentry .Values.global.sentry -}}
+{{- $_ := set $agentConfig.nats .Values.global.nats -}}
+{{- $_ := set $agentConfig.featureflags "nats_enabled" .Values.global.featureflags.nats_enabled -}}
+{{- $_ := set $agentConfig.featureflags "agent_component_validation" .Values.global.featureflags.agent_component_validation -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ include "agent.name" . }}-config
 data:
   "config.yaml": |
-{{ tpl $configMap . | indent 4 }}
+{{ tpl (toYaml $agentConfig) . | indent 4 }}
