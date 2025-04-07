@@ -228,6 +228,13 @@ gateway:
       tag: edge
       name: "identity-injector"
       registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public"
+    resources:
+      limits:
+        cpu: 50m
+        memory: 50Mi
+      requests:
+        cpu: 10m
+        memory: 15Mi
   envoy:
     replicaCount: 1
     image:
@@ -283,6 +290,13 @@ gateway:
     nodeSelector: {}
     affinity: {}
     tolerations: []
+    resources:
+      limits:
+        cpu: 1000m
+        memory: 2048Mi
+      requests:
+        cpu: 100m
+        memory: 512Mi
   controlplane:
     replicaCount: 1
     xds:
@@ -331,6 +345,13 @@ gateway:
     nodeSelector: {}
     affinity: {}
     tolerations: []
+    resources:
+      limits:
+        cpu: 100m
+        memory: 100Mi
+      requests:
+        cpu: 50m
+        memory: 50Mi
 
 #------------------------------------------------------------------------------
 # Management Service Configurations
