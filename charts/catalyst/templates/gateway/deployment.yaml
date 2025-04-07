@@ -12,7 +12,7 @@ metadata:
   labels:
     {{- include "merge.maps" (dict "base" (fromYaml (include "gateway.envoy.labels" .)) "overrides" .Values.gateway.envoy.merge.labels) | nindent 4 }}
 spec:
-  replicas: {{ .Values.gateway.envoy.replicaCount }}
+  replicas: {{ if .Values.gateway.ha.enabled }}{{ .Values.gateway.ha.minReplicas }}{{ else }}{{ .Values.gateway.envoy.replicaCount }}{{ end }}
   selector:
     matchLabels:
       {{- include "gateway.envoy.selectorLabels" . | nindent 6 }}
@@ -141,7 +141,7 @@ metadata:
   labels:
     {{- include "merge.maps" (dict "base" (fromYaml (include "gateway.controlplane.labels" .)) "overrides" .Values.gateway.controlplane.merge.labels) | nindent 4 }}
 spec:
-  replicas: {{ .Values.gateway.controlplane.replicaCount }}
+  replicas: {{ if .Values.gateway.ha.enabled }}{{ .Values.gateway.ha.minReplicas }}{{ else }}{{ .Values.gateway.controlplane.replicaCount }}{{ end }}
   selector:
     matchLabels:
       {{- include "gateway.controlplane.selectorLabels" . | nindent 6 }}
@@ -208,7 +208,7 @@ spec:
                 fieldRef:
                   fieldPath: metadata.name
             - name: LEADER_ELECTION_ENABLED
-              value: "true"
+              value: {{ .Values.gateway.ha.enabled | quote }}
           {{- if .Values.gateway.controlplane.xds.mtls.enabled }}
             - name: XDS_SERVER_TLS_CERT
               value: "/var/run/secrets/diagrid.io/tls/tls.crt"
