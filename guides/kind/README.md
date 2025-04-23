@@ -15,9 +15,6 @@ This guide shows how to deploy [Diagrid Catalyst](https://docs.diagrid.io/cataly
 - [jq](https://stedolan.github.io/jq/download/)
 - [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) (for OCI registry login)
 
-> [!WARNING]
-> Some commands in this guide rely on using the `BETA_MODE` environment variable for the Diagrid CLI. This will be removed once these features graduate to stable.
-
 ## Step 1: Create a Kind Cluster 📦
 
 Create a Kind cluster:
@@ -35,7 +32,7 @@ Use the [Diagrid CLI](https://docs.diagrid.io/catalyst/references/cli-reference/
 diagrid login [--api https://api.stg.diagrid.io]
 
 # Create a new region and capture the join token
-export JOIN_TOKEN=$(BETA_MODE=true diagrid region create kind-region | jq -r .joinToken)
+export JOIN_TOKEN=$(diagrid region create kind-region | jq -r .joinToken)
 ```
 
 ## Step 3: Install PostgreSQL (Optional) 💿
@@ -50,8 +47,6 @@ helm repo update
 # Install PostgreSQL
 helm install postgres bitnami/postgresql \
   --set auth.postgresPassword=postgres \
-  --set auth.username=diagrid \
-  --set auth.password=diagrid \
   --set auth.database=catalyst \
   --create-namespace \
   --namespace postgres
@@ -69,18 +64,17 @@ Create a Helm values file for the Catalyst installation:
 cat > catalyst-values.yaml << EOF
 agent:
   config:
-    host:
-      private_region: true
     project:
       wildcard_domain: "127.0.0.1.nip.io"
       default_managed_state_store_type: postgresql-shared-external
       external_postgresql:
         enabled: true
         auth_type: connectionString
-        connection_string_host: postgres.postgres.svc.cluster.local
+        namespace: postgres
+        connection_string_host: postgres-postgresql.postgres.svc.cluster.local
         connection_string_port: 5432
-        connection_string_username: diagrid
-        connection_string_password: diagrid
+        connection_string_username: postgres
+        connection_string_password: postgres
         connection_string_database: catalyst
 EOF
 ```
@@ -131,7 +125,7 @@ Create a Project in your Region
 
 ```bash
 # Create the project
-BETA_MODE=true diagrid project create kind-project --region kind-region
+diagrid project create kind-project --region kind-region
 
 # Use the project
 diagrid project use kind-project

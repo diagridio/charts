@@ -27,7 +27,7 @@ Use the [Diagrid CLI](https://docs.diagrid.io/catalyst/references/cli-reference/
 diagrid login [--api https://api.stg.diagrid.io]
 
 # Create a new region and capture the join token
-export JOIN_TOKEN=$(BETA_MODE=true diagrid region create azure-region | jq -r .joinToken)
+export JOIN_TOKEN=$(diagrid region create azure-region | jq -r .joinToken)
 
 # Create an api key to use the Diagrid CLI in Azure
 export API_KEY=$(diagrid apikey create --name azure-key --role cra.diagrid:editor --duration 8640)
@@ -114,8 +114,6 @@ helm repo update
 # Install PostgreSQL
 helm install postgres bitnami/postgresql \
   --set auth.postgresPassword=postgres \
-  --set auth.username=diagrid \
-  --set auth.password=diagrid \
   --set auth.database=catalyst \
   --create-namespace \
   --namespace postgres
@@ -133,18 +131,17 @@ Create a Helm values file for the Catalyst installation:
 cat > catalyst-values.yaml << EOF
 agent:
   config:
-    host:
-      private_region: true
     project:
       wildcard_domain: "10.42.1.180.nip.io"
       default_managed_state_store_type: postgresql-shared-external
       external_postgresql:
         enabled: true
         auth_type: connectionString
-        connection_string_host: postgres.postgres.svc.cluster.local
+        namespace: postgres
+        connection_string_host: postgres-postgresql.postgres.svc.cluster.local
         connection_string_port: 5432
-        connection_string_username: diagrid
-        connection_string_password: diagrid
+        connection_string_username: postgres
+        connection_string_password: postgres
         connection_string_database: catalyst
 gateway:
   envoy:
@@ -190,7 +187,7 @@ kubectl -n cra-agent wait --for=condition=ready pod --all --timeout=5m
 Create a new Project in your Region
 ```bash
 # Create the project
-BETA_MODE=true diagrid project create azure-project --region azure-region
+diagrid project create azure-project --region azure-region
 
 # Use the project
 diagrid project use azure-project

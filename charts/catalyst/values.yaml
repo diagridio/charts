@@ -55,8 +55,8 @@ agent:
       join_token: ""
       ingress_ip_addr: ""
       egress_addresses: []
-    control_plane_url: cra-cloudgrid.stg.n.diagrid.io:443
-    control_plane_http_url: https://api.stg.diagrid.io
+    control_plane_url: cra-cloudgrid.prd.p.diagrid.io:443
+    control_plane_http_url: https://api.diagrid.io
     placement:
       max_project_count: 50
     project:
@@ -84,8 +84,8 @@ agent:
       enabled: true
       image_repository: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/diagrid-otel-collector"
       image_tag: "edge"
-      metrics_endpoint: https://cra-metrics.stg.n.diagrid.io/api/v1/push
-      loki_endpoint: https://cra-logs.stg.n.diagrid.io/loki/api/v1/push
+      metrics_endpoint: https://cra-metrics.prd.p.diagrid.io/api/v1/push
+      loki_endpoint: https://cra-logs.prd.p.diagrid.io/loki/api/v1/push
       metrics_tls_insecure: false
       loki_tls_insecure: false
       internal_cortex_enabled: false
@@ -138,12 +138,12 @@ agent:
     sentry:
       enabled: true
       endpoint: dapr-sentry.root-dapr-system.svc.cluster.local:443
-      remote_endpoint: sentry.stg.n.diagrid.io:443
-      diagrid_trust_anchors_endpoint: https://trust-pem.stg.n.diagrid.io
+      remote_endpoint: sentry.prd.p.diagrid.io:443
+      diagrid_trust_anchors_endpoint: https://pem.trust.diagrid.io
       trust_domain: prj-root.cra.diagrid.io
       namespace: root-dapr-system
     nats:
-      endpoint: tls://client.events.stg.n.diagrid.io:443
+      endpoint: tls://client.events.prd.p.diagrid.io:443
       trust_domain: cra.diagrid.io
     featureflags:
       nats_enabled: true
@@ -371,15 +371,15 @@ management:
     profiling:
       enabled: false
     nats:
-      endpoint: tls://client.events.stg.n.diagrid.io:443
+      endpoint: tls://client.events.prd.p.diagrid.io:443
       trust_domain: cra.diagrid.io
     featureflags:
       nats_enabled: true
     sentry:
       enabled: true
       endpoint: dapr-sentry.root-dapr-system.svc.cluster.local:443
-      remote_endpoint: sentry.stg.n.diagrid.io:443
-      diagrid_trust_anchors_endpoint: https://trust-pem.stg.n.diagrid.io
+      remote_endpoint: sentry.prd.p.diagrid.io:443
+      diagrid_trust_anchors_endpoint: https://pem.trust.diagrid.io
       diagrid_trust_anchors_endpoint_insecure: false
       trust_domain: prj-root.cra.diagrid.io
       namespace: root-dapr-system
