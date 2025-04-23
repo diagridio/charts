@@ -29,7 +29,7 @@ CHART_NAME ?= catalyst
 helm-lint: helm-prereqs
 	cd $(CHART_DIR) && \
 	helm lint $(TARGET_PATH) \
-	--set agent.config.host.join_token="fake_token"
+	--set join_token="fake_token"
 
 .PHONY: helm-add-repos
 helm-add-repos: ## Add helm repos
@@ -54,7 +54,7 @@ helm-template: helm-prereqs ## Render helm chart
 	helm template my-release ./ \
 		--namespace test \
 		--debug \
-		--set agent.config.host.join_token="fake_token" > rendered.yaml
+		--set join_token="fake_token" > rendered.yaml
 
 .PHONY: helm-package
 helm-package: ## Package helm chart
@@ -78,6 +78,6 @@ helm-upgrade: helm-prereqs ## Upgrade the Helm chart
 		--dry-run \
 		--skip-crds \
 		--debug \
-		--set agent.config.host.join_token="fake_token" \
+		--set join_token="fake_token" \
 		--set agent.config.host.control_plane_url="fake_url" \
 		--set agent.config.host.control_plane_http_url="fake_http_url"
