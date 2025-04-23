@@ -4,6 +4,8 @@
 #-----------------------------------------------------------------------------
 
 join_token: ""
+# Wildcard domain for the ingress
+wildcard_domain: "private.diagrid.io"
 
 #------------------------------------------------------------------------------
 # Global Options

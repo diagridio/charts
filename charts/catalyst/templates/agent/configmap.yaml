@@ -1,6 +1,7 @@
 {{- include "agent.validateValues" . -}}
 {{- $agentConfig := deepCopy .Values.agent.config -}}
 {{- $_ := set $agentConfig.host "join_token" .Values.join_token -}}
+{{- $_ := set $agentConfig.project "wildcard_domain" .Values.wildcard_domain -}}
 {{- $_ := set $agentConfig "sentry" .Values.global.sentry -}}
 {{- $_ := set $agentConfig "nats" .Values.global.nats -}}
 {{- $_ := set $agentConfig.featureflags "nats_enabled" .Values.global.featureflags.nats_enabled -}}

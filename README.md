@@ -42,16 +42,14 @@ Before installing any charts, ensure you have the following tools:
 
 ### Step 1: Create a Region
 
-First, create a Diagrid Region using the Diagrid CLI, 
+First, create a Diagrid Region using the Diagrid CLI:
 
 ```bash
 # Login to Diagrid
 diagrid login
 
-# Set the wildcard domain that is going to be used to expose dapr runtime instances (e.g https://http-prj123.$WILDCARD_DOMAIN)
-export WILDCARD_DOMAIN=subdomain.my-domain.com
 # Create a new region and capture the join token
-export JOIN_TOKEN=$(diagrid region create myregion --wildcard-domain $WILDCARD_DOMAIN | jq -r .joinToken)
+export JOIN_TOKEN=$(diagrid region create myregion | jq -r .joinToken)
 ```
 
 ### Step 2: Install the Catalyst Helm Chart
@@ -106,6 +104,14 @@ diagrid project create myproject --region myregion
 
 
 Now you're ready to start building you very first application. Head over to our [quickstarts](https://docs.diagrid.io/catalyst/quickstarts) to get started 🚀!
+
+### Networking
+
+#### Ingress
+Dapr runtime instances in a Catalyst region are made available to applications via their project's network address. For a private Catalyst installation, you must configure a wildcard DNS rule (`*.apps.myinternal.net`) so that your application's can resolve all project network addresses (e.g. `https://http-prj123.apps.myinternal.net`) to the IP address of the Catalyst gateway. You must also provide your wildcard domain when installing the Catalyst Helm Chart by setting the following Helm value:
+```
+agent.config.project.wildcard_domain=my-domain.com
+```
 
 ### Secrets
 The secrets provider allows Diagrid Catalyst to store and manage sensitive data specific to the resources hosted in a Region.
