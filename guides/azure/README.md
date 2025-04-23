@@ -24,7 +24,7 @@ Use the [Diagrid CLI](https://docs.diagrid.io/catalyst/references/cli-reference/
 
 ```bash
 # The --api flag is only required when running against a none production environment.
-diagrid login [--api https://api.stg.diagrid.io]
+diagrid login
 
 # Create a new region and capture the join token
 export JOIN_TOKEN=$(diagrid region create azure-region | jq -r .joinToken)
@@ -74,7 +74,7 @@ rm "$HOME/setup.sh"
 source .env
 
 # Login to Diagrid CLI
-diagrid login --api-key="$API_KEY" [--api https://api.stg.diagrid.io]
+diagrid login --api-key="$API_KEY"
 ```
 
 ## Step 5: Create a Kubernetes Storage Class 🗄️
