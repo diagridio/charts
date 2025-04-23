@@ -4,8 +4,6 @@
 #-----------------------------------------------------------------------------
 
 join_token: ""
-# Wildcard domain for the ingress
-wildcard_domain: "private.diagrid.io"
 
 #------------------------------------------------------------------------------
 # Global Options
@@ -86,6 +84,7 @@ agent:
     placement:
       max_project_count: 50
     project:
+      wildcard_domain: "private.diagrid.io"
       default_managed_pubsub_type: kafka-shared-disabled
       default_managed_state_store_type: postgresql-shared-disabled
       ingress_tls_secret_name: ""

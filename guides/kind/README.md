@@ -93,7 +93,7 @@ helm install catalyst oci://public.ecr.aws/diagrid/catalyst \
      -n cra-agent \
      --create-namespace \
      -f catalyst-values.yaml \
-     --set agent.config.host.join_token="${JOIN_TOKEN}" \
+     --set join_token="${JOIN_TOKEN}" \
      --version 0.0.0-edge
 ```
 
