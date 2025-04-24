@@ -36,7 +36,7 @@ spec:
             - ./identity-injector
           env:
             - name: IDENTITY_TRUST_DOMAIN
-              value: prj-root.cra.diagrid.io
+              value: prj-root.trust.diagrid.io
             - name: IDENTITY_APPID
               valueFrom:
                 fieldRef:
@@ -163,7 +163,7 @@ spec:
           - ./identity-injector
           env:
             - name: IDENTITY_TRUST_DOMAIN
-              value: prj-root.cra.diagrid.io
+              value: prj-root.trust.diagrid.io
             - name: IDENTITY_APPID
               valueFrom:
                 fieldRef:
