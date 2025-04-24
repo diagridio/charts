@@ -45,13 +45,13 @@ global:
     remote_endpoint: sentry.prd.p.diagrid.io:443
     diagrid_trust_anchors_endpoint: https://pem.trust.diagrid.io
     diagrid_trust_anchors_endpoint_insecure: false
-    trust_domain: prj-root.cra.diagrid.io
+    trust_domain: prj-root.trust.diagrid.io
     namespace: root-dapr-system
     trust_anchors_file: "/var/run/secrets/diagrid.io/trust/ca.crt"
   # Global nats configuration
   nats:
     endpoint: tls://client.events.prd.p.diagrid.io:443
-    trust_domain: cra.diagrid.io
+    trust_domain: trust.diagrid.io
   # Global feature flags
   featureflags:
     nats_enabled: true
