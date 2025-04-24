@@ -29,7 +29,7 @@ Use the [Diagrid CLI](https://docs.diagrid.io/catalyst/references/cli-reference/
 
 ```bash
 # --api is only required when running against a none production environment.
-diagrid login [--api https://api.stg.diagrid.io]
+diagrid login
 
 # Create a new region and capture the join token
 export JOIN_TOKEN=$(diagrid region create kind-region | jq -r .joinToken)
@@ -93,7 +93,7 @@ helm install catalyst oci://public.ecr.aws/diagrid/catalyst \
      -n cra-agent \
      --create-namespace \
      -f catalyst-values.yaml \
-     --set agent.config.host.join_token="${JOIN_TOKEN}" \
+     --set join_token="${JOIN_TOKEN}" \
      --version 0.0.0-edge
 ```
 

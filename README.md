@@ -67,7 +67,7 @@ aws ecr-public get-login-password \
 helm install catalyst oci://public.ecr.aws/diagrid/catalyst \
      -n cra-agent \
      --create-namespace \
-     --set "agent.config.host.join_token=${JOIN_TOKEN}" \
+     --set "join_token=${JOIN_TOKEN}" \
      --version 0.0.0-edge
 ```
 
@@ -82,7 +82,7 @@ cd charts
 helm install catalyst ./charts/catalyst/ \
      -n cra-agent \
      --create-namespace \
-     --set "agent.config.host.join_token=${JOIN_TOKEN}"
+     --set "join_token=${JOIN_TOKEN}"
 ```
 
 The Catalyst installation will take a few minutes to onboard itself. During this time you may see pods restart but it will stabilize.
@@ -107,7 +107,7 @@ Now you're ready to start building you very first application. Head over to our 
 
 ### Networking
 
-#### Ingress 
+#### Ingress
 Dapr runtime instances in a Catalyst region are made available to applications via their project's network address. For a private Catalyst installation, you must configure a wildcard DNS rule (`*.apps.myinternal.net`) so that your application's can resolve all project network addresses (e.g. `https://http-prj123.apps.myinternal.net`) to the IP address of the Catalyst gateway. You must also provide your wildcard domain when installing the Catalyst Helm Chart by setting the following Helm value:
 ```
 agent.config.project.wildcard_domain=my-domain.com
