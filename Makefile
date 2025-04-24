@@ -81,3 +81,10 @@ helm-upgrade: helm-prereqs ## Upgrade the Helm chart
 		--set join_token="fake_token" \
 		--set agent.config.host.control_plane_url="fake_url" \
 		--set agent.config.host.control_plane_http_url="fake_http_url"
+
+update-tags:
+	@if [ -z "$(IMAGES_TAG)" ]; then \
+		echo "IMAGES_TAG is not set"; \
+		exit 1; \
+	fi
+	sed -i '' 's/"edge"/"$(IMAGES_TAG)"/g' $(CHART_DIR)/values.yaml
