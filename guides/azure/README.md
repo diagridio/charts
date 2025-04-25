@@ -77,31 +77,6 @@ source .env
 diagrid login --api-key="$API_KEY"
 ```
 
-## Step 5: Create a Kubernetes Storage Class 🗄️
-
-Create a `standard` Kubernetes storage class for Dapr
-
-```bash
-cat > storage.yaml << EOF
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  name: standard
-provisioner: disk.csi.azure.com
-parameters:
-  skuName: Standard_LRS
-reclaimPolicy: Retain
-volumeBindingMode: WaitForFirstConsumer
-allowVolumeExpansion: true
-EOF
-```
-
-Apply the storage class to Kubernetes
-
-```bash
-kubectl apply -f ./storage.yaml
-```
-
 ## Step 5: Install PostgreSQL (Optional) 💿
 
 If you want to use the [Dapr Workflow API](https://docs.dapr.io/developing-applications/building-blocks/workflow/workflow-overview/), install [PostgreSQL](https://www.postgresql.org/):
