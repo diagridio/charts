@@ -144,7 +144,7 @@ agent:
         requests:
           memory: 130Mi
       scheduler:
-        storage_class: standard
+        # storage_class: ""
         storage_size: 8Gi
     artifacts:
       # make sure the k8s container image version works with the vcluster chart version when updating these, best is to copy the container image version from the vcluster release
