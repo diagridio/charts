@@ -31,8 +31,11 @@ Use the [Diagrid CLI](https://docs.diagrid.io/catalyst/references/cli-reference/
 # --api is only required when running against a none production environment.
 diagrid login
 
+# Set the wildcard domain that is going to be used to expose dapr runtime instances (e.g https://http-prj123.$WILDCARD_DOMAIN)
+export WILDCARD_DOMAIN="127.0.0.1.nip.io"
+
 # Create a new region and capture the join token
-export JOIN_TOKEN=$(diagrid region create kind-region | jq -r .joinToken)
+export JOIN_TOKEN=$(diagrid region create kind-region --wildcard-domain $WILDCARD_DOMAIN | jq -r .joinToken)
 ```
 
 ## Step 3: Install PostgreSQL (Optional) 💿
@@ -65,7 +68,6 @@ cat > catalyst-values.yaml << EOF
 agent:
   config:
     project:
-      wildcard_domain: "127.0.0.1.nip.io"
       default_managed_state_store_type: postgresql-shared-external
       external_postgresql:
         enabled: true
