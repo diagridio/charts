@@ -26,8 +26,12 @@ Use the [Diagrid CLI](https://docs.diagrid.io/catalyst/references/cli-reference/
 # The --api flag is only required when running against a none production environment.
 diagrid login
 
+# Set the wildcard domain that is going to be used to expose dapr runtime instances (e.g https://http-prj123.$WILDCARD_DOMAIN)
+# We will annotate the gateway service to be exposed using this ip address: "10.42.1.180".
+export WILDCARD_DOMAIN="10.42.1.180.nip.io"
+
 # Create a new region and capture the join token
-export JOIN_TOKEN=$(diagrid region create azure-region | jq -r .joinToken)
+export JOIN_TOKEN=$(diagrid region create azure-region --wildcard-domain $WILDCARD_DOMAIN | jq -r .joinToken)
 
 # Create an api key to use the Diagrid CLI in Azure
 export API_KEY=$(diagrid apikey create --name azure-key --role cra.diagrid:editor --duration 8640)
@@ -132,7 +136,6 @@ cat > catalyst-values.yaml << EOF
 agent:
   config:
     project:
-      wildcard_domain: "10.42.1.180.nip.io"
       default_managed_state_store_type: postgresql-shared-external
       external_postgresql:
         enabled: true
