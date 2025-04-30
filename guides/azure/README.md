@@ -102,11 +102,8 @@ helm install postgres bitnami/postgresql \
 
 Create a Helm values file for the Catalyst installation:
 
-> [!NOTE]
-> If you do not want to use the Dapr Workflow API remove the `default_managed_state_store_type` and `external_postgresql` config properties.
-
 ```bash
-# Write Helm values to catalyst-values.yaml
+# If you installed PostresSQL
 cat > catalyst-values.yaml << EOF
 agent:
   config:
@@ -121,6 +118,21 @@ agent:
         connection_string_username: postgres
         connection_string_password: postgres
         connection_string_database: catalyst
+gateway:
+  envoy:
+    service:
+      type: LoadBalancer
+    podAnnotations:
+        service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+        service.beta.kubernetes.io/azure-load-balancer-ipv4: 10.42.1.180
+EOF
+
+# If you did not install PostgreSQL
+cat > catalyst-values.yaml << EOF
+agent:
+  config:
+    project:
+      default_managed_state_store_type: postgresql-shared-disabled
 gateway:
   envoy:
     service:
