@@ -241,7 +241,7 @@ gateway:
     minReplicas: 2
   identityInjector:
     image:
-      tag: edge
+      tag: "edge"
       name: "identity-injector"
       registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public"
     resources:
@@ -321,7 +321,7 @@ gateway:
       mtls:
         enabled: true
     image:
-      tag: edge
+      tag: "edge"
       name: catalyst-gateway
       registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public"
     serviceAccount:
