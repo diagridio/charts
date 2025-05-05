@@ -16,6 +16,12 @@ spec:
       port: {{ .Values.gateway.envoy.service.port }}
       targetPort: {{ .Values.gateway.envoy.service.targetPort }}
       protocol: TCP
+    {{- if .Values.gateway.tls.enabled }}
+    - name: https
+      port: {{ .Values.gateway.envoy.service.httpsPort }}
+      targetPort: {{ .Values.gateway.envoy.service.httpsTargetPort }}
+      protocol: TCP
+    {{- end }}
   type: {{ .Values.gateway.envoy.service.type }}
 ---
 apiVersion: v1

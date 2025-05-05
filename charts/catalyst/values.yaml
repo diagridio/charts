@@ -234,6 +234,23 @@ agent:
 
 gateway:
   namespace: gateway
+  tls:
+    enabled: false
+    # Name of the secret containing TLS certificates
+    secretName: "gateway-tls-certs"
+    # TLS certificate configuration
+    certificates:
+      # Path to the TLS certificate file
+      certFile: "/etc/ssl/certs/tls.crt"
+      # Path to the TLS key file
+      keyFile: "/etc/ssl/certs/tls.key"
+      # Optional: Path to the CA certificate file for client certificate validation
+      caFile: ""
+    # Volume configuration for mounting TLS certificates
+    volumes:
+      # Mount path for TLS certificates
+      mountPath: "/etc/ssl/certs"
+
   # Enable High Availability mode for gateway components
   ha:
     enabled: false
@@ -272,6 +289,9 @@ gateway:
       appLabel: envoy
       port: 8080
       targetPort: 8080
+      # HTTPS port configuration
+      httpsPort: 8443
+      httpsTargetPort: 8443
       type: ClusterIP
     xds:
       connect_timeout: 10s
