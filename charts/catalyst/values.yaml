@@ -233,7 +233,6 @@ agent:
 #------------------------------------------------------------------------------
 
 gateway:
-  namespace: gateway
   tls:
     enabled: false
     # Name of the secret containing TLS certificates

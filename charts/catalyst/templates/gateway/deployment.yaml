@@ -87,6 +87,11 @@ spec:
             - name: http
               containerPort: {{ .Values.gateway.envoy.service.targetPort }}
               protocol: TCP
+            {{- if .Values.gateway.tls.enabled }}
+            - name: https
+              containerPort: 8443
+              protocol: TCP
+            {{- end }}
           volumeMounts:
             - name: envoy-config
               mountPath: /etc/envoy
@@ -232,6 +237,7 @@ spec:
           securityContext:
             {{- toYaml .Values.gateway.controlplane.securityContext | nindent 12 }}
           image: "{{ $controlplaneImage }}"
+          imagePullPolicy: Always
           resources:
             {{- toYaml .Values.gateway.controlplane.resources | nindent 12 }}
           ports:
