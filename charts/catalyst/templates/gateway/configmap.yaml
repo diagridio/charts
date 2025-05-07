@@ -27,6 +27,19 @@ data:
                 cluster_name: controlplane
 
     static_resources:
+      {{- if .Values.gateway.tls.enabled }}
+      secrets:
+        - name: gateway_tls_cert
+          tls_certificate:
+            certificate_chain:
+              filename: {{ .Values.gateway.tls.certificates.certFile }}
+            private_key:
+              filename: {{ .Values.gateway.tls.certificates.keyFile }}
+            {{- if .Values.gateway.tls.certificates.caFile }}
+            ocsp_staple:
+              filename: {{ .Values.gateway.tls.certificates.caFile }}
+            {{- end }}
+      {{- end }}
       clusters:
         - name: controlplane
           connect_timeout: {{ .Values.gateway.envoy.xds.connect_timeout }}

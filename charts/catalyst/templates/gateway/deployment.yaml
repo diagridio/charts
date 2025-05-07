@@ -91,6 +91,11 @@ spec:
             - name: envoy-config
               mountPath: /etc/envoy
               readOnly: true
+            {{- if .Values.gateway.tls.enabled }}
+            - name: wildcard-tls-certs
+              mountPath: {{ .Values.gateway.tls.volumes.mountPath }}
+              readOnly: true
+            {{- end }}
             {{- if .Values.gateway.controlplane.xds.mtls.enabled }}
             - mountPath: /var/run/secrets/diagrid.io
               name: tls-certs
@@ -106,6 +111,11 @@ spec:
         - name: envoy-config
           configMap:
             name: envoy-config
+        {{- if .Values.gateway.tls.enabled }}
+        - name: wildcard-tls-certs
+          secret:
+            secretName: {{ .Values.gateway.tls.secretName }}
+        {{- end }}
         {{- if .Values.gateway.controlplane.xds.mtls.enabled }}
         - configMap:
             defaultMode: 420
@@ -209,6 +219,8 @@ spec:
                   fieldPath: metadata.name
             - name: LEADER_ELECTION_ENABLED
               value: {{ .Values.gateway.ha.enabled | quote }}
+            - name: GATEWAY_TLS_ENABLED
+              value: {{ .Values.gateway.tls.enabled | quote }}
           {{- if .Values.gateway.controlplane.xds.mtls.enabled }}
             - name: XDS_SERVER_TLS_CERT
               value: "/var/run/secrets/diagrid.io/tls/tls.crt"
