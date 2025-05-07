@@ -114,7 +114,7 @@ agent:
       internal_cortex_enabled: false
       internal_cortex_endpoint: ""
       internal_cortex_org_id: common
-      loki_enabled: false
+      loki_enabled: true
       logs_resources:
         limits:
           memory: 750Mi
