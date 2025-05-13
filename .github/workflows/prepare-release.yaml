@@ -21,6 +21,11 @@ jobs:
       run: |
         make update-catalyst-tags IMAGES_TAG=${{ inputs.images_tag }}
 
+    - name: Increment chart minor version
+      run: |
+        chmod +x .github/scripts/increment-chart-minor.sh
+        ./.github/scripts/increment-chart-minor.sh
+
     - name: Create Pull Request
       id: cpr
       uses: peter-evans/create-pull-request@v7
