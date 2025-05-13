@@ -21,7 +21,7 @@ help: ## Show this help message.
 
 -include .env
 
-VERSION ?= "0.0.0-$(shell git rev-parse --short HEAD)"
+VERSION ?= 0.0.0-$(shell git rev-parse --short HEAD)
 CHART_DIR ?= ./charts/catalyst
 CHART_NAME ?= catalyst
 
@@ -82,9 +82,20 @@ helm-upgrade: helm-prereqs ## Upgrade the Helm chart
 		--set agent.config.host.control_plane_url="fake_url" \
 		--set agent.config.host.control_plane_http_url="fake_http_url"
 
-update-tags:
+# NOTICE: we need to update this function every time we use a new diagrid image
+update-catalyst-tags:
 	@if [ -z "$(IMAGES_TAG)" ]; then \
 		echo "IMAGES_TAG is not set"; \
 		exit 1; \
 	fi
-	sed -i '' 's/"edge"/"$(IMAGES_TAG)"/g' $(CHART_DIR)/values.yaml
+	yq -i '.agent.config.sidecar.image_tag="$(IMAGES_TAG)"' $(CHART_DIR)/values.yaml
+	yq -i '.agent.config.otel.image_tag="$(IMAGES_TAG)"' $(CHART_DIR)/values.yaml
+	yq -i '.agent.image.tag="$(IMAGES_TAG)"' $(CHART_DIR)/values.yaml
+	yq -i '.gateway.identityInjector.image.tag="$(IMAGES_TAG)"' $(CHART_DIR)/values.yaml
+	yq -i '.gateway.controlplane.image.tag="$(IMAGES_TAG)"' $(CHART_DIR)/values.yaml
+	yq -i '.management.image.tag="$(IMAGES_TAG)"' $(CHART_DIR)/values.yaml
+
+# unused for now?
+update-catalyst-chart-version:
+	yq -i '.version="$(VERSION)"' ./charts/catalyst/Chart.yaml
+
