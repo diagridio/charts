@@ -24,6 +24,8 @@ else
     fi
 fi
 
+echo "Using base release branch: $BASE_RELEASE_BRANCH"
+
 # Determine version based on branch
 if [[ "$BASE_RELEASE_BRANCH" =~ ^release-([0-9]+)\.([0-9]+)$ ]]; then
   MAJOR="${BASH_REMATCH[1]}"
