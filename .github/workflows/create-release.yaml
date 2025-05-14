@@ -34,11 +34,23 @@ jobs:
         chmod +x .github/scripts/get-release-branch.sh
         ./.github/scripts/get-release-branch.sh
 
+    # will create a new release branch. CI won't trigger on this branch because it was created by an workflow.
     - name: Create release branch
       run: |
         git config --global user.email "bot@diagrid.io"
         git config --global user.name "Diagrid Bot"
-        git checkout -b release-${{ env.RELEASE_BRANCH }}
-        git add .
-        git commit -m "Prepare new release ${{ inputs.release_version }}, update tags to ${{ inputs.images_tag }}"
-        git push origin release-${{ env.RELEASE_BRANCH }}
+        git checkout -b ${{ env.RELEASE_BRANCH }}
+        git push origin ${{ env.RELEASE_BRANCH }}
+
+    - name: Create Pull Request to branch ${{ env.RELEASE_BRANCH }}
+      id: cpr
+      uses: peter-evans/create-pull-request@v7
+      with:
+        commit-message: "Prepare new release ${{ inputs.release_version }}, update tags to ${{ inputs.images_tag }}"
+        title: "[Auto] Prepare new release ${{ inputs.release_version }}, update tags to ${{ inputs.images_tag }}"
+        body: "Prepare new release ${{ inputs.release_version }}, update tags to ${{ inputs.images_tag }} 🎬"
+        base: ${{ env.RELEASE_BRANCH }}
+        branch: prepate-release-${{ inputs.release_version }}
+        delete-branch: true
+        token: ${{ secrets.GITHUB_TOKEN }}
+        labels: automerge
