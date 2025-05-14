@@ -4,7 +4,7 @@ name: Sync branches
 on:
   push:
     branches:
-      - release-*
+      - 'release-[0-9]+.[0-9]+'
 
 jobs:
   sync-branches:
