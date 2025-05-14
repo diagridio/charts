@@ -45,6 +45,11 @@ jobs:
         with:
           registry-type: public
 
+      - name: Update tags to edge
+        if: ${{ startsWith(github.ref, 'refs/heads/main') }}
+        run: |
+          make update-catalyst-tags IMAGES_TAG=edge
+
       - name: Package and Push Helm Chart
         env:
           BRANCH: ${{ github.event.pull_request.base.ref || github.ref_name }}
