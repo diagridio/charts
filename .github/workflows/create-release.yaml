@@ -55,11 +55,11 @@ jobs:
       id: cpr
       uses: peter-evans/create-pull-request@v7
       with:
-        commit-message: "Prepare new release ${{ inputs.release_version }}, update tags to ${{ inputs.images_tag }}"
-        title: "[Auto] Prepare new release ${{ inputs.release_version }}, update tags to ${{ inputs.images_tag }}"
-        body: "Prepare new release ${{ inputs.release_version }}, update tags to ${{ inputs.images_tag }} 🎬"
+        commit-message: "Prepare new release ${{ env.VERSION }}, update tags to ${{ inputs.images_tag }}"
+        title: "[Auto] Prepare new release ${{ env.VERSION }}, update tags to ${{ inputs.images_tag }}"
+        body: "Prepare new release $${{ env.VERSION }}, update tags to ${{ inputs.images_tag }} 🎬"
         base: ${{ env.RELEASE_BRANCH }}
-        branch: prepate-release-${{ inputs.release_version }}
+        branch: prepate-release-${{ env.VERSION }}
         delete-branch: true
         token: ${{ secrets.GITHUB_TOKEN }}
         labels: automerge
