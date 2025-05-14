@@ -1,0 +1,24 @@
+name: Sync branches
+# This workflow is used to sync the release branches to the main branch.
+
+on:
+  push:
+    branches:
+      - release-*
+
+jobs:
+  sync-branches:
+    runs-on: ubuntu-latest
+    name: Syncing branches
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Open Sync PR
+        id: pull
+        uses: tretuna/sync-branches@main
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FROM_BRANCH: ${{ github.ref_name }}
+          TO_BRANCH: "main"
+          CONTENT_COMPARISON: true
