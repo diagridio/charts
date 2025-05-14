@@ -5,10 +5,14 @@ concurrency: "new-release"
 on:
   workflow_dispatch:
     inputs:
-      release_version:
-        description: "Version to use for the release (e.g. 0.2.0)."
+      patch_catalyst_chart:
+        description: "Patch an existing release for the Catalyst chart e.g. 0.3.0 -> 0.3.1"
+        type: boolean
+        default: false
+      base_release_version:
+        description: "Base release version to increment from. If omitted, the latest release will be used. e.g. 0.3.0"
         type: string
-        required: true
+        required: false
       images_tag:
         description: "Diagrid container images tag to use for the release."
         type: string
@@ -21,18 +25,21 @@ jobs:
     - uses: actions/checkout@v4
       name: Checkout
 
+    - name: Get next release version
+      env:
+        PATCH_CATALYST_CHART: ${{ inputs.patch_catalyst_chart }}
+        BASE_RELEASE_VERSION: ${{ inputs.base_release_version }}
+      run: |
+        chmod +x .github/scripts/get-next-release-version.sh
+        ./.github/scripts/get-next-release-version.sh
+
     - name: Update tags
       run: |
         make update-catalyst-tags IMAGES_TAG=${{ inputs.images_tag }}
     
     - name: Update chart version
       run: |
-        make update-catalyst-chart-version VERSION=${{ inputs.release_version }}
-
-    - name: Get release branch
-      run: |
-        chmod +x .github/scripts/get-release-branch.sh
-        ./.github/scripts/get-release-branch.sh
+        make update-catalyst-chart-version VERSION=${{ env.VERSION }}
 
     # will create a new release branch. CI won't trigger on this branch because it was created by an workflow.
     - name: Create release branch
