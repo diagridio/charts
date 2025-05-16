@@ -1,7 +1,7 @@
 # Deploying Catalyst to Azure
 
 
-This guide demonstrates how to deploy Catalyst Private in a private Azure Virtual Network.
+This guide demonstrates how to deploy Catalyst Private in a private Azure Virtual Network. This setup is for demonstration purposes only and this should not be used in production.
 
 ![azure](../../assets/img/azure.svg)
 
@@ -34,7 +34,7 @@ export WILDCARD_DOMAIN="10.42.1.180.nip.io"
 export JOIN_TOKEN=$(diagrid region create azure-region --wildcard-domain $WILDCARD_DOMAIN | jq -r .joinToken)
 
 # Create an api key to use the Diagrid CLI in Azure
-export API_KEY=$(diagrid apikey create --name azure-key --role cra.diagrid:editor --duration 8640)
+export API_KEY=$(diagrid apikey create --name azure-key --role cra.diagrid:editor --duration 8640 | jq -r .token))
 ```
 
 ## Step 2: Login to Azure 🪪
