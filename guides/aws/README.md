@@ -9,9 +9,6 @@ This guide demonstrates how to deploy Catalyst Private in a private AWS Virtual 
 
 - [Diagrid CLI](https://docs.diagrid.io/catalyst/references/cli-reference/intro)
 - [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) (configured with credentials for your AWS account)
-- [AWS CDK](https://docs.aws.amazon.com/cdk/v2/guide/getting_started.html#getting_started_install) (Installation script provided)
-- [Node.js and npm](https://nodejs.org/en/download/) (Required by AWS CDK, installation script provided)
-- [Go](https://go.dev/doc/install) (Required to build the CDK app)
 - [Helm](https://helm.sh/)
 - [jq](https://stedolan.github.io/jq/download/)
 - An AWS account with permissions to create VPC, EKS, EC2, IAM, and related resources.
@@ -32,13 +29,13 @@ export API_KEY=$(diagrid apikey create --name aws-key --role cra.diagrid:editor 
 
 ## Step 2: Deploy your AWS Resources 📦
 
-Use the provided Terraform to deploy the required infrastructure to you AWS account.
+Use the provided Terraform to deploy the required infrastructure to your AWS account.
 
 ```bash
 # Login to AWS cli and ensure you are on the correct profile
 aws sts get-caller-identity
 
-# Intialize terraform
+# Initialize terraform
 make init
 
 # Show the terraform plan
@@ -103,7 +100,7 @@ make output postgresql_master_user_secret
 
 # $> On the Bastion host SSH session
 
-export RDS_POSTGRESQL_ENDPOINT="<value-from-output>" # remove the port
+export RDS_POSTGRESQL_ENDPOINT="<value-from-output>" # remove port from endpoint
 export RDS_POSTGRESQL_PASSWORD="<value-from-secrets-manager>" # fetch the password from AWS Secrets Manager
 
 # Create base catalyst-values.yaml
@@ -160,9 +157,9 @@ kubectl -n cra-agent wait --for=condition=ready pod --all --timeout=5m
 # Get the internal NLB hostname created for the gateway
 export GATEWAY_IP=$(dig +short $(kubectl get svc gateway-envoy -n cra-agent -o jsonpath='{.status.loadBalancer.ingress[0].hostname}') | head -n1)
 
-# Update the region with the a wildecard domain that will resolve to the gateway ip
+# Update the region with the a wildcard domain that will resolve to the gateway ip
 export WILDCARD_DOMAIN="${GATEWAY_IP}.nip.io"
-diagrid region update aws-region --wildcard-domain "$WILDCARD_DOMAIN"
+diagrid region update my-aws-region --wildcard-domain "$WILDCARD_DOMAIN"
 ```
 
 ## Step 7: Create a Project and Deploy App Identities 🚀
@@ -226,7 +223,7 @@ To view your project details, open the Catalyst web console:
 diagrid web
 ```
 
-## Step 9: Write your applications 🎩
+## Step 8: Write your applications 🎩
 
 Now that you've deployed a Project to your Catalyst Region on AWS along with 2 App Identities, you can head over to our [local development docs](https://docs.diagrid.io/catalyst/how-to-guides/develop-locally) to see how to start writing applications that leverage App Identities. Remember that applications running within the VPC can directly access the internal gateway at `http://<GATEWAY_HOSTNAME>:8080`.
 
