@@ -18,7 +18,7 @@ This guide demonstrates how to deploy Catalyst Private in a private AWS Virtual 
 
 ## Step 1: Create a Catalyst Region 🏢
 
-Use the [Diagrid CLI](https://docs.diagrid.io/catalyst/references/cli-reference/intro) to create a new Region. The wildcard domain will be configured later based on the internal Load Balancer created by the Helm chart.
+Use the [Diagrid CLI](https://docs.diagrid.io/catalyst/references/cli-reference/intro) to create a new Region. The wildcard domain will be configured later based on the Load Balancer service created by the Helm chart.
 
 ```bash
 diagrid login
@@ -91,7 +91,7 @@ kubectl patch storageclass gp2 -p '{"metadata": {"annotations":{"storageclass.ku
 > [!IMPORTANT]
 > It is possible to configure Catalyst to use the AWS secrets manager but this example uses the default Kubernetes secret manager.
 
-Create a Helm values file for the Catalyst installation. This configuration sets up the Catalyst Gateway service as an internal AWS Network Load Balancer (NLB).
+Create a Helm values file for the Catalyst installation. This configuration sets up the Catalyst Gateway service as an AWS Network Load Balancer (NLB).
 
 ```bash
 # $> On your local host machine
