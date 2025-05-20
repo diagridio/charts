@@ -18,5 +18,12 @@ spec:
       {{- if .Values.management.service.nodePort }}
       nodePort: {{ .Values.management.service.nodePort }}
       {{- end }}
+    - name: management-http
+      port: {{ .Values.management.http_service.port }}
+      protocol: TCP
+      targetPort: {{ .Values.management.config.http_server.port }}
+      {{- if .Values.management.http_service.nodePort }}
+      nodePort: {{ .Values.management.http_service.nodePort }}
+      {{- end }}
   selector:
     {{- include "management.selectorLabels" . | nindent 6 }}
