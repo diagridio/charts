@@ -195,7 +195,7 @@ EC2_CONNECT_CMD=$(make output bastion_ec2_instance_connect_command)
 eval $EC2_CONNECT_CMD
 
 # $> On the NEW Bastion host SSH session
-diagrid login --api-key="$API_KEY"
+diagrid login --api-key="$API_KEY" # API_KEY taken from Step 1.
 diagrid project use aws-project
 
 # The Diagrid CLI can create a listener for your App Identity and will print any requests that are sent to it.
@@ -204,10 +204,10 @@ diagrid project use aws-project
 diagrid listen -a app1
 ```
 
-Send messages between your App Identities from the original Bastion session:
+Send message between your App Identities from the original Bastion session:
 
 ```bash
-# $> On your ORIGINAL terminal connected to the Bastion on your local host machine
+# $> On your ORIGINAL terminal connected to the Bastion.
 
 # Call app1 from app2 via the internal gateway using the wildcard domain
 # The gateway runs on port 8080 by default in the chart
@@ -230,3 +230,7 @@ diagrid web
 
 Now that you've deployed a Project to your Catalyst Region on AWS along with 2 App Identities, you can head over to our [local development docs](https://docs.diagrid.io/catalyst/how-to-guides/develop-locally) to see how to start writing applications that leverage App Identities. Remember that applications running within the VPC can directly access the internal gateway at `http://<GATEWAY_HOSTNAME>:8080`.
 
+This guide is only for demonstration purposes. You are expected to setup your region using a domain that you own that can direct traffic from your applications to your Catalyst Gateway. You can configure the Catalyst Gateway with TLS by setting the Catalyst Helm values `gateway.tls.enabled` to `true` and creating a Kubernetes TLS secret for your server key and certificate called `gateway-tls-certs` in the `cra-agent` namespace. Your applications must be able to connect to your Catalyst Gateway and must trust the root CA for the TLS certificates you use. You can then set the appropriate env vars show below and connect to your Catalyst installation using the Dapr SDKs.
+- `DAPR_GRPC_ENDPOINT=<your-project-grpc-url>`
+- `DAPR_HTTP_ENDPOINT=<your-project-http-url>`
+- `DAPR_API_TOKEN=<your-appid-api-token>`
