@@ -70,6 +70,9 @@ The Bastion host will have installed `kubectl` and will be configured to access 
 # view the EKS cluster name
 make output eks_cluster_name
 
+# view the EKS cluster region
+cat terraform/terraform.tfvars | grep region | awk -F'"' '{print $2}'
+
 # $> On the Bastion host SSH session
 
 export EKS_CLUSTER_NAME="<value-from-output>"
