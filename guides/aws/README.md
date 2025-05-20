@@ -204,7 +204,7 @@ diagrid project use aws-project
 diagrid listen -a app1
 ```
 
-Send message between your App Identities from the original Bastion session:
+Send messages between your App Identities from the original Bastion session:
 
 ```bash
 # $> On your ORIGINAL terminal connected to the Bastion.
