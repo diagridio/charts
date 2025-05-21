@@ -68,6 +68,7 @@ resource "aws_db_instance" "postgresql" {
   db_subnet_group_name   = aws_db_subnet_group.rds_subnet_group.name
   parameter_group_name   = aws_db_parameter_group.postgresql.name
   skip_final_snapshot    = var.postgresql_skip_final_snapshot
+  final_snapshot_identifier = var.postgresql_final_snapshot_identifier
   deletion_protection    = var.postgresql_deletion_protection
   backup_retention_period = var.postgresql_backup_retention_period
   backup_window          = var.postgresql_backup_window
