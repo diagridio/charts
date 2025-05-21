@@ -297,5 +297,11 @@ output "aws_load_balancer_controller_role_arn" {
 # Output the EKS cluster name
 output "eks_cluster_name" {
   description = "EKS cluster name"
-  value       = module.eks.cluster_id
+  value       = module.eks.cluster_name
+}
+
+# Output the EKS cluster region
+output "eks_cluster_region" {
+  description = "EKS cluster region"
+  value       = var.aws_region
 }
