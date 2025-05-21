@@ -71,12 +71,12 @@ The Bastion host will have installed `kubectl` and will be configured to access 
 make output eks_cluster_name
 
 # view the EKS cluster region
-cat terraform/terraform.tfvars | grep region | awk -F'"' '{print $2}'
+make output eks_cluster_region
 
 # $> On the Bastion host SSH session
 
 export EKS_CLUSTER_NAME="<value-from-output>"
-export EKS_CLUSTER_REGION="<value-from-tfvars>"
+export EKS_CLUSTER_REGION="<value-from-output>"
 
 aws eks update-kubeconfig --name $EKS_CLUSTER_NAME --region $EKS_CLUSTER_REGION
 
