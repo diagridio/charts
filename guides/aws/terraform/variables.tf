@@ -176,6 +176,12 @@ variable "postgresql_skip_final_snapshot" {
   default     = false
 }
 
+variable "postgresql_final_snapshot_identifier" {
+  description = "Identifier for the final snapshot of the PostgreSQL RDS instance, required when skip_final_snapshot is false"
+  type        = string
+  default     = "final-snapshot"
+}
+
 variable "postgresql_deletion_protection" {
   description = "Whether to enable deletion protection for the PostgreSQL RDS instance"
   type        = bool
