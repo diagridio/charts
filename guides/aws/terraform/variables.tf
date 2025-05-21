@@ -137,7 +137,7 @@ variable "eks_readonly_users" {
 variable "postgresql_version" {
   description = "PostgreSQL engine version"
   type        = string
-  default     = "15.5"
+  default     = "17.5"
 }
 
 variable "postgresql_instance_class" {
