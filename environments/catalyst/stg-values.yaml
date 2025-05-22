@@ -16,4 +16,4 @@ agent:
 management:
   config:
     http_server_auth:
-      domain: "diagrid-n.us.auth0.com"
+      domain: "api.stg.diagrid.io"
