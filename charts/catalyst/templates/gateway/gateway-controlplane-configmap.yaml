@@ -1,0 +1,10 @@
+{{- $configMap := deepCopy .Values.gateway.controlplane.config -}}
+{{- $_ := set $configMap "control_plane_url" .Values.global.control_plane_url -}}
+{{- $_ := set $configMap "sentry" .Values.global.sentry -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: catalyst-gateway-controlplane-config
+data:
+  "config.yaml": |
+{{ tpl (toYaml $configMap) . | indent 4 }}

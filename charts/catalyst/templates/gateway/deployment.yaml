@@ -20,6 +20,8 @@ spec:
     metadata:
       annotations:
         checksum/controlplane-config: {{ include (print $.Template.BasePath "/gateway/configmap.yaml") . | sha256sum }}
+        dapr.io/app-id: gateway
+        dapr.io/config: catalyst
       labels:
         {{- include "merge.maps" (dict "base" (include "gateway.envoy.selectorLabels" . | fromYaml) "overrides" .Values.gateway.envoy.merge.selectorLabels) | nindent 8 }}
     spec:
@@ -38,9 +40,7 @@ spec:
             - name: IDENTITY_TRUST_DOMAIN
               value: prj-root.trust.diagrid.io
             - name: IDENTITY_APPID
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
+              value: gateway
             - name: IDENTITY_ROOT_DIR
               value: /var/run/secrets/diagrid.io
             - name: IDENTITY_CA_CERT
@@ -162,6 +162,9 @@ spec:
       {{- include "gateway.controlplane.selectorLabels" . | nindent 6 }}
   template:
     metadata:
+      annotations:
+        dapr.io/app-id: gateway-controlplane
+        dapr.io/config: catalyst
       labels:
         {{- include "merge.maps" (dict "base" (include "gateway.controlplane.selectorLabels" . | fromYaml) "overrides" .Values.gateway.controlplane.merge.selectorLabels) | nindent 8 }}
     spec:
@@ -180,9 +183,7 @@ spec:
             - name: IDENTITY_TRUST_DOMAIN
               value: prj-root.trust.diagrid.io
             - name: IDENTITY_APPID
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
+              value: gateway-controlplane
             - name: IDENTITY_ROOT_DIR
               value: /var/run/secrets/diagrid.io
             - name: IDENTITY_CA_CERT
@@ -222,6 +223,8 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+            - name: CONFIG_FILE_DIR
+              value: /etc/gateway-controlplane
             - name: LEADER_ELECTION_ENABLED
               value: {{ .Values.gateway.ha.enabled | quote }}
             - name: GATEWAY_TLS_ENABLED
@@ -248,6 +251,11 @@ spec:
               containerPort: {{ .Values.gateway.controlplane.deployment.httpXDS.containerPort }}
               protocol: TCP
           volumeMounts:
+            - name: gateway-controlplane-config
+              mountPath: /etc/gateway-controlplane
+            - mountPath: /var/run/secrets/dapr.io/sentrytoken
+              name: dapr-identity-token
+              readOnly: true
           {{- if .Values.gateway.controlplane.xds.mtls.enabled }}
             - mountPath: /var/run/secrets/diagrid.io
               name: tls-certs
@@ -256,6 +264,9 @@ spec:
               subPath: ca.crt
           {{- end }}
       volumes:
+        - name: gateway-controlplane-config
+          configMap:
+            name: catalyst-gateway-controlplane-config
       {{- if .Values.gateway.controlplane.xds.mtls.enabled }}
         - configMap:
             defaultMode: 420

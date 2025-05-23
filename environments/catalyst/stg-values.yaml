@@ -1,4 +1,5 @@
 global:
+  control_plane_url: cra-cloudgrid.stg.n.diagrid.io:443
   sentry:
     remote_endpoint: sentry.stg.n.diagrid.io:443
     diagrid_trust_anchors_endpoint: https://trust-pem.stg.n.diagrid.io
@@ -7,8 +8,12 @@ global:
 
 agent:
   config:
-    control_plane_url: cra-cloudgrid.stg.n.diagrid.io:443
     control_plane_http_url: https://api.stg.diagrid.io
     otel:
       metrics_endpoint: https://cra-metrics.stg.n.diagrid.io/api/v1/push
       loki_endpoint: https://cra-logs.stg.n.diagrid.io/loki/api/v1/push
+
+management:
+  config:
+    http_server_auth:
+      domain: "api.stg.diagrid.io"

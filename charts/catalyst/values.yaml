@@ -37,6 +37,8 @@ global:
       # Optional, access key and secret key par to access AWS Secrets Manager
       access_key: ""
       secret_access_key: ""
+  # Global control plane URL
+  control_plane_url: cra-cloudgrid.prd.p.diagrid.io:443
   # Global sentry configuration
   sentry:
     enabled: true
@@ -73,7 +75,6 @@ agent:
       private_region: true
       ingress_ip_addr: ""
       egress_addresses: []
-    control_plane_url: cra-cloudgrid.prd.p.diagrid.io:443
     control_plane_http_url: https://api.diagrid.io
     placement:
       max_project_count: 50
@@ -363,12 +364,20 @@ gateway:
       requests:
         cpu: 50m
         memory: 50Mi
+    config: {}
 #------------------------------------------------------------------------------
 # Management Service Configurations
 #------------------------------------------------------------------------------
 management:
   logLevel: info
   config:
+    http_server:
+      enabled: true
+      port: 8181
+    http_server_auth:
+      enabled: true
+      domain: "api.diagrid.io"
+      audience: "admingrid-api"
     grpc_server:
       enabled: false
     profiling:
@@ -385,6 +394,9 @@ management:
   service:
     type: ClusterIP
     port: 9090
+  http_service:
+    type: ClusterIP
+    port: 8181
   ingress:
     enabled: false
     dns_top_level_domain: ""
