@@ -23,7 +23,8 @@ A Catalyst installation consists of the following components:
 ## Guides
 
 - [Deploying Catalyst to a KinD Cluster](./guides/kind/README.md)
-- [Deploying Catalyst to an Azure Kubernetes Cluster](./guides/azure/README.md)
+- [Deploying Catalyst to an Azure Kubernetes Service Cluster](./guides/azure/README.md)
+- [Deploying Catalyst to an AWS Elastic Kubernetes Service Cluster](./guides/aws/README.md)
 
 ## Docs
 
