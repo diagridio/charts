@@ -21,7 +21,7 @@ Use the [Diagrid CLI](https://docs.diagrid.io/catalyst/references/cli-reference/
 diagrid login
 
 # Create a new region (we'll update the wildcard domain later)
-export JOIN_TOKEN=$(diagrid region create my-aws-region --wildcard-domain placeholder.example.com | jq -r .joinToken)
+export JOIN_TOKEN=$(diagrid region create my-aws-region --ingress placeholder.example.com | jq -r .joinToken)
 
 # Create an api key to use the Diagrid CLI in AWS later
 export API_KEY=$(diagrid apikey create --name aws-key --role cra.diagrid:editor --duration 8640 | jq -r .token)
@@ -162,7 +162,7 @@ export GATEWAY_IP=$(dig +short $(kubectl get svc gateway-envoy -n cra-agent -o j
 
 # Update the region with the a wildcard domain that will resolve to the gateway ip
 export WILDCARD_DOMAIN="${GATEWAY_IP}.nip.io"
-diagrid region update my-aws-region --wildcard-domain "$WILDCARD_DOMAIN"
+diagrid region update my-aws-region --ingress "$WILDCARD_DOMAIN"
 ```
 
 ## Step 7: Create a Project and Deploy App Identities 🚀
