@@ -158,7 +158,7 @@ helm install catalyst oci://public.ecr.aws/diagrid/catalyst \
      --create-namespace \
      -f catalyst-values.yaml \
      --set join_token="${JOIN_TOKEN}" \
-     --version 0.0.0-edge
+     --version 0.3.0
 ```
 
 ## Step 7: Verify the Installation ✅

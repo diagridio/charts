@@ -1,4 +1,4 @@
-name: Create new release
+name: Create New Release PR
 
 concurrency: "new-release"
 
