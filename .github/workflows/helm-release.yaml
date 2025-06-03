@@ -1,4 +1,4 @@
-name: Release Catalyst Helm Chart
+name: Publish Catalyst Helm Chart
 
 on:
   # Only trigger on main branch and release branches
@@ -84,3 +84,10 @@ jobs:
             echo "Error: Chart file not found for upload"
             exit 1
           fi
+
+      - name: Update Version in Guides
+        if: ${{ !startsWith(github.ref, 'refs/heads/main') }}
+        run: |
+          VERSION="${{ env.VERSION }}"
+          chmod +x .github/scripts/package-helm-chart.sh
+          ./.github/scripts/package-helm-chart.sh
