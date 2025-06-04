@@ -31,7 +31,7 @@ diagrid login
 export WILDCARD_DOMAIN="10.42.1.180.nip.io"
 
 # Create a new region and capture the join token
-export JOIN_TOKEN=$(diagrid region create azure-region --wildcard-domain $WILDCARD_DOMAIN | jq -r .joinToken)
+export JOIN_TOKEN=$(diagrid region create azure-region --ingress $WILDCARD_DOMAIN | jq -r .joinToken)
 
 # Create an api key to use the Diagrid CLI in Azure
 export API_KEY=$(diagrid apikey create --name azure-key --role cra.diagrid:editor --duration 8640 | jq -r .token)

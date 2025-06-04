@@ -35,7 +35,7 @@ diagrid login
 export WILDCARD_DOMAIN="127.0.0.1.nip.io"
 
 # Create a new region and capture the join token
-export JOIN_TOKEN=$(diagrid region create kind-region --wildcard-domain $WILDCARD_DOMAIN | jq -r .joinToken)
+export JOIN_TOKEN=$(diagrid region create kind-region --ingress $WILDCARD_DOMAIN | jq -r .joinToken)
 ```
 
 ## Step 3: Install PostgreSQL (Optional) 💿
