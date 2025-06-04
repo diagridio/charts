@@ -85,9 +85,3 @@ jobs:
             exit 1
           fi
 
-      - name: Update Version in Guides
-        if: ${{ !startsWith(github.ref, 'refs/heads/main') }}
-        run: |
-          VERSION="${{ env.VERSION }}"
-          chmod +x .github/scripts/package-helm-chart.sh
-          ./.github/scripts/package-helm-chart.sh
