@@ -161,8 +161,8 @@ kubectl -n cra-agent wait --for=condition=ready pod --all --timeout=5m
 export GATEWAY_IP=$(dig +short $(kubectl get svc gateway-envoy -n cra-agent -o jsonpath='{.status.loadBalancer.ingress[0].hostname}') | head -n1)
 
 # Update the region with the a wildcard domain that will resolve to the gateway ip
-export WILDCARD_DOMAIN="${GATEWAY_IP}.nip.io"
-diagrid region update my-aws-region --ingress "$WILDCARD_DOMAIN"
+# The Diagrid Catalyst gateway defaults to http and is exposed on port 8080
+diagrid region update my-aws-region --ingress "http://*.${GATEWAY_IP}.nip.io:8080"
 ```
 
 ## Step 7: Create a Project and Deploy App Identities 🚀
@@ -210,8 +210,7 @@ Send messages between your App Identities from the original Bastion session:
 # $> On your ORIGINAL terminal connected to the Bastion.
 
 # Call app1 from app2 via the internal gateway using the wildcard domain
-# The gateway runs on port 8080 by default in the chart
-GATEWAY_TLS_INSECURE=true GATEWAY_PORT=8080 diagrid call invoke get app1.hello -a app2
+diagrid call invoke get app1.hello -a app2
 
 # You should now see the request received ('method': 'GET', 'url': '/hello')
 # in the output of the 'diagrid listen -a app1' command in the other terminal.

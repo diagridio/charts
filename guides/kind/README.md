@@ -31,12 +31,11 @@ Use the [Diagrid CLI](https://docs.diagrid.io/catalyst/references/cli-reference/
 # --api is only required when running against a none production environment.
 diagrid login
 
-# Set the wildcard domain that is going to be used to expose dapr runtime instances (e.g https://http-prj123.$WILDCARD_DOMAIN)
-export WILDCARD_DOMAIN="127.0.0.1.nip.io"
-
 # Create a new region and capture the join token
-export JOIN_TOKEN=$(diagrid region create kind-region --ingress $WILDCARD_DOMAIN | jq -r .joinToken)
+export JOIN_TOKEN=$(diagrid region create kind-region --ingress "http://*.127.0.0.1.nip.io:9082" | jq -r .joinToken)
 ```
+
+> NOTE: we provide the ingress flag indicating how dapr runtime instances are going to be exposed. With this Diagrid Catalyst will be able to configure its gateway with the appropriate wildcard domain and the project URLs will be accurate with how the dapr runtime is exposed.
 
 ## Step 3: Install PostgreSQL (Optional) 💿
 
@@ -159,7 +158,7 @@ Send messages between your App Identities
 diagrid listen -a app1
 
 # Call app1 from app2
-GATEWAY_TLS_INSECURE=true GATEWAY_PORT=9082 diagrid call invoke get app1.hello -a app2
+diagrid call invoke get app1.hello -a app2
 
 # You will now see the requests being received on your app 1 listener
 # ...
