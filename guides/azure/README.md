@@ -26,12 +26,10 @@ Use the [Diagrid CLI](https://docs.diagrid.io/catalyst/references/cli-reference/
 # The --api flag is only required when running against a none production environment.
 diagrid login
 
-# Set the wildcard domain that is going to be used to expose dapr runtime instances (e.g https://http-prj123.$WILDCARD_DOMAIN)
-# We will annotate the gateway service to be exposed using this ip address: "10.42.1.180".
-export WILDCARD_DOMAIN="10.42.1.180.nip.io"
-
 # Create a new region and capture the join token
-export JOIN_TOKEN=$(diagrid region create azure-region --ingress $WILDCARD_DOMAIN | jq -r .joinToken)
+# We will annotate the gateway service to be exposed using this ip address: "10.42.1.180".
+# The Diagrid Catalyst gateway defaults to http and is exposed on port 8080
+export JOIN_TOKEN=$(diagrid region create azure-region --ingress "http://*.10.42.1.180.nip.io:8080" | jq -r .joinToken)
 
 # Create an api key to use the Diagrid CLI in Azure
 export API_KEY=$(diagrid apikey create --name azure-key --role cra.diagrid:editor --duration 8640 | jq -r .token)
@@ -213,7 +211,7 @@ Send messages between your App Identities
 
 ```bash
 # From the original SSH session, call app1 from app2
-GATEWAY_TLS_INSECURE=true GATEWAY_PORT=8080 diagrid call invoke get app1.hello -a app2
+diagrid call invoke get app1.hello -a app2
 
 # You will now see the requests being received on your app 1 listener
 # ...
