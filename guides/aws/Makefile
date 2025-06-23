@@ -16,6 +16,7 @@ PEER_VPC_CIDR ?=
 ENABLE_BASTION ?= "true"
 BASTION_KEY_NAME ?= 
 BASTION_ALLOWED_CIDR ?= "0.0.0.0/0"
+REGION ?= "us-west-2"
 
 # Help target
 help:
@@ -36,6 +37,7 @@ help:
 	@echo "  ENABLE_BASTION        - Whether to deploy a bastion host (default: true)"
 	@echo "  BASTION_KEY_NAME      - SSH key name for the bastion host (optional, will be auto-generated if not provided)"
 	@echo "  BASTION_ALLOWED_CIDR  - CIDR blocks allowed to SSH to the bastion host (default: 0.0.0.0/0)"
+	@echo "  REGION                - AWS region to deploy resources (default: us-west-2)"
 	@echo ""
 	@echo "Example usage:"
 	@echo "  make plan PEER_VPC_ID=vpc-12345 PEER_VPC_CIDR=172.31.0.0/16"
@@ -58,6 +60,7 @@ plan:
 	# BASTION_KEY_NAME is now optional and will be auto-generated if not provided
 	cd terraform && terraform plan -var="enable_peering=$(ENABLE_PEERING)" -var="peer_vpc_id=$(PEER_VPC_ID)" -var="peer_vpc_cidr=$(PEER_VPC_CIDR)" \
 		-var="enable_bastion=$(ENABLE_BASTION)" -var="bastion_key_name=$(BASTION_KEY_NAME)" -var="bastion_allowed_cidr=$(BASTION_ALLOWED_CIDR)" \
+		-var="aws_region=$(REGION)" \
 		$(if $(wildcard $(TF_VAR_FILE)),-var-file=../$(TF_VAR_FILE),)
 
 # Apply terraform changes
@@ -70,6 +73,7 @@ apply:
 	# BASTION_KEY_NAME is now optional and will be auto-generated if not provided
 	cd terraform && terraform apply -var="enable_peering=$(ENABLE_PEERING)" -var="peer_vpc_id=$(PEER_VPC_ID)" -var="peer_vpc_cidr=$(PEER_VPC_CIDR)" \
 		-var="enable_bastion=$(ENABLE_BASTION)" -var="bastion_key_name=$(BASTION_KEY_NAME)" -var="bastion_allowed_cidr=$(BASTION_ALLOWED_CIDR)" \
+		-var="aws_region=$(REGION)" \
 		$(if $(wildcard $(TF_VAR_FILE)),-var-file=../$(TF_VAR_FILE),)
 
 # Destroy terraform resources
@@ -82,6 +86,7 @@ destroy:
 	# BASTION_KEY_NAME is now optional and will be auto-generated if not provided
 	cd terraform && terraform destroy -var="enable_peering=$(ENABLE_PEERING)" -var="peer_vpc_id=$(PEER_VPC_ID)" -var="peer_vpc_cidr=$(PEER_VPC_CIDR)" \
 		-var="enable_bastion=$(ENABLE_BASTION)" -var="bastion_key_name=$(BASTION_KEY_NAME)" -var="bastion_allowed_cidr=$(BASTION_ALLOWED_CIDR)" \
+		-var="aws_region=$(REGION)" \
 		$(if $(wildcard $(TF_VAR_FILE)),-var-file=../$(TF_VAR_FILE),)
 
 output:
