@@ -118,7 +118,7 @@ agent:
         namespace: postgresql
         connection_string_host: $RDS_POSTGRESQL_ENDPOINT
         connection_string_port: 5432
-        connection_string_username: catalyst_dapr
+        connection_string_username: postgres
         connection_string_password: $RDS_POSTGRESQL_PASSWORD
         connection_string_database: catalyst
 gateway:
