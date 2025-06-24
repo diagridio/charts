@@ -21,7 +21,7 @@ Use the [Diagrid CLI](https://docs.diagrid.io/catalyst/references/cli-reference/
 diagrid login
 
 # Create a new region (we'll update the wildcard domain later)
-export JOIN_TOKEN=$(diagrid region create my-aws-region --ingress placeholder.example.com | jq -r .joinToken)
+export JOIN_TOKEN=$(diagrid region create my-aws-region --ingress *.placeholder.example.com | jq -r .joinToken)
 
 # Create an api key to use the Diagrid CLI in AWS later
 export API_KEY=$(diagrid apikey create --name aws-key --role cra.diagrid:editor --duration 8640 | jq -r .token)
@@ -86,6 +86,107 @@ kubectl config current-context
 kubectl patch storageclass gp2 -p '{"metadata": {"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
 ```
 
+# (optional) Install aws-load-balancer-controller
+
+```bash
+
+# $> On your local host machine
+
+# view the AWS Load Balancer Controller IAM role ARN
+make output aws_load_balancer_controller_role_arn
+
+# $> On the Bastion host SSH session
+
+export EKS_LOAD_BALANCER_CONTROLLER_ROLE_ARN="<value-from-output>"
+
+cat > aws-load-balancer-controller.yaml << EOF
+clusterName: $EKS_CLUSTER_NAME
+serviceAccount:
+  create: true
+  name: aws-load-balancer-controller
+  annotations:
+    eks.amazonaws.com/role-arn: $EKS_LOAD_BALANCER_CONTROLLER_ROLE_ARN
+EOF
+
+helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
+    -n kube-system \
+    --values aws-load-balancer-controller-values.yaml
+
+```
+
+# (optional) Install cert-manager
+
+```bash
+
+# $> On your local host machine
+
+# view the cert-manager IAM role ARN
+make output cert_manager_role_arn
+
+# $> On the Bastion host SSH session
+
+export CERT_MANAGER_ROLE_ARN="<value-from-output>"
+
+helm repo add jetstack https://charts.jetstack.io --force-update
+
+helm install \
+  cert-manager jetstack/cert-manager \
+  --namespace cert-manager \
+  --create-namespace \
+  --version v1.18.0 \
+  --set crds.enabled=true
+
+# Add the Let's Encrypt cluster issuer
+
+cat > lets-encrypt-cluster-issuer.yaml << EOF
+kind: ClusterIssuer
+apiVersion: cert-manager.io/v1
+metadata:
+  name: letsencrypt
+  namespace: cert-manager
+spec:
+  acme:
+    email: support@diagrid.io
+    privateKeySecretRef:
+      name: letsencrypt
+    server: https://acme-v02.api.letsencrypt.org/directory
+    solvers:
+    - dns01:
+        route53:
+          region: us-east-1
+          role: $CERT_MANAGER_ROLE_ARN
+          auth:
+            kubernetes:
+              serviceAccountRef:
+                name: cert-manager
+EOF
+
+kubectl apply -f lets-encrypt-cluster-issuer.yaml
+
+# Create the gateway TLS certificate
+
+cat > gateway-certificate.yaml << EOF
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: cert-wildcard
+  namespace: cra-agent
+spec:
+  dnsNames:
+  - "<ingress-wildcard>"
+  issuerRef:
+    group: cert-manager.io
+    kind: ClusterIssuer
+    name: letsencrypt
+  secretName: certs-wildcard
+  usages:
+  - digital signature
+  - key encipherment
+EOF
+
+kubectl apply -f gateway-certificate.yaml
+```
+
 ## Step 5: Configure and Install Catalyst ⚡️
 
 > [!IMPORTANT]
@@ -125,9 +226,27 @@ gateway:
   envoy:
     service:
       type: LoadBalancer
+      httpsPort: 443
+      port: 80
       annotations:
         service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
         service.beta.kubernetes.io/aws-load-balancer-internal: "true"
+  tls:
+    enabled: true
+    # Name of the secret containing TLS certificates
+    secretName: "certs-wildcard"
+    # TLS certificate configuration
+    certificates:
+      # Path to the TLS certificate file
+      certFile: "/etc/ssl/certs/tls.crt"
+      # Path to the TLS key file
+      keyFile: "/etc/ssl/certs/tls.key"
+      # Optional: Path to the CA certificate file for client certificate validation
+      caFile: ""
+    # Volume configuration for mounting TLS certificates
+    volumes:
+      # Mount path for TLS certificates
+      mountPath: "/etc/ssl/certs"
 EOF
 
 # Authenticate Helm with the public AWS ECR registry

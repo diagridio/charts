@@ -267,6 +267,7 @@ gateway:
       httpsPort: 8443
       httpsTargetPort: 8443
       type: ClusterIP
+      annotations: {}
     xds:
       connect_timeout: 10s
       health_check:
@@ -337,6 +338,7 @@ gateway:
         targetPort: 57206
       type: ClusterIP
       clusterIP: None
+      annotations: {}
     podAnnotations: {}
     labels:
       app: gateway-controlplane

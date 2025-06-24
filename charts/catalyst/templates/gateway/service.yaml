@@ -3,7 +3,7 @@ kind: Service
 metadata:
   name: {{ .Values.gateway.envoy.service.name }}
   annotations:
-{{- with .Values.gateway.envoy.podAnnotations }}
+{{- with .Values.gateway.envoy.service.annotations }}
 {{ toYaml . | nindent 4 }}
 {{- end }}
   labels:
@@ -29,7 +29,7 @@ kind: Service
 metadata:
   name: {{ .Values.gateway.controlplane.service.name }}
   annotations:
-{{- with .Values.gateway.controlplane.podAnnotations }}
+{{- with .Values.gateway.controlplane.service.annotations }}
 {{ toYaml . | nindent 4 }}
 {{- end }}
   labels:
