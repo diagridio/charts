@@ -98,6 +98,18 @@ resource "aws_db_parameter_group" "postgresql" {
     value = "1"
   }
 
+  parameter {
+    apply_method = "pending-reboot"
+    name = "max_replication_slots"
+    value = "25"
+  }
+
+  parameter {
+    apply_method = "pending-reboot"
+    name = "rds.logical_replication"
+    value = "1"
+  }
+
   tags = {
     Name = "${var.cluster_name}-postgresql-params"
   }

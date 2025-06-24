@@ -161,13 +161,13 @@ variable "postgresql_max_allocated_storage" {
 variable "postgresql_db_name" {
   description = "Name of the PostgreSQL database"
   type        = string
-  default     = "postgres"
+  default     = "catalyst"
 }
 
 variable "postgresql_username" {
   description = "Master username for the PostgreSQL RDS instance"
   type        = string
-  default     = "postgres"
+  default     = "catalyst_dapr"
 }
 
 variable "postgresql_skip_final_snapshot" {
