@@ -87,10 +87,6 @@ spec:
           - /proxy-certs/tls.key
           - --proxy.tls.cert
           - /proxy-certs/tls.crt
-          - --upstream.tls.key
-          - /upstream-certs/tls.key
-          - --upstream.tls.cert
-          - /upstream-certs/tls.crt
         env:
           - name: POD_NAME
             valueFrom:
