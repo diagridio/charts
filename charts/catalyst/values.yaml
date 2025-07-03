@@ -473,8 +473,12 @@ piko:
     gossipPort: 8003
 
   certificates:
-    proxySecretName: cra-agent-ingress-wildcard-tls
-    upstreamSecretName: cra-agent-ingress-wildcard-tls
+    # Currently the internal proxy TLS is not supported because the
+    # public key comes from the shared control plane and it's not
+    # configurable.
+    proxy:
+      enabled: false
+      secretName: cra-agent-ingress-wildcard-tls
 
   terminationGracePeriodSeconds: 60
 

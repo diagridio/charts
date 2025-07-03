@@ -83,10 +83,12 @@ spec:
           - --config.path
           - /config/server.yaml
           - --config.expand-env
+{{- if .Values.piko.certificates.proxy.enabled }}
           - --proxy.tls.key
           - /proxy-certs/tls.key
           - --proxy.tls.cert
           - /proxy-certs/tls.crt
+{{- end }}
         env:
           - name: POD_NAME
             valueFrom:
@@ -95,10 +97,10 @@ spec:
         volumeMounts:
           - name: config-writable
             mountPath: "/config"
-          - name: upstream-certs
-            mountPath: "/upstream-certs"
+{{- if .Values.piko.certificates.proxy.enabled }}
           - name: proxy-certs
             mountPath: "/proxy-certs"
+{{- end }}
       {{- with .Values.piko.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
@@ -115,6 +117,8 @@ spec:
         - name: upstream-certs
           secret:
             secretName: {{ .Values.piko.certificates.upstreamSecretName }}
+{{- if .Values.piko.certificates.proxy.enabled }}
         - name: proxy-certs
           secret:
-            secretName: {{ .Values.piko.certificates.proxySecretName }}
+            secretName: {{ .Values.piko.certificates.proxy.secretName }}
+{{- end }}
