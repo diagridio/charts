@@ -1,0 +1,23 @@
+apiVersion: projectcontour.io/v1
+kind: HTTPProxy
+metadata:
+  name: {{ .Values.piko.releaseName }}-tcp-proxy
+spec:
+  virtualhost:
+    fqdn: {{ .Values.piko.httpproxy.upstreamHostName }}
+    tls:
+      passthrough: true
+    rateLimitPolicy:
+      global:
+        descriptors:
+          - entries:
+              - genericKey:
+                  key: vhost
+                  value: {{ .Values.piko.httpproxy.upstreamHostName }}
+              - remoteAddress: { }
+  tcpproxy:
+    services:
+      - name: {{ .Values.piko.releaseName }}
+        port: {{ .Values.piko.server.upstreamPort }}
+        # weird, but contour needs to treat the grpc proxy as plain data for the tls passthrough to work properly
+        protocol: h2c

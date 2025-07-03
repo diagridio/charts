@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name:  {{ .Values.piko.releaseName }}
+  labels:
+    helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/name: {{ .Values.piko.pikoName }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  ports:
+  - port: {{ .Values.piko.server.proxyPort }}
+    name: proxy
+    protocol: TCP
+  - port: {{ .Values.piko.server.upstreamPort }}
+    name: upstream
+    protocol: TCP
+  - port: {{ .Values.piko.server.adminPort }}
+    name: admin
+    protocol: TCP
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: {{ .Values.piko.pikoName }}
+    app.kubernetes.io/instance: {{ .Release.Name }}

@@ -1,0 +1,124 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Values.piko.releaseName }}
+  labels:
+    helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/name: {{ .Values.piko.pikoName }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.piko.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Values.piko.pikoName }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  serviceName: {{ .Values.piko.releaseName }}
+  template:
+    metadata:
+      {{- with .Values.piko.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+        app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+        app.kubernetes.io/managed-by: {{ .Release.Service }}
+        app.kubernetes.io/name: {{ .Values.piko.pikoName }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        {{- with .Values.piko.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ .Values.piko.serviceAccount.name }}
+      terminationGracePeriodSeconds: {{ .Values.piko.terminationGracePeriodSeconds }}
+
+      initContainers:
+        # inject-rsa-key is a workaround to inject the public key into the configuration.
+        - name: inject-rsa-key
+          image: "{{ .Values.piko.image.repository }}:{{ .Values.piko.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: "{{ .Values.piko.image.pullPolicy }}"
+          command:
+            - /bin/sh
+            - -c
+            - |
+              INDENTED_KEY="$(echo "$JWT_RSA_PUBLIC_KEY" | sed 's/^/      /')"
+              sed "/^RSA_PUBLIC_KEY_PLACE_HOLDER$/ {
+                r /dev/stdin
+                d
+              }" /config-base/server.yaml <<EOF > /config/server.yaml
+              $INDENTED_KEY
+              EOF
+          env:
+            - name: JWT_RSA_PUBLIC_KEY
+              valueFrom:
+                configMapKeyRef:
+                  name: token-public-key
+                  key: public_key.pem
+          volumeMounts:
+            - name: config
+              mountPath: /config-base
+              readOnly: true
+            - name: config-writable
+              mountPath: /config
+
+      containers:
+      - name: piko
+        image: "{{ .Values.piko.image.repository }}:{{ .Values.piko.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: "{{ .Values.piko.image.pullPolicy }}"
+        ports:
+          - containerPort: {{ .Values.piko.server.proxyPort }}
+            name: proxy
+          - containerPort: {{ .Values.piko.server.upstreamPort }}
+            name: upstream
+          - containerPort: {{ .Values.piko.server.adminPort }}
+            name: admin
+          - containerPort: {{ .Values.piko.server.gossipPort }}
+            name: gossip
+        readinessProbe:
+          {{- toYaml .Values.piko.readinessProbe | nindent 12 }}
+        args:
+          - server
+          - --config.path
+          - /config/server.yaml
+          - --config.expand-env
+          - --proxy.tls.key
+          - /proxy-certs/tls.key
+          - --proxy.tls.cert
+          - /proxy-certs/tls.crt
+          - --upstream.tls.key
+          - /upstream-certs/tls.key
+          - --upstream.tls.cert
+          - /upstream-certs/tls.crt
+        env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+        volumeMounts:
+          - name: config-writable
+            mountPath: "/config"
+          - name: upstream-certs
+            mountPath: "/upstream-certs"
+          - name: proxy-certs
+            mountPath: "/proxy-certs"
+      {{- with .Values.piko.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ .Values.piko.releaseName }}
+            items:
+            - key: "server.yaml"
+              path: "server.yaml"
+        - name: config-writable
+          emptyDir: {}
+        - name: upstream-certs
+          secret:
+            secretName: {{ .Values.piko.certificates.upstreamSecretName }}
+        - name: proxy-certs
+          secret:
+            secretName: {{ .Values.piko.certificates.proxySecretName }}

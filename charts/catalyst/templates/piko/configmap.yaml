@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.piko.releaseName }}
+  labels:
+    helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/name: {{ .Values.piko.pikoName }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+data:
+  server.yaml: |
+    cluster:
+      node_id_prefix: ${POD_NAME}-
+      join:
+        - {{ .Values.piko.releaseName }}
+    upstream:
+      auth:
+        rsa_public_key: |
+    RSA_PUBLIC_KEY_PLACE_HOLDER
