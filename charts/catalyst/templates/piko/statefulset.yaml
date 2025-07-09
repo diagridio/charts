@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: {{ .Values.piko.releaseName }}
+  namespace: {{ .Release.Namespace }}
   labels:
     helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
     app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
@@ -52,10 +53,15 @@ spec:
               EOF
           env:
             - name: JWT_RSA_PUBLIC_KEY
+              {{- if not .Values.piko.tokenPublicKey.useConfigMap }}
+              value: |-
+{{ .Values.piko.tokenPublicKey.value | indent 16 }}
+              {{- else }}
               valueFrom:
                 configMapKeyRef:
-                  name: token-public-key
-                  key: public_key.pem
+                  name: {{ .Values.piko.tokenPublicKey.configMap.mapName }}
+                  key: {{ .Values.piko.tokenPublicKey.configMap.keyName }}
+              {{- end}}
           volumeMounts:
             - name: config
               mountPath: /config-base
@@ -114,9 +120,6 @@ spec:
               path: "server.yaml"
         - name: config-writable
           emptyDir: {}
-        - name: upstream-certs
-          secret:
-            secretName: {{ .Values.piko.certificates.upstreamSecretName }}
 {{- if .Values.piko.certificates.proxy.enabled }}
         - name: proxy-certs
           secret:

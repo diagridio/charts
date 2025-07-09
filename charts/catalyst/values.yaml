@@ -443,17 +443,23 @@ piko:
   pikoName: "piko"
   releaseName: "diagrid-piko"
 
+  # Sets the configmap name and the key in the config map
+  # that contains the public key to validate the JWT.
+  tokenPublicKey:
+    useConfigMap: false
+    configMap:
+      mapName: token-public-key
+      keyName: public_key.pem
+    value: ""
+
   image:
     repository: ghcr.io/andydunstall/piko
     pullPolicy: IfNotPresent
     tag: "v0.7.0"
 
   serviceAccount:
-    # -- Specifies whether a service account should be created
     create: true
-    # -- Annotations to add to the service account
     annotations: {}
-    # -- The name of the service account to use.
     name: "diagrid-piko"
 
   podAnnotations: {}
