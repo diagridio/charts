@@ -1,0 +1,27 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .Values.piko.releaseName }}-reloader
+  namespace: {{ .Release.Namespace }}
+rules:
+  - apiGroups: ["apps"]
+    resources: ["statefulsets"]
+    resourceNames:
+      - "{{ .Values.piko.releaseName }}"
+    verbs: ["get","patch"]
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Values.piko.releaseName }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.piko.serviceAccount.name }}
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: {{ .Values.piko.releaseName }}-reloader
+  apiGroup: rbac.authorization.k8s.io
+

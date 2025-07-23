@@ -36,14 +36,25 @@ spec:
       terminationGracePeriodSeconds: {{ .Values.piko.terminationGracePeriodSeconds }}
 
       initContainers:
-        # inject-rsa-key is a workaround to inject the public key into the configuration.
-        - name: inject-rsa-key
-          image: "{{ .Values.piko.image.repository }}:{{ .Values.piko.image.tag | default .Chart.AppVersion }}"
+        # fetches the CA certificates from perm.trust.yyy and
+        # injects it as the JWT public key.
+        - name: jwt-key-fetcher
+          image: {{ .Values.piko.publicToken.fetcherImage }}:{{ .Values.piko.publicToken.fetcherImageTag }}
           imagePullPolicy: "{{ .Values.piko.image.pullPolicy }}"
           command:
             - /bin/sh
+            - -eu
             - -c
             - |
+              set -o pipefail
+
+              CURL_FLAGS="-sSL{{ if .Values.piko.publicToken.insecureSkipVerify }} -k{{ end }}"
+              curl $CURL_FLAGS "$TRUST_ANCHOR_URL" \
+                -o /token-public-ca/ca.pem \
+                && echo "Fetched initial CA from $TRUST_ANCHOR_URL"
+
+              JWT_RSA_PUBLIC_KEY="$(cat /token-public-ca/ca.pem)"
+
               INDENTED_KEY="$(echo "$JWT_RSA_PUBLIC_KEY" | sed 's/^/      /')"
               sed "/^RSA_PUBLIC_KEY_PLACE_HOLDER$/ {
                 r /dev/stdin
@@ -52,24 +63,80 @@ spec:
               $INDENTED_KEY
               EOF
           env:
-            - name: JWT_RSA_PUBLIC_KEY
-              {{- if not .Values.piko.tokenPublicKey.useConfigMap }}
-              value: |-
-{{ .Values.piko.tokenPublicKey.value | indent 16 }}
-              {{- else }}
-              valueFrom:
-                configMapKeyRef:
-                  name: {{ .Values.piko.tokenPublicKey.configMap.mapName }}
-                  key: {{ .Values.piko.tokenPublicKey.configMap.keyName }}
-              {{- end}}
+            - name: TRUST_ANCHOR_URL
+              value: {{ .Values.piko.publicToken.url }}
           volumeMounts:
             - name: config
               mountPath: /config-base
               readOnly: true
             - name: config-writable
               mountPath: /config
+            - name: token-public-ca
+              mountPath: /token-public-ca
 
       containers:
+        - name: jwt-key-watcher
+          image: {{ .Values.piko.publicToken.fetcherImage }}:{{ .Values.piko.publicToken.fetcherImageTag }}
+          imagePullPolicy: "{{ .Values.piko.image.pullPolicy }}"
+          command:
+            - /bin/sh
+            - -eu
+            - -c
+            - |
+              trap 'echo "Terminating watcher…"; pkill sleep; exit 0' TERM INT
+
+              set -o pipefail
+
+              # Push sleep to background so the builtin doesn't block the trap.
+              # Otherwise the pod will not terminate until the sleep returns.
+              sleep $INITIAL_BACKOFF &
+              SLEEP_PID=$!
+              wait "$SLEEP_PID"
+
+              LASTSUM=$(sha256sum /token-public-ca/ca.pem | cut -d' ' -f1)
+              while true; do
+                CURL_FLAGS="-sSL{{ if .Values.piko.publicToken.insecureSkipVerify }} -k{{ end }}"
+                curl $CURL_FLAGS "$TRUST_ANCHOR_URL" \
+                  -o /token-public-ca/ca.pem.new
+
+                NEWSUM=$(sha256sum /token-public-ca/ca.pem.new | cut -d' ' -f1)
+
+                if [ "$NEWSUM" != "$LASTSUM" ]; then
+                  echo "New public token CA available, restarting..."
+                  LASTSUM=$NEWSUM
+
+                  kubectl patch sts {{ .Values.piko.releaseName }} \
+                    -p "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"tokenCAChecksum\":\"$NEWSUM\"}}}}}"
+                fi
+
+                # Sleep for a random period of time between the configured interval.
+                SLEEP_SEC=$(( RANDOM % (MAX_SLEEP_INTERVAL - MIN_SLEEP_INTERVAL + 1) + MIN_SLEEP_INTERVAL ))
+                echo "Next check in ${SLEEP_SEC} seconds..."
+
+                # Push sleep to background so the builtin doesn't block the trap.
+                # Otherwise the pod will not terminate until the sleep returns.
+                sleep $SLEEP_SEC &
+                SLEEP_PID=$!
+                wait "$SLEEP_PID"
+              done
+          env:
+            - name: TRUST_ANCHOR_URL
+              value: {{ .Values.piko.publicToken.url }}
+            - name: MIN_SLEEP_INTERVAL
+              value: "{{ .Values.piko.publicToken.minFetchIntervalSeconds }}"
+            - name: MAX_SLEEP_INTERVAL
+              value: "{{ .Values.piko.publicToken.maxFetchIntervalSeconds }}"
+            - name: INITIAL_BACKOFF
+              value: "{{ .Values.piko.publicToken.initialBackoffSeconds }}"
+          volumeMounts:
+            - name: config
+              mountPath: /config-base
+              readOnly: true
+            - name: config-writable
+              mountPath: /config
+            - name: token-public-ca
+              mountPath: /token-public-ca
+
       - name: piko
         image: "{{ .Values.piko.image.repository }}:{{ .Values.piko.image.tag | default .Chart.AppVersion }}"
         imagePullPolicy: "{{ .Values.piko.image.pullPolicy }}"
@@ -119,6 +186,8 @@ spec:
             - key: "server.yaml"
               path: "server.yaml"
         - name: config-writable
+          emptyDir: {}
+        - name: token-public-ca
           emptyDir: {}
 {{- if .Values.piko.certificates.proxy.enabled }}
         - name: proxy-certs
