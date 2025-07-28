@@ -58,6 +58,15 @@ global:
   featureflags:
     nats_enabled: true
     agent_component_validation: false
+  # Consolidated image allows you to use a single image for
+  # all Catalyst components instead of individual images.
+  # This can be used when you need to reduce the number of
+  # images you need to procure.
+  consolidated_image:
+    enabled: false
+    name: catalyst-all
+    tag: 'edge'
+    pull_policy: Always
 #------------------------------------------------------------------------------
 # Shared Configurations
 # TODO not implemented yet
@@ -71,6 +80,9 @@ shared:
 #------------------------------------------------------------------------------
 agent:
   logLevel: info
+  # This agent config is read directly into the ConfigMap. However,
+  # we do apply templating which allows us to provide inline
+  # templates in the values.
   config:
     host:
       private_region: true
@@ -88,6 +100,7 @@ agent:
       skip_api_validation: true
       image_registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public"
       image_tag: "0.464.0"
+      image_name: "{{ ternary .Values.global.consolidated_image.name \"sidecar\" .Values.global.consolidated_image.enabled }}"
       resources:
         limits:
           cpu: 300m
@@ -98,9 +111,12 @@ agent:
       service_account_annotations: []
     api_token_error:
       enabled: false
+      image_name: "{{ ternary .Values.global.consolidated_image.name \"cra-agent\" .Values.global.consolidated_image.enabled }}"
+      image_tag: "0.464.0"
     otel:
       enabled: true
-      image_repository: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/diagrid-otel-collector"
+      image_registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public"
+      image_name: "{{ ternary .Values.global.consolidated_image.name \"diagrid-otel-collector\" .Values.global.consolidated_image.enabled }}"
       image_tag: "0.464.0"
       metrics_endpoint: https://cra-metrics.prd.p.diagrid.io/api/v1/push
       loki_endpoint: https://cra-logs.prd.p.diagrid.io/loki/api/v1/push
@@ -370,6 +386,9 @@ gateway:
 #------------------------------------------------------------------------------
 management:
   logLevel: info
+  # This agent config is read directly into the ConfigMap. However,
+  # we do apply templating which allows us to provide inline
+  # templates in the values.
   config:
     http_server:
       enabled: true

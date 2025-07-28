@@ -39,9 +39,19 @@ spec:
         - name: {{ .Chart.Name }}
           securityContext:
             {{- include "merge.maps" (dict "base" .Values.management.securityContext "overrides" .Values.management.merge.securityContext) | nindent 12 }}
+{{- if .Values.global.consolidated_image.enabled }}
+          image: "{{ .Values.management.image.registry }}/{{ .Values.global.consolidated_image.name }}:{{ .Values.global.consolidated_image.tag }}"
+          imagePullPolicy: {{ .Values.global.consolidated_image.pull_policy }}
+          command: ["/management"]
+{{- else if .Values.management.image.fullName }}
+          image: "{{ .Values.management.image.fullName }}"
+          imagePullPolicy: {{ .Values.management.image.pullPolicy }}
+          command: ["./management"]
+{{- else }}
           image: "{{ .Values.management.image.registry }}/{{ .Values.management.image.name }}:{{ .Values.management.image.tag }}"
           imagePullPolicy: {{ .Values.management.image.pullPolicy }}
           command: ["./management"]
+{{- end }}
           args:
           - "--log-level={{ .Values.management.logLevel }}"
           {{- if eq .Values.global.secrets.provider "redis" }}
