@@ -65,7 +65,6 @@ global:
   consolidated_image:
     enabled: false
     name: catalyst-all
-    tag: 'edge'
     pull_policy: Always
 #------------------------------------------------------------------------------
 # Shared Configurations
@@ -405,7 +404,7 @@ management:
   replicaCount: 2
   image:
     registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public"
-    name: catalyst-management
+    name: "{{ ternary .Values.global.consolidated_image.name \"catalyst-management\" .Values.global.consolidated_image.enabled }}"
     tag: "0.464.0"
     pullPolicy: Always
   nameOverride: ""
