@@ -40,20 +40,26 @@ curl -o- https://downloads.diagrid.io/cli/install.sh | bash
 sudo mv ./diagrid /usr/local/bin/diagrid
 sudo chmod +x /usr/local/bin/diagrid
 
+echo "✅ Installed Diagrid CLI"
+
 # Install AWS CLI
 echo "> Installing AWS CLI"
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
 unzip awscliv2.zip
 sudo ./aws/install
 aws --version
-echo "✅ Installed AWS CLI"
-
-echo "✅ Installed Diagrid CLI"
+echo "✅ Installed AWS CLI for retrieving Catalyst images from public ECR"
 
 # Install Azure CLI
 echo "> Installing Azure CLI"
 
-curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+sudo apt-get update
+sudo apt-get install ca-certificates curl apt-transport-https lsb-release gnupg -y
+curl -sL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/microsoft.gpg > /dev/null
+AZ_REPO=$(lsb_release -cs)
+echo "deb [arch=amd64] https://packages.microsoft.com/repos/azure-cli/ $AZ_REPO main" | sudo tee /etc/apt/sources.list.d/azure-cli.list
+sudo apt-get update
+sudo apt-get install azure-cli -y
 
 echo "✅ Installed Azure CLI"
 
