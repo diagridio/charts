@@ -1,5 +1,7 @@
 {{- $configMap := deepCopy .Values.management.config -}}
 {{- $_ := set $configMap "control_plane_url" .Values.global.control_plane_url -}}
+{{- $_ := set $configMap "control_plane_http_url" .Values.global.control_plane_http_url -}}
+{{- $_ := set $configMap "control_plane_http_insecure" .Values.global.control_plane_http_insecure -}}
 {{- $_ := set $configMap "sentry" .Values.global.sentry -}}
 {{- $_ := set $configMap "nats" .Values.global.nats -}}
 {{- $_ := set $configMap.featureflags "nats_enabled" .Values.global.featureflags.nats_enabled -}}
