@@ -253,6 +253,16 @@ gateway:
       enabled: true
       address: "127.0.0.1"
       port: 9090
+    stats:
+      enabled: true
+      port: 9091
+      service:
+        name: gateway-envoy-stats
+        port: 9091
+        annotations:
+          prometheus.io/scrape: "true"
+          prometheus.io/port: "9091"
+          prometheus.io/path: "/stats"
     serviceAccount:
       name: gateway-envoy
       annotations: {}

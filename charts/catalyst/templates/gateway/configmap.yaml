@@ -40,6 +40,52 @@ data:
               filename: {{ .Values.gateway.tls.certificates.caFile }}
             {{- end }}
       {{- end }}
+      {{- if .Values.gateway.envoy.stats.enabled }}
+      listeners:
+        - name: envoy_stats_listener
+          address:
+            socket_address:
+              address: 0.0.0.0
+              port_value: {{ .Values.gateway.envoy.stats.port }}
+          filter_chains:
+            - filters:
+                - name: envoy.filters.network.http_connection_manager
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                    stat_prefix: stats_listener
+                    route_config:
+                      name: stats_local_route
+                      virtual_hosts:
+                        - name: stats_vhost
+                          domains: ["*"]
+                          routes:
+                            - match:
+                                prefix: "/"
+                              route:
+                                cluster: envoy_admin
+                                timeout: 5s
+                    http_filters:
+                      - name: envoy.filters.http.lua
+                        typed_config:
+                          "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+                          inline_code: |
+                            function envoy_on_request(handle)
+                              local headers = handle:headers()
+                              if headers:get(":method") != "GET" then
+                                handle:respond({[":status"] = "405"}, "")
+                                return
+                              end
+                              local path = headers:get(":path") or ""
+                              if path == "/stats" or path == "/stats/" then
+                                headers:replace(":path", "/stats?format=prometheus")
+                                return
+                              end
+                              handle:respond({[":status"] = "404"}, "")
+                            end
+                      - name: envoy.filters.http.router
+                        typed_config:
+                          "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+      {{- end }}
       clusters:
         - name: controlplane
           connect_timeout: {{ .Values.gateway.envoy.xds.connect_timeout }}
@@ -90,3 +136,18 @@ data:
                   watched_directory:
                     path: /var/run/secrets/diagrid.io/tls
           {{- end }}
+        {{- if .Values.gateway.envoy.stats.enabled }}
+        - name: envoy_admin
+          connect_timeout: 5s
+          type: STATIC
+          lb_policy: ROUND_ROBIN
+          load_assignment:
+            cluster_name: envoy_admin
+            endpoints:
+              - lb_endpoints:
+                  - endpoint:
+                      address:
+                        socket_address:
+                          address: 127.0.0.1
+                          port_value: {{ .Values.gateway.envoy.admin.port }}
+        {{- end }}
