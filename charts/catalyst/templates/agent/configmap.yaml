@@ -2,6 +2,8 @@
 {{- $agentConfig := deepCopy .Values.agent.config -}}
 {{- $_ := set $agentConfig.host "join_token" .Values.join_token -}}
 {{- $_ := set $agentConfig "control_plane_url" .Values.global.control_plane_url -}}
+{{- $_ := set $agentConfig "control_plane_http_url" .Values.global.control_plane_http_url -}}
+{{- $_ := set $agentConfig "control_plane_http_insecure" .Values.global.control_plane_http_insecure -}}
 {{- $_ := set $agentConfig "sentry" .Values.global.sentry -}}
 {{- $_ := set $agentConfig "nats" .Values.global.nats -}}
 {{- $_ := set $agentConfig.featureflags "nats_enabled" .Values.global.featureflags.nats_enabled -}}

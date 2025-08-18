@@ -39,6 +39,7 @@ global:
       secret_access_key: ""
   # Global control plane URL
   control_plane_url: cra-cloudgrid.prd.p.diagrid.io:443
+  control_plane_http_url: https://api.diagrid.io
   # Global sentry configuration
   sentry:
     enabled: true
@@ -75,7 +76,6 @@ agent:
       private_region: true
       ingress_ip_addr: ""
       egress_addresses: []
-    control_plane_http_url: https://api.diagrid.io
     placement:
       max_project_count: 50
     project:
