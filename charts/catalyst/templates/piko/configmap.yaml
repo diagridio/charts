@@ -15,7 +15,3 @@ data:
       node_id_prefix: ${POD_NAME}-
       join:
         - {{ .Values.piko.releaseName }}
-    upstream:
-      auth:
-        rsa_public_key: |
-    RSA_PUBLIC_KEY_PLACE_HOLDER
