@@ -31,14 +31,14 @@ helm-lint: helm-prereqs
 	helm lint $(TARGET_PATH) \
 	--set join_token="fake_token"
 
+.PHONY: helm-add-repos
+helm-add-repos: ## Add helm repos
+	helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/ > /dev/null 2>&1 || true
+
 .PHONY: helm-dependency-build
 helm-dependency-build: ## Build helm dependencies
 	cd $(CHART_DIR) && \
 	helm dependency build
-
-.PHONY: helm-add-repos
-helm-add-repos: ## Add helm repos
-	helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/ > /dev/null 2>&1 || tru
 
 .PHONY: helm-dependency-update
 helm-depedency-update: ## Update helm dependencies
