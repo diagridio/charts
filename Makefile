@@ -36,13 +36,17 @@ helm-dependency-build: ## Build helm dependencies
 	cd $(CHART_DIR) && \
 	helm dependency build
 
+.PHONY: helm-add-repos
+helm-add-repos: ## Add helm repos
+	helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/ > /dev/null 2>&1 || tru
+
 .PHONY: helm-dependency-update
 helm-depedency-update: ## Update helm dependencies
 	cd $(CHART_DIR) && \
 	helm dependency update ./
 
 .PHONY: helm-prereqs ## Install helm dependencies
-helm-prereqs: helm-dependency-build helm-depedency-update
+helm-prereqs: helm-add-repos helm-dependency-build helm-depedency-update
 
 .PHONY: helm-template
 helm-template: helm-prereqs ## Render helm chart
