@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Values.piko.releaseName }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+    app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/name: {{ .Values.piko.pikoName }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.piko.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Values.piko.pikoName }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  serviceName: {{ .Values.piko.releaseName }}
+  template:
+    metadata:
+      {{- with .Values.piko.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        helm.sh/chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+        app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+        app.kubernetes.io/managed-by: {{ .Release.Service }}
+        app.kubernetes.io/name: {{ .Values.piko.pikoName }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        {{- with .Values.piko.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ .Values.piko.serviceAccount.name }}
+      terminationGracePeriodSeconds: {{ .Values.piko.terminationGracePeriodSeconds }}
+
+      containers:
+        - name: piko
+          image: "{{ .Values.piko.image.repository }}:{{ .Values.piko.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: "{{ .Values.piko.image.pullPolicy }}"
+          ports:
+            - containerPort: {{ .Values.piko.server.proxyPort }}
+              name: proxy
+            - containerPort: {{ .Values.piko.server.upstreamPort }}
+              name: upstream
+            - containerPort: {{ .Values.piko.server.adminPort }}
+              name: admin
+            - containerPort: {{ .Values.piko.server.gossipPort }}
+              name: gossip
+          readinessProbe:
+            {{- toYaml .Values.piko.readinessProbe | nindent 12 }}
+          args:
+            - server
+            - --config.path
+            - /config/server.yaml
+            - --config.expand-env
+{{- if .Values.piko.certificates.proxy.enabled }}
+            - --proxy.tls.key
+            - /proxy-certs/tls.key
+            - --proxy.tls.cert
+            - /proxy-certs/tls.crt
+{{- end }}
+            - --upstream.auth.jwks.endpoint
+            - {{ .Values.piko.publicToken.url }}
+            - --upstream.auth.jwks.cache-ttl
+            - {{ .Values.piko.publicToken.cacheTTL }}
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          volumeMounts:
+            - name: config
+              mountPath: "/config"
+{{- if .Values.piko.certificates.proxy.enabled }}
+            - name: proxy-certs
+              mountPath: "/proxy-certs"
+{{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ .Values.piko.releaseName }}
+            items:
+            - key: "server.yaml"
+              path: "server.yaml"
+{{- if .Values.piko.certificates.proxy.enabled }}
+        - name: proxy-certs
+          secret:
+            secretName: {{ .Values.piko.certificates.proxy.secretName }}
+{{- end }}
+

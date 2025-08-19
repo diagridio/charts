@@ -437,3 +437,59 @@ management:
   extraEnvs: []
   merge: {}
   patch: {}
+
+piko:
+  replicaCount: 3
+  pikoName: "piko"
+  releaseName: "diagrid-piko"
+
+  # Sets the configmap name and the key in the config map
+  # that contains the public key to validate the JWT.
+  publicToken:
+    url: https://tunnels.trust.diagrid.io/.well-known/jwks.json
+    cacheTTL: "5m"
+
+  image:
+    repository: ghcr.io/andydunstall/piko
+    pullPolicy: IfNotPresent
+    tag: "v0.8.1"
+
+  serviceAccount:
+    annotations: {}
+    name: "diagrid-piko"
+
+  podAnnotations: {}
+  podLabels: {}
+
+  server:
+    # -- Specifies the proxy port to listen on. The proxy port listens for
+    # requests that are forwarded to upstream services.
+    proxyPort: 8000
+    # -- Specifies the upstream port to listen on. The upstream port listens
+    # for connections from upstream service.
+    upstreamPort: 8001
+    # -- Specifies the admin port to listen on. The admin port exposes an API for
+    # metrics and observability.
+    adminPort: 8002
+    # -- Specifies the gossip port for inter-node traffic.
+    gossipPort: 8003
+
+  certificates:
+    # Currently the internal proxy TLS is not supported because the
+    # public key comes from the shared control plane and it's not
+    # configurable.
+    proxy:
+      enabled: false
+      secretName: cra-agent-ingress-wildcard-tls
+
+  terminationGracePeriodSeconds: 60
+
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: admin
+
+  affinity: {}
+
+  httpproxy:
+    upstreamHostName: "tunnels.api.diagrid.io"

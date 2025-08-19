@@ -19,6 +19,7 @@ A Catalyst installation consists of the following components:
 - **Management**: Provides access to service providers such as secrets stores.
 - **Gateway**: Provides routing to Dapr runtime instances.
 - **Telemetry**: Collectors export telemetry from Dapr.
+- **Piko**: Provides a replacement to Ngrok for App Tunnels.
 
 ## Guides
 
