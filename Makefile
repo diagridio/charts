@@ -31,10 +31,6 @@ helm-lint: helm-prereqs
 	helm lint $(TARGET_PATH) \
 	--set join_token="fake_token"
 
-.PHONY: helm-add-repos
-helm-add-repos: ## Add helm repos
-	helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/ > /dev/null 2>&1 || true
-
 .PHONY: helm-dependency-build
 helm-dependency-build: ## Build helm dependencies
 	cd $(CHART_DIR) && \
@@ -46,7 +42,7 @@ helm-depedency-update: ## Update helm dependencies
 	helm dependency update ./
 
 .PHONY: helm-prereqs ## Install helm dependencies
-helm-prereqs: helm-add-repos helm-dependency-build helm-depedency-update
+helm-prereqs: helm-dependency-build helm-depedency-update
 
 .PHONY: helm-template
 helm-template: helm-prereqs ## Render helm chart
