@@ -1,3 +1,4 @@
+{{- $isNodePort := eq .Values.gateway.envoy.service.type "NodePort" }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -15,11 +16,17 @@ spec:
     - name: http
       port: {{ .Values.gateway.envoy.service.port }}
       targetPort: {{ .Values.gateway.envoy.service.targetPort }}
+      {{- if $isNodePort }}
+      nodePort: {{ .Values.gateway.envoy.service.port }}
+      {{- end }}
       protocol: TCP
     {{- if .Values.gateway.tls.enabled }}
     - name: https
       port: {{ .Values.gateway.envoy.service.httpsPort }}
       targetPort: {{ .Values.gateway.envoy.service.httpsTargetPort }}
+      {{- if $isNodePort }}
+      nodePort: {{ .Values.gateway.envoy.service.httpsPort }}
+      {{- end }}
       protocol: TCP
     {{- end }}
   type: {{ .Values.gateway.envoy.service.type }}
