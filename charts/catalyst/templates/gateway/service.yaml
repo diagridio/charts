@@ -15,11 +15,17 @@ spec:
     - name: http
       port: {{ .Values.gateway.envoy.service.port }}
       targetPort: {{ .Values.gateway.envoy.service.targetPort }}
+      {{- if .Values.gateway.envoy.service.nodePort }}
+      nodePort: {{ .Values.gateway.envoy.service.nodePort }}
+      {{- end }}
       protocol: TCP
     {{- if .Values.gateway.tls.enabled }}
     - name: https
       port: {{ .Values.gateway.envoy.service.httpsPort }}
       targetPort: {{ .Values.gateway.envoy.service.httpsTargetPort }}
+      {{- if .Values.gateway.envoy.service.httpsNodePort }}
+      nodePort: {{ .Values.gateway.envoy.service.httpsNodePort }}
+      {{- end }}
       protocol: TCP
     {{- end }}
   type: {{ .Values.gateway.envoy.service.type }}
