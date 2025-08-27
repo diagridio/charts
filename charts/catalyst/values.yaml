@@ -87,7 +87,7 @@ agent:
       # default to disable API validation because ingress could be not configured by users
       skip_api_validation: true
       image_registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public"
-      image_tag: "0.449.0"
+      image_tag: "0.459.0"
       resources:
         limits:
           cpu: 300m
@@ -101,7 +101,7 @@ agent:
     otel:
       enabled: true
       image_repository: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/diagrid-otel-collector"
-      image_tag: "0.449.0"
+      image_tag: "0.459.0"
       metrics_endpoint: https://cra-metrics.prd.p.diagrid.io/api/v1/push
       loki_endpoint: https://cra-logs.prd.p.diagrid.io/loki/api/v1/push
       metrics_tls_insecure: false
@@ -160,7 +160,7 @@ agent:
   image:
     registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public"
     name: cra-agent
-    tag: "0.449.0"
+    tag: "0.459.0"
     fullName: ""
     pullPolicy: Always
   nameOverride: ""
@@ -232,7 +232,7 @@ gateway:
     minReplicas: 2
   identityInjector:
     image:
-      tag: "0.449.0"
+      tag: "0.459.0"
       name: "identity-injector"
       registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public"
     resources:
@@ -315,7 +315,7 @@ gateway:
       mtls:
         enabled: true
     image:
-      tag: "0.449.0"
+      tag: "0.459.0"
       name: catalyst-gateway
       registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public"
     serviceAccount:
@@ -387,7 +387,7 @@ management:
   image:
     registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public"
     name: catalyst-management
-    tag: "0.449.0"
+    tag: "0.459.0"
     pullPolicy: Always
   nameOverride: ""
   fullnameOverride: ""
@@ -437,3 +437,48 @@ management:
   extraEnvs: []
   merge: {}
   patch: {}
+piko:
+  replicaCount: 3
+  pikoName: "piko"
+  releaseName: "diagrid-piko"
+  # Sets the configmap name and the key in the config map
+  # that contains the public key to validate the JWT.
+  publicToken:
+    url: https://tunnels.trust.diagrid.io/.well-known/jwks.json
+    cacheTTL: "5m"
+  image:
+    repository: ghcr.io/andydunstall/piko
+    pullPolicy: IfNotPresent
+    tag: "v0.8.1"
+  serviceAccount:
+    annotations: {}
+    name: "diagrid-piko"
+  podAnnotations: {}
+  podLabels: {}
+  server:
+    # -- Specifies the proxy port to listen on. The proxy port listens for
+    # requests that are forwarded to upstream services.
+    proxyPort: 8000
+    # -- Specifies the upstream port to listen on. The upstream port listens
+    # for connections from upstream service.
+    upstreamPort: 8001
+    # -- Specifies the admin port to listen on. The admin port exposes an API for
+    # metrics and observability.
+    adminPort: 8002
+    # -- Specifies the gossip port for inter-node traffic.
+    gossipPort: 8003
+  certificates:
+    # Currently the internal proxy TLS is not supported because the
+    # public key comes from the shared control plane and it's not
+    # configurable.
+    proxy:
+      enabled: false
+      secretName: cra-agent-ingress-wildcard-tls
+  terminationGracePeriodSeconds: 60
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: admin
+  affinity: {}
+  httpproxy:
+    upstreamHostName: "tunnels.api.diagrid.io"
