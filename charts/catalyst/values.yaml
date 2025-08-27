@@ -480,7 +480,7 @@ piko:
     # configurable.
     proxy:
       enabled: false
-      secretName: cra-agent-ingress-wildcard-tls
+      secretName: ""
 
   terminationGracePeriodSeconds: 60
 
