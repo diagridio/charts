@@ -1,3 +1,4 @@
+{{- if .Values.piko.enabled }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -93,4 +94,4 @@ spec:
           secret:
             secretName: {{ .Values.piko.certificates.proxy.secretName }}
 {{- end }}
-
+{{- end }}

@@ -438,6 +438,7 @@ management:
   merge: {}
   patch: {}
 piko:
+  enabled: true
   replicaCount: 3
   pikoName: "piko"
   releaseName: "diagrid-piko"
@@ -473,7 +474,8 @@ piko:
     # configurable.
     proxy:
       enabled: false
-      secretName: cra-agent-ingress-wildcard-tls
+      secretName: ""
+
   terminationGracePeriodSeconds: 60
   readinessProbe:
     httpGet:

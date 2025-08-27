@@ -1,3 +1,4 @@
+{{- if .Values.piko.enabled }}
 apiVersion: v1
 kind: Service
 metadata:
@@ -24,3 +25,4 @@ spec:
   selector:
     app.kubernetes.io/name: {{ .Values.piko.pikoName }}
     app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
