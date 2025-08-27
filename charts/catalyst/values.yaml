@@ -439,6 +439,7 @@ management:
   patch: {}
 
 piko:
+  enabled: true
   replicaCount: 3
   pikoName: "piko"
   releaseName: "diagrid-piko"
