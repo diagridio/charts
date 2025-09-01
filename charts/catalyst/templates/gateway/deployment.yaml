@@ -92,6 +92,16 @@ spec:
               containerPort: 8443
               protocol: TCP
             {{- end }}
+            {{- if .Values.gateway.envoy.admin.enabled }}
+            - name: admin
+              containerPort: {{ .Values.gateway.envoy.admin.port }}
+              protocol: TCP
+            {{- end }}
+            {{- if .Values.gateway.envoy.stats.enabled }}
+            - name: stats
+              containerPort: {{ .Values.gateway.envoy.stats.port }}
+              protocol: TCP
+            {{- end }}
           volumeMounts:
             - name: envoy-config
               mountPath: /etc/envoy
@@ -112,10 +122,31 @@ spec:
               name: dapr-identity-token
               readOnly: true
             {{- end }}
+        {{- if and .Values.gateway.envoy.admin.enabled .Values.gateway.envoy.statsProxy.enabled }}
+        - name: envoy-stats-proxy
+          image: "{{ .Values.gateway.envoy.statsProxy.image.registry }}/{{ .Values.gateway.envoy.statsProxy.image.name }}:{{ .Values.gateway.envoy.statsProxy.image.tag }}"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: stats-proxy
+              containerPort: {{ .Values.gateway.envoy.statsProxy.port }}
+              protocol: TCP
+          volumeMounts:
+            - name: envoy-stats-proxy-config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+              readOnly: true
+          resources:
+            {{- toYaml .Values.gateway.envoy.statsProxy.resources | nindent 12 }}
+        {{- end }}
       volumes:
         - name: envoy-config
           configMap:
             name: envoy-config
+        {{- if and .Values.gateway.envoy.admin.enabled .Values.gateway.envoy.statsProxy.enabled }}
+        - name: envoy-stats-proxy-config
+          configMap:
+            name: {{ default "envoy-stats-proxy-config" .Values.gateway.envoy.statsProxy.configmap.name }}
+        {{- end }}
         {{- if .Values.gateway.tls.enabled }}
         - name: wildcard-tls-certs
           secret:

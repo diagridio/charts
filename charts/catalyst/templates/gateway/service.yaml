@@ -54,3 +54,25 @@ spec:
       protocol: TCP
   type: {{ .Values.gateway.controlplane.service.type }}
   clusterIP: {{ .Values.gateway.controlplane.service.clusterIP }}
+---
+{{- if .Values.gateway.envoy.stats.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.gateway.envoy.stats.service.name }}
+  annotations:
+{{- with .Values.gateway.envoy.stats.service.annotations }}
+{{ toYaml . | nindent 4 }}
+{{- end }}
+  labels:
+    {{- include "gateway.envoy.labels" . | nindent 4 }}
+spec:
+  selector:
+    {{- include "gateway.envoy.selectorLabels" . | nindent 6 }}
+  ports:
+    - name: stats
+      port: {{ .Values.gateway.envoy.stats.service.port }}
+      targetPort: {{ .Values.gateway.envoy.stats.port }}
+      protocol: TCP
+  type: ClusterIP
+{{- end }}
