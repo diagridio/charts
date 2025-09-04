@@ -98,7 +98,7 @@ agent:
       # default to disable API validation because ingress could be not configured by users
       skip_api_validation: true
       image_registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public"
-      image_tag: "0.464.0"
+      image_tag: "0.468.0"
       image_name: "{{ ternary .Values.global.consolidated_image.name \"sidecar\" .Values.global.consolidated_image.enabled }}"
       resources:
         limits:
@@ -114,7 +114,7 @@ agent:
       enabled: true
       image_registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public"
       image_name: "{{ ternary .Values.global.consolidated_image.name \"diagrid-otel-collector\" .Values.global.consolidated_image.enabled }}"
-      image_tag: "0.464.0"
+      image_tag: "0.468.0"
       metrics_endpoint: https://cra-metrics.prd.p.diagrid.io/api/v1/push
       loki_endpoint: https://cra-logs.prd.p.diagrid.io/loki/api/v1/push
       metrics_tls_insecure: false
@@ -173,7 +173,7 @@ agent:
   image:
     registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public"
     name: cra-agent
-    tag: "0.464.0"
+    tag: "0.468.0"
     fullName: ""
     pullPolicy: Always
   nameOverride: ""
@@ -245,7 +245,7 @@ gateway:
     minReplicas: 2
   identityInjector:
     image:
-      tag: "0.464.0"
+      tag: "0.468.0"
       name: "identity-injector"
       registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public"
     resources:
@@ -328,7 +328,7 @@ gateway:
       mtls:
         enabled: true
     image:
-      tag: "0.464.0"
+      tag: "0.468.0"
       name: catalyst-gateway
       registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public"
     serviceAccount:
@@ -403,7 +403,7 @@ management:
   image:
     registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public"
     name: "{{ ternary .Values.global.consolidated_image.name \"catalyst-management\" .Values.global.consolidated_image.enabled }}"
-    tag: "0.464.0"
+    tag: "0.468.0"
     pullPolicy: Always
   nameOverride: ""
   fullnameOverride: ""
