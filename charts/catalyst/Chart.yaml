@@ -5,7 +5,3 @@ description: Helm chart for Diagrid Catalyst
 type: application
 version: '0.17.0'
 appVersion: '0.0.1'
-dependencies:
-  - name: metrics-server
-    version: 3.10.0
-    repository: https://kubernetes-sigs.github.io/metrics-server/
