@@ -35,13 +35,8 @@ spec:
       containers:
       {{- if .Values.gateway.controlplane.xds.mtls.enabled }}
         - name: identity-injector
-          {{- if .Values.global.consolidated_image.enabled }}
-          command:
-            - /identity-injector
-          {{- else }}
           command:
             - ./identity-injector
-          {{- end }}
           env:
             - name: IDENTITY_TRUST_DOMAIN
               value: prj-root.trust.diagrid.io
@@ -87,16 +82,8 @@ spec:
         - name: envoy
           securityContext:
             {{- toYaml .Values.gateway.envoy.securityContext | nindent 12 }}
-{{- if .Values.global.consolidated_image.enabled }}
-          image: "{{ .Values.gateway.envoy.image.registry }}/{{ .Values.global.consolidated_image.name }}:{{ .Values.gateway.envoy.image.tag }}"
-          imagePullPolicy: {{ .Values.global.consolidated_image.pull_policy }}
-{{- else if .Values.gateway.envoy.image.fullName }}
-          image: "{{ .Values.gateway.envoy.image.fullName }}"
-          imagePullPolicy: {{ .Values.gateway.envoy.image.pullPolicy }}
-{{- else }}
           image: "{{ $envoyImage }}"
           imagePullPolicy: {{ .Values.gateway.envoy.image.pullPolicy }}
-{{- end }}
           args:
             - "-c"
             - "/etc/envoy/bootstrap-envoy.yaml"
@@ -201,13 +188,8 @@ spec:
       containers:
       {{- if .Values.gateway.controlplane.xds.mtls.enabled }}
         - name: identity-injector
-          {{- if .Values.global.consolidated_image.enabled }}
-          command:
-            - /identity-injector
-          {{- else }}
           command:
             - ./identity-injector
-          {{- end }}
           env:
             - name: IDENTITY_TRUST_DOMAIN
               value: prj-root.trust.diagrid.io
@@ -286,11 +268,7 @@ spec:
           image: "{{ $controlplaneImage }}"
           imagePullPolicy: Always
 {{- end }}
-{{- if .Values.global.consolidated_image.enabled }}
-          command: ["/catalyst-gateway-controlplane"]
-{{- else }}
-          command: ["./catalyst-gateway-controlplane"]
-{{- end }}
+          command: ["./gateway-controlplane"]
           resources:
             {{- toYaml .Values.gateway.controlplane.resources | nindent 12 }}
           ports:

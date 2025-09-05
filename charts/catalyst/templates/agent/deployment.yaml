@@ -38,16 +38,14 @@ spec:
 {{- if .Values.global.consolidated_image.enabled }}
           image: "{{ .Values.agent.image.registry }}/{{ .Values.global.consolidated_image.name }}:{{ .Values.agent.image.tag }}"
           imagePullPolicy: {{ .Values.global.consolidated_image.pull_policy }}
-          command: ["/agent"]
 {{- else if .Values.agent.image.fullName }}
           image: "{{ .Values.agent.image.fullName }}"
           imagePullPolicy: {{ .Values.agent.image.pullPolicy }}
-          command: ["./agent"]
 {{- else }}
           image: "{{ .Values.agent.image.registry }}/{{ .Values.agent.image.name }}:{{ .Values.agent.image.tag }}"
           imagePullPolicy: {{ .Values.agent.image.pullPolicy }}
-          command: ["./agent"]
 {{- end }}
+          command: ["./agent"]
           args:
           - "--log-level={{ .Values.agent.logLevel }}"
           - "--tls.enabled=false"
