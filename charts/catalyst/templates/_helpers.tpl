@@ -149,7 +149,7 @@ Merge two maps, with the second map overriding the first
   {{- $base := .base | default dict }}
   {{- $overrides := .overrides | default dict }}
   {{- $merged := merge $base $overrides }}
-  {{- $merged | toYaml | trim | nindent 2 }}
+  {{- $merged | toYaml | nindent 2 }}
 {{- end }}
 
 {{/*

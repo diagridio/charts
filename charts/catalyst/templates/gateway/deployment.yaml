@@ -34,7 +34,8 @@ spec:
       {{- end }}
       containers:
       {{- if .Values.gateway.controlplane.xds.mtls.enabled }}
-        - command:
+        - name: identity-injector
+          command:
             - ./identity-injector
           env:
             - name: IDENTITY_TRUST_DOMAIN
@@ -52,9 +53,16 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: metadata.namespace
+{{- if .Values.global.consolidated_image.enabled }}
+          image: "{{ .Values.gateway.identityInjector.image.registry }}/{{ .Values.global.consolidated_image.name }}:{{ .Values.gateway.identityInjector.image.tag }}"
+          imagePullPolicy: {{ .Values.global.consolidated_image.pull_policy }}
+{{- else if .Values.gateway.identityInjector.image.fullName }}
+          image: "{{ .Values.gateway.identityInjector.image.fullName }}"
+          imagePullPolicy: {{ .Values.gateway.identityInjector.image.pullPolicy }}
+{{- else }}
           image: {{ $identityInjectorImage }}
           imagePullPolicy: IfNotPresent
-          name: identity-injector
+{{- end }}
           resources:
             {{- toYaml .Values.gateway.identityInjector.resources | nindent 12 }}
           terminationMessagePath: /dev/termination-log
@@ -74,6 +82,7 @@ spec:
           securityContext:
             {{- toYaml .Values.gateway.envoy.securityContext | nindent 12 }}
           image: "{{ $envoyImage }}"
+          imagePullPolicy: {{ .Values.gateway.envoy.image.pullPolicy }}
           args:
             - "-c"
             - "/etc/envoy/bootstrap-envoy.yaml"
@@ -177,8 +186,9 @@ spec:
       {{- end }}
       containers:
       {{- if .Values.gateway.controlplane.xds.mtls.enabled }}
-        - command:
-          - ./identity-injector
+        - name: identity-injector
+          command:
+            - ./identity-injector
           env:
             - name: IDENTITY_TRUST_DOMAIN
               value: prj-root.trust.diagrid.io
@@ -195,9 +205,16 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: metadata.namespace
+{{- if .Values.global.consolidated_image.enabled }}
+          image: "{{ .Values.gateway.identityInjector.image.registry }}/{{ .Values.global.consolidated_image.name }}:{{ .Values.gateway.identityInjector.image.tag }}"
+          imagePullPolicy: {{ .Values.global.consolidated_image.pull_policy }}
+{{- else if .Values.gateway.identityInjector.image.fullName }}
+          image: "{{ .Values.gateway.identityInjector.image.fullName }}"
+          imagePullPolicy: {{ .Values.gateway.identityInjector.image.pullPolicy }}
+{{- else }}
           image: {{ $identityInjectorImage }}
           imagePullPolicy: IfNotPresent
-          name: identity-injector
+{{- end }}
           resources:
             {{- toYaml .Values.gateway.identityInjector.resources | nindent 12 }}
           terminationMessagePath: /dev/termination-log
@@ -239,8 +256,17 @@ spec:
           {{- end }}
           securityContext:
             {{- toYaml .Values.gateway.controlplane.securityContext | nindent 12 }}
+{{- if .Values.global.consolidated_image.enabled }}
+          image: "{{ .Values.gateway.controlplane.image.registry }}/{{ .Values.global.consolidated_image.name }}:{{ .Values.gateway.controlplane.image.tag }}"
+          imagePullPolicy: {{ .Values.global.consolidated_image.pull_policy }}
+{{- else if .Values.gateway.controlplane.image.fullName }}
+          image: "{{ .Values.gateway.controlplane.image.fullName }}"
+          imagePullPolicy: {{ .Values.gateway.controlplane.image.pullPolicy }}
+{{- else }}
           image: "{{ $controlplaneImage }}"
           imagePullPolicy: Always
+{{- end }}
+          command: ["./gateway-controlplane"]
           resources:
             {{- toYaml .Values.gateway.controlplane.resources | nindent 12 }}
           ports:
