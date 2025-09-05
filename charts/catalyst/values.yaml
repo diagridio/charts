@@ -110,8 +110,6 @@ agent:
       service_account_annotations: []
     api_token_error:
       enabled: false
-      image_name: "{{ ternary .Values.global.consolidated_image.name \"cra-agent\" .Values.global.consolidated_image.enabled }}"
-      image_tag: "0.464.0"
     otel:
       enabled: true
       image_registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public"
@@ -385,7 +383,7 @@ gateway:
 #------------------------------------------------------------------------------
 management:
   logLevel: info
-  # This agent config is read directly into the ConfigMap. However,
+  # This agent mangement is read directly into the ConfigMap. However,
   # we do apply templating which allows us to provide inline
   # templates in the values.
   config:
