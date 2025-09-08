@@ -98,3 +98,14 @@ update-catalyst-tags:
 update-catalyst-chart-version:
 	yq -i '.version="$(VERSION)"' ./charts/catalyst/Chart.yaml
 
+update-catalyst-registry:
+	@if [ -z "$(REGISTRY)" ]; then \
+		echo "REGISTRY is not set"; \
+		exit 1; \
+	fi
+	yq -i '.agent.config.sidecar.image_registry="$(REGISTRY)"' $(CHART_DIR)/values.yaml
+	yq -i '.agent.image.registry="$(REGISTRY)"' $(CHART_DIR)/values.yaml
+	yq -i '.gateway.identityInjector.image.registry="$(REGISTRY)"' $(CHART_DIR)/values.yaml
+	yq -i '.gateway.controlplane.image.registry="$(REGISTRY)"' $(CHART_DIR)/values.yaml
+	yq -i '.management.image.registry="$(REGISTRY)"' $(CHART_DIR)/values.yaml
+	yq -i '.agent.config.internal_dapr.container_registry="$(REGISTRY)"' $(CHART_DIR)/values.yaml

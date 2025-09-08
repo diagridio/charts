@@ -57,8 +57,8 @@ else
     echo "New version: $VERSION"
     yq -i ".version = \"$VERSION\"" "$TEMP_CHART_YAML"
   else
-    echo "Error: Branch $BRANCH does not match expected pattern"
-    exit 1
+    [ -z "$CHART_VERSION" ] && { echo "Error: CHART_VERSION environment variable is required."; exit 1; }
+    VERSION="$CHART_VERSION"
   fi
 fi
 
