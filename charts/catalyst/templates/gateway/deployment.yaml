@@ -246,6 +246,8 @@ spec:
               value: {{ .Values.gateway.ha.enabled | quote }}
             - name: GATEWAY_TLS_ENABLED
               value: {{ .Values.gateway.tls.enabled | quote }}
+            - name: GATEWAY_TLS_SECRET_NAME
+              value: {{ .Values.gateway.tls.secretName | quote }}
           {{- if .Values.gateway.controlplane.xds.mtls.enabled }}
             - name: XDS_SERVER_TLS_CERT
               value: "/var/run/secrets/diagrid.io/tls/tls.crt"
@@ -276,6 +278,11 @@ spec:
             - name: http-xds
               containerPort: {{ .Values.gateway.controlplane.deployment.httpXDS.containerPort }}
               protocol: TCP
+            {{- if .Values.gateway.tls.enabled }}
+            - name: https
+              containerPort: {{ .Values.gateway.envoy.service.httpsTargetPort }}
+              protocol: TCP
+            {{- end }}
           volumeMounts:
             - name: gateway-controlplane-config
               mountPath: /etc/gateway-controlplane
