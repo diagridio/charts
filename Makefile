@@ -41,12 +41,12 @@ helm-dependency-build: ## Build helm dependencies
 	helm dependency build
 
 .PHONY: helm-dependency-update
-helm-depedency-update: ## Update helm dependencies
+helm-dependency-update: ## Update helm dependencies
 	cd $(CHART_DIR) && \
 	helm dependency update ./
 
 .PHONY: helm-prereqs ## Install helm dependencies
-helm-prereqs: helm-add-repos helm-dependency-build helm-depedency-update
+helm-prereqs: helm-add-repos helm-dependency-build helm-dependency-update
 
 .PHONY: helm-template
 helm-template: helm-prereqs ## Render helm chart
@@ -56,8 +56,12 @@ helm-template: helm-prereqs ## Render helm chart
 		--debug \
 		--set join_token="fake_token" > rendered.yaml
 
+.PHONE: helm-clean
+helm-clean: ## Clean up generated files
+	rm -rf $(CHART_DIR)/dist
+
 .PHONY: helm-package
-helm-package: ## Package helm chart
+helm-package: helm-clean ## Package helm chart
 	cd $(CHART_DIR) && \
 	helm package . --version $(VERSION) --destination ./dist
 
