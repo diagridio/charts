@@ -1,6 +1,9 @@
 {{- $configMap := deepCopy .Values.gateway.controlplane.config -}}
 {{- $_ := set $configMap "control_plane_url" .Values.global.control_plane_url -}}
 {{- $_ := set $configMap "sentry" .Values.global.sentry -}}
+{{- $_ := set $configMap "secretsprovider" .Values.global.secrets.provider -}}
+{{- $_ := set $configMap "secrets_redis" .Values.global.secrets.redis -}}
+{{- $_ := set $configMap "secrets_aws_secretmanager" .Values.global.secrets.aws -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
