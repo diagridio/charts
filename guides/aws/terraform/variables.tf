@@ -225,3 +225,28 @@ variable "postgresql_multi_az" {
   type        = bool
   default     = true
 }
+
+# Scheduler RDS
+variable "scheduler_rds" {
+  description = "Enable Scheduler PostgreSQL RDS instance"
+  type        = bool
+  default     = true
+}
+
+variable "postgresql_scheduler_instance_class" {
+  description = "Instance class for the Scheduler PostgreSQL RDS instance"
+  type        = string
+  default     = "db.t3.medium"
+}
+
+variable "postgresql_scheduler_db_name" {
+  description = "Name of the Scheduler PostgreSQL database"
+  type        = string
+  default     = "scheduler"
+}
+
+variable "postgresql_scheduler_username" {
+  description = "Master username for the Scheduler PostgreSQL RDS instance"
+  type        = string
+  default     = "postgres"
+}
