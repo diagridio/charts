@@ -25,6 +25,11 @@ data:
           grpc_services:
             - envoy_grpc:
                 cluster_name: controlplane
+      ads_config:
+        api_type: GRPC
+        grpc_services:
+          - envoy_grpc:
+              cluster_name: controlplane
 
     static_resources:
       {{- if .Values.gateway.tls.enabled }}

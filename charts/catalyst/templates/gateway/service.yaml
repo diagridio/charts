@@ -19,7 +19,6 @@ spec:
       nodePort: {{ .Values.gateway.envoy.service.nodePort }}
       {{- end }}
       protocol: TCP
-    {{- if .Values.gateway.tls.enabled }}
     - name: https
       port: {{ .Values.gateway.envoy.service.httpsPort }}
       targetPort: {{ .Values.gateway.envoy.service.httpsTargetPort }}
@@ -27,7 +26,6 @@ spec:
       nodePort: {{ .Values.gateway.envoy.service.httpsNodePort }}
       {{- end }}
       protocol: TCP
-    {{- end }}
   type: {{ .Values.gateway.envoy.service.type }}
 ---
 apiVersion: v1
