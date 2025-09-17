@@ -97,6 +97,20 @@ variable "enable_bastion_ssh_key" {
   default     = false
 }
 
+# Variable to control whether to use the most recent AMI
+variable "bastion_use_most_recent_ami" {
+  description = "Whether to use the most recent AMI or stick to a specific version"
+  type        = bool
+  default     = true
+}
+
+# Variable for the specific AMI name when not using most recent
+variable "bastion_specific_ami_name" {
+  description = "Specific AMI name to use when use_most_recent_ami is false"
+  type        = string
+  default     = "al2023-ami-2023.8.20250908.0-kernel-6.1-x86_64"
+}
+
 variable "ebs_csi_addon_version" {
   description = "Version of the EBS CSI driver addon for EKS"
   type        = string
