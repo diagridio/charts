@@ -232,16 +232,22 @@ resource "aws_security_group" "bastion_sg" {
   }
 }
 
-# Get the latest Amazon Linux 2023 AMI
+# Get a Amazon Linux 2023 AMI
 data "aws_ami" "amazon_linux_2023" {
-  most_recent = true
+  # don't use the most recent AMI otherwise bastion will get replaced on every apply
+  most_recent = var.bastion_use_most_recent_ami
   owners      = ["amazon"]
-
+  
+  # Conditional filter - use specific version when most_recent is false, wildcard when true
   filter {
-    name   = "name"
-    values = ["al2023-ami-2023.*-kernel-6.*-x86_64"]
+    name = "name"
+    values = var.bastion_use_most_recent_ami ? [
+      "al2023-ami-2023.*-kernel-6.*-x86_64"
+    ] : [
+      var.bastion_specific_ami_name
+    ]
   }
-
+  
   filter {
     name   = "virtualization-type"
     values = ["hvm"]

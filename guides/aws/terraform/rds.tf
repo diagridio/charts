@@ -75,6 +75,10 @@ resource "aws_db_instance" "postgresql" {
   maintenance_window     = var.postgresql_maintenance_window
   multi_az               = var.postgresql_multi_az
   publicly_accessible    = false
+  apply_immediately      = true
+  # Performance Insights configuration
+  performance_insights_enabled          = true
+  performance_insights_retention_period = 7  # 7 days (free tier) or 731 days (paid)
 
   tags = {
     Name = "${var.cluster_name}-postgresql"
@@ -127,5 +131,152 @@ output "postgresql_username" {
 output "postgresql_master_user_secret" {
   description = "The master user secret for the PostgreSQL RDS instance"
   value       = aws_db_instance.postgresql.master_user_secret
+  sensitive   = true
+}
+
+# Scheduler PostgreSQL RDS Configuration
+
+# Create a security group for the RDS instance
+resource "aws_security_group" "scheduler_rds_sg" {
+  count       = var.scheduler_rds ? 1 : 0
+  name        = "${var.cluster_name}-scheduler-rds-sg"
+  description = "Security group for PostgreSQL RDS instance"
+  vpc_id      = module.vpc.vpc_id
+
+  # Allow PostgreSQL traffic from EKS worker nodes
+  ingress {
+    from_port       = 5432
+    to_port         = 5432
+    protocol        = "tcp"
+    security_groups = [module.eks.node_security_group_id]
+    description     = "Allow PostgreSQL access from EKS worker nodes"
+  }
+
+  # Allow PostgreSQL traffic from bastion host (if enabled)
+  ingress {
+    from_port       = 5432
+    to_port         = 5432
+    protocol        = "tcp"
+    security_groups = var.enable_bastion ? [aws_security_group.bastion_sg[0].id] : []
+    description     = "Allow PostgreSQL access from bastion host"
+  }
+
+  # Allow all outbound traffic
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "Allow all outbound traffic"
+  }
+
+  tags = {
+    Name = "${var.cluster_name}-scheduler-rds-sg"
+  }
+}
+
+# Create a subnet group for the RDS instance using private subnets
+resource "aws_db_subnet_group" "scheduler_rds_subnet_group" {
+  count       = var.scheduler_rds ? 1 : 0
+  name        = "${var.cluster_name}-scheduler-rds-subnet-group"
+  description = "Subnet group for Scheduler PostgreSQL RDS instance"
+  subnet_ids  = module.vpc.private_subnets
+
+  tags = {
+    Name = "${var.cluster_name}-scheduler-rds-subnet-group"
+  }
+}
+
+# Create the Scheduler PostgreSQL RDS instance
+resource "aws_db_instance" "scheduler_postgresql" {
+  count       = var.scheduler_rds ? 1 : 0
+  identifier             = "${var.cluster_name}-scheduler-postgresql"
+  engine                 = "postgres"
+  engine_version         = var.postgresql_version
+  instance_class         = var.postgresql_scheduler_instance_class
+  allocated_storage      = var.postgresql_allocated_storage
+  max_allocated_storage  = var.postgresql_max_allocated_storage
+  storage_type           = "gp3"
+  storage_encrypted      = true
+  db_name                = var.postgresql_scheduler_db_name
+  username               = var.postgresql_scheduler_username
+  manage_master_user_password = true
+  master_user_secret_kms_key_id = module.eks.kms_key_id
+  port                   = 5432
+  vpc_security_group_ids = [aws_security_group.scheduler_rds_sg[0].id]
+  db_subnet_group_name   = aws_db_subnet_group.scheduler_rds_subnet_group[0].name
+  parameter_group_name   = aws_db_parameter_group.scheduler_postgresql[0].name
+  skip_final_snapshot    = var.postgresql_skip_final_snapshot
+  final_snapshot_identifier = var.postgresql_final_snapshot_identifier
+  deletion_protection    = var.postgresql_deletion_protection
+  backup_retention_period = var.postgresql_backup_retention_period
+  backup_window          = var.postgresql_backup_window
+  maintenance_window     = var.postgresql_maintenance_window
+  # multi_az               = var.postgresql_multi_az
+  multi_az               = false
+  publicly_accessible    = false
+  apply_immediately      = true
+  # Performance Insights configuration
+  performance_insights_enabled          = true
+  performance_insights_retention_period = 7  # 7 days (free tier) or 731 days (paid)
+
+  tags = {
+    Name = "${var.cluster_name}-scheduler-postgresql"
+  }
+}
+
+# Create a parameter group for Scheduler PostgreSQL
+resource "aws_db_parameter_group" "scheduler_postgresql" {
+  count       = var.scheduler_rds ? 1 : 0
+  name        = "${var.cluster_name}-scheduler-postgresql-params"
+  family      = "postgres${split(".", var.postgresql_version)[0]}"
+  description = "Parameter group for Scheduler PostgreSQL RDS instance"
+
+  # Add any custom parameters here
+  parameter {
+    name  = "log_connections"
+    value = "1"
+  }
+
+  parameter {
+    name  = "log_disconnections"
+    value = "1"
+  }
+
+  parameter {
+    apply_method = "pending-reboot"
+    name  = "rds.logical_replication"
+    value = "1"
+  }
+
+  tags = {
+    Name = "${var.cluster_name}-scheduler-postgresql-params"
+  }
+}
+
+# Output the RDS connection information
+output "scheduler_postgresql_endpoint" {
+  description = "The connection endpoint for the Scheduler PostgreSQL RDS instance"
+  value       = var.scheduler_rds ? aws_db_instance.scheduler_postgresql[0].endpoint : null
+}
+
+output "scheduler_postgresql_port" {
+  description = "The port for the Scheduler PostgreSQL RDS instance"
+  value       = var.scheduler_rds ? aws_db_instance.scheduler_postgresql[0].port : null
+}
+
+output "scheduler_postgresql_database_name" {
+  description = "The database name for the Scheduler PostgreSQL RDS instance"
+  value       = var.scheduler_rds ? aws_db_instance.scheduler_postgresql[0].db_name : null
+}
+
+output "scheduler_postgresql_username" {
+  description = "The master username for the Scheduler PostgreSQL RDS instance"
+  value       = var.scheduler_rds ? aws_db_instance.scheduler_postgresql[0].username : null
+}
+
+output "scheduler_postgresql_master_user_secret" {
+  description = "The master user secret for the Scheduler PostgreSQL RDS instance"
+  value       = var.scheduler_rds ? aws_db_instance.scheduler_postgresql[0].master_user_secret : null
   sensitive   = true
 }
