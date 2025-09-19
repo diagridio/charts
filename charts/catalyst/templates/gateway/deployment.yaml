@@ -257,6 +257,7 @@ spec:
 {{- if .Values.global.consolidated_image.enabled }}
           image: "{{ .Values.gateway.controlplane.image.registry }}/{{ .Values.global.consolidated_image.name }}:{{ .Values.gateway.controlplane.image.tag }}"
           imagePullPolicy: {{ .Values.global.consolidated_image.pull_policy }}
+          command: ["./gateway-controlplane"]
 {{- else if .Values.gateway.controlplane.image.fullName }}
           image: "{{ .Values.gateway.controlplane.image.fullName }}"
           imagePullPolicy: {{ .Values.gateway.controlplane.image.pullPolicy }}
@@ -264,7 +265,6 @@ spec:
           image: "{{ $controlplaneImage }}"
           imagePullPolicy: Always
 {{- end }}
-          command: ["./gateway-controlplane"]
           resources:
             {{- toYaml .Values.gateway.controlplane.resources | nindent 12 }}
           ports:
