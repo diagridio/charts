@@ -96,11 +96,9 @@ spec:
             - name: http
               containerPort: {{ .Values.gateway.envoy.service.targetPort }}
               protocol: TCP
-            {{- if .Values.gateway.tls.enabled }}
             - name: https
               containerPort: 8443
               protocol: TCP
-            {{- end }}
           volumeMounts:
             - name: envoy-config
               mountPath: /etc/envoy

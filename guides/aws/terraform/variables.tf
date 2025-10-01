@@ -97,6 +97,20 @@ variable "enable_bastion_ssh_key" {
   default     = false
 }
 
+# Variable to control whether to use the most recent AMI
+variable "bastion_use_most_recent_ami" {
+  description = "Whether to use the most recent AMI or stick to a specific version"
+  type        = bool
+  default     = true
+}
+
+# Variable for the specific AMI name when not using most recent
+variable "bastion_specific_ami_name" {
+  description = "Specific AMI name to use when use_most_recent_ami is false"
+  type        = string
+  default     = "al2023-ami-2023.8.20250908.0-kernel-6.1-x86_64"
+}
+
 variable "ebs_csi_addon_version" {
   description = "Version of the EBS CSI driver addon for EKS"
   type        = string
@@ -210,4 +224,29 @@ variable "postgresql_multi_az" {
   description = "Whether to enable Multi-AZ deployment for the PostgreSQL RDS instance"
   type        = bool
   default     = true
+}
+
+# Scheduler RDS
+variable "scheduler_rds" {
+  description = "Enable Scheduler PostgreSQL RDS instance"
+  type        = bool
+  default     = true
+}
+
+variable "postgresql_scheduler_instance_class" {
+  description = "Instance class for the Scheduler PostgreSQL RDS instance"
+  type        = string
+  default     = "db.t3.medium"
+}
+
+variable "postgresql_scheduler_db_name" {
+  description = "Name of the Scheduler PostgreSQL database"
+  type        = string
+  default     = "scheduler"
+}
+
+variable "postgresql_scheduler_username" {
+  description = "Master username for the Scheduler PostgreSQL RDS instance"
+  type        = string
+  default     = "postgres"
 }
