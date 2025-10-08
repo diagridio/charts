@@ -32,7 +32,7 @@ Use the [Diagrid CLI](https://docs.diagrid.io/catalyst/references/cli-reference/
 diagrid login
 
 # Create a new region and capture the join token
-export JOIN_TOKEN=$(diagrid region create kind-region --ingress "http://*.127.0.0.1.nip.io:9082" | jq -r .joinToken)
+export JOIN_TOKEN=$(diagrid region create kind-region --ingress "https://*.127.0.0.1.nip.io:9082" | jq -r .joinToken)
 ```
 
 > NOTE: we provide the ingress flag indicating how dapr runtime instances are going to be exposed. With this Diagrid Catalyst will be able to configure its gateway with the appropriate wildcard domain and the project URLs will be accurate with how the dapr runtime is exposed.
@@ -50,11 +50,105 @@ helm repo update
 helm install postgres bitnami/postgresql \
   --set auth.postgresPassword=postgres \
   --set auth.database=catalyst \
+  --set image.repository=bitnamilegacy/postgresql \
   --create-namespace \
   --namespace postgres
 ```
 
-## Step 4: Configure and Install Catalyst ⚡️
+## Step 4: Create self-signed certificate 🔐
+
+# Install Cloudflare's CFSSL tool
+```bash
+# On macOS with Homebrew
+brew install cfssl
+
+# Or download binaries directly
+go install github.com/cloudflare/cfssl/cmd/cfssl@latest
+go install github.com/cloudflare/cfssl/cmd/cfssljson@latest
+```
+
+# Create a CA certificate configuration file
+
+```bash
+cat > ca-config.json << EOF
+{
+  "signing": {
+    "default": {
+      "expiry": "8760h"
+    },
+    "profiles": {
+      "server": {
+        "usages": ["signing", "key encipherment", "server auth"],
+        "expiry": "8760h"
+      }
+    }
+  }
+}
+EOF
+```
+
+# Create a certificate signing request (CSR) configuration file
+
+Notice the use of the wildcard domain `*.127.0.0.1.nip.io` matching the ingress we
+specified when creating the region.
+
+```bash
+cat > cert-csr.json << EOF
+{
+  "CN": "*.127.0.0.1.nip.io",
+  "hosts": [
+    "*.127.0.0.1.nip.io"
+  ],
+  "key": {
+    "algo": "ecdsa",
+    "size": 256
+  },
+  "names": [
+    {
+      "C": "US",
+      "L": "Seattle",
+      "O": "Awesome Company",
+      "OU": "Engineering",
+      "ST": "Washington"
+    }
+  ]
+}
+EOF
+```
+
+# Generate the CA and server certificates
+
+```bash
+cfssl gencert -initca cert-csr.json | cfssljson -bare ca
+cfssl gencert -ca=ca.pem -ca-key=ca-key.pem -config=ca-config.json -profile=server cert-csr.json | cfssljson -bare server
+```
+
+# Trust the CA certificate
+
+## On macOS
+
+```bash
+sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ca.pem
+```
+
+## On Linux (Ubuntu)
+
+```bash
+# Copy certificate to trusted location
+sudo cp ca.pem /usr/local/share/ca-certificates/kind-ca.crt
+
+# Update CA certificates
+sudo update-ca-certificates
+```
+
+## On Windows
+
+```powershell
+# Import the certificate
+Import-Certificate -FilePath "ca.pem" -CertStoreLocation Cert:\LocalMachine\Root
+```
+
+## Step 5: Configure and Install Catalyst ⚡️
 
 Create a Helm values file for the Catalyst installation:
 
@@ -74,6 +168,9 @@ agent:
         connection_string_username: postgres
         connection_string_password: postgres
         connection_string_database: catalyst
+gateway:
+  tls:
+    enabled: true
 EOF
 
 # If you did not install PostgreSQL
@@ -101,6 +198,8 @@ helm install catalyst oci://public.ecr.aws/diagrid/catalyst \
      --create-namespace \
      -f catalyst-values.yaml \
      --set join_token="${JOIN_TOKEN}" \
+     --set-file gateway.tls.cert=server.pem \
+     --set-file gateway.tls.key=server-key.pem \
      --version 0.22.0
 ```
 
@@ -123,7 +222,7 @@ diagrid region list
 Port forward to the Gateway to expose Catalyst to your host machine.
 
 ```bash
-kubectl port-forward -n cra-agent svc/gateway-envoy 9082:8080
+kubectl port-forward -n cra-agent svc/gateway-envoy 9082:8443
 ```
 
 ## Step 7: Create a Project and Deploy App Identities 🚀

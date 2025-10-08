@@ -224,20 +224,23 @@ agent:
 gateway:
   tls:
     enabled: false
-    # Name of the secret containing TLS certificates
-    secretName: "gateway-tls-certs"
+    # Name of a previously created secret containing TLS certificates
+    existingSecret: ""
     # TLS certificate configuration
     certificates:
-      # Path to the TLS certificate file
-      certFile: "/etc/ssl/certs/tls.crt"
-      # Path to the TLS key file
-      keyFile: "/etc/ssl/certs/tls.key"
-      # Optional: Path to the CA certificate file for client certificate validation
+      # Name of the TLS certificate file in the secret
+      certFile: "tls.crt"
+      # Name of the TLS key file in the secret
+      keyFile: "tls.key"
+      # Optional: Name of the CA certificate file in the secret for client certificate validation
       caFile: ""
-    # Volume configuration for mounting TLS certificates
-    volumes:
-      # Mount path for TLS certificates
-      mountPath: "/etc/ssl/certs"
+    # Optional: customize the generated secret name
+    # secretName: ""
+    #
+    # Only used if existingSecret is empty
+    # Path on local disk to TLS certificate and key in PEM format
+    cert: ""
+    key: ""
   # Enable High Availability mode for gateway components
   ha:
     enabled: false

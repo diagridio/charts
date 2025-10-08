@@ -37,12 +37,12 @@ data:
         - name: gateway_tls_cert
           tls_certificate:
             certificate_chain:
-              filename: {{ .Values.gateway.tls.certificates.certFile }}
+              filename: /etc/ssl/certs/{{ .Values.gateway.tls.certificates.certFile }}
             private_key:
-              filename: {{ .Values.gateway.tls.certificates.keyFile }}
+              filename: /etc/ssl/certs/{{ .Values.gateway.tls.certificates.keyFile }}
             {{- if .Values.gateway.tls.certificates.caFile }}
             ocsp_staple:
-              filename: {{ .Values.gateway.tls.certificates.caFile }}
+              filename: /etc/ssl/certs/{{ .Values.gateway.tls.certificates.caFile }}
             {{- end }}
       {{- end }}
       clusters:
