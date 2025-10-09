@@ -61,3 +61,14 @@ Create the name of the service account to use for the gateway controlplane.
     {{- printf "%s-sa" (include "gateway.envoy.fullname" .) | trunc 63 | trimSuffix "-" }}
   {{- end }}
 {{- end }}
+
+{{/*
+Get the name of the TLS secret to use
+*/}}
+{{- define "gateway.tlsSecretName" -}}
+{{- if .Values.gateway.tls.existingSecret }}
+  {{- .Values.gateway.tls.existingSecret }}
+{{- else }}
+  {{- .Values.gateway.tls.secretName | default (printf "%s-gateway-tls" .Release.Name) }}
+{{- end }}
+{{- end }}

@@ -22,6 +22,9 @@ spec:
         checksum/controlplane-config: {{ include (print $.Template.BasePath "/gateway/configmap.yaml") . | sha256sum }}
         dapr.io/app-id: gateway
         dapr.io/config: catalyst
+        {{- if and .Values.gateway.tls (not .Values.gateway.tls.existingSecret) }}
+        checksum/tls-secret: {{ include (print $.Template.BasePath "/gateway/tls-secret.yaml") . | sha256sum }}
+        {{- end }}
       labels:
         {{- include "merge.maps" (dict "base" (include "gateway.envoy.selectorLabels" . | fromYaml) "overrides" .Values.gateway.envoy.merge.selectorLabels) | nindent 8 }}
     spec:
@@ -105,7 +108,7 @@ spec:
               readOnly: true
             {{- if .Values.gateway.tls.enabled }}
             - name: wildcard-tls-certs
-              mountPath: {{ .Values.gateway.tls.volumes.mountPath }}
+              mountPath: "/etc/ssl/certs"
               readOnly: true
             {{- end }}
             {{- if .Values.gateway.controlplane.xds.mtls.enabled }}
@@ -126,7 +129,7 @@ spec:
         {{- if .Values.gateway.tls.enabled }}
         - name: wildcard-tls-certs
           secret:
-            secretName: {{ .Values.gateway.tls.secretName }}
+            secretName: {{ include "gateway.tlsSecretName" . }}
         {{- end }}
         {{- if .Values.gateway.controlplane.xds.mtls.enabled }}
         - configMap:
