@@ -3,6 +3,9 @@ kind: Service
 metadata:
   name: {{ .Values.gateway.envoy.service.name }}
   annotations:
+{{- with .Values.gateway.envoy.service.annotations }}
+{{ toYaml . | nindent 4 }}
+{{- end }}
 {{- with .Values.gateway.envoy.podAnnotations }}
 {{ toYaml . | nindent 4 }}
 {{- end }}
