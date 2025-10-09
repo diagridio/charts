@@ -17,6 +17,7 @@ ENABLE_BASTION ?= "true"
 BASTION_KEY_NAME ?= 
 BASTION_ALLOWED_CIDR ?= "0.0.0.0/0"
 REGION ?= "us-west-2"
+REGION_INGRESS_ENDPOINT ?= ""
 
 # Help target
 help:
@@ -58,9 +59,15 @@ plan:
 		exit 1; \
 	fi
 	# BASTION_KEY_NAME is now optional and will be auto-generated if not provided
-	cd terraform && terraform plan -var="enable_peering=$(ENABLE_PEERING)" -var="peer_vpc_id=$(PEER_VPC_ID)" -var="peer_vpc_cidr=$(PEER_VPC_CIDR)" \
-		-var="enable_bastion=$(ENABLE_BASTION)" -var="bastion_key_name=$(BASTION_KEY_NAME)" -var="bastion_allowed_cidr=$(BASTION_ALLOWED_CIDR)" \
+	cd terraform && terraform plan \
+		-var="enable_peering=$(ENABLE_PEERING)" \
+		-var="peer_vpc_id=$(PEER_VPC_ID)" \
+		-var="peer_vpc_cidr=$(PEER_VPC_CIDR)" \
+		-var="enable_bastion=$(ENABLE_BASTION)" \
+		-var="bastion_key_name=$(BASTION_KEY_NAME)" \
+		-var="bastion_allowed_cidr=$(BASTION_ALLOWED_CIDR)" \
 		-var="aws_region=$(REGION)" \
+		-var="region_ingress_endpoint=$(REGION_INGRESS_ENDPOINT)" \
 		$(if $(wildcard $(TF_VAR_FILE)),-var-file=../$(TF_VAR_FILE),)
 
 # Apply terraform changes
@@ -71,9 +78,15 @@ apply:
 		exit 1; \
 	fi
 	# BASTION_KEY_NAME is now optional and will be auto-generated if not provided
-	cd terraform && terraform apply -var="enable_peering=$(ENABLE_PEERING)" -var="peer_vpc_id=$(PEER_VPC_ID)" -var="peer_vpc_cidr=$(PEER_VPC_CIDR)" \
-		-var="enable_bastion=$(ENABLE_BASTION)" -var="bastion_key_name=$(BASTION_KEY_NAME)" -var="bastion_allowed_cidr=$(BASTION_ALLOWED_CIDR)" \
+	cd terraform && terraform apply \
+		-var="enable_peering=$(ENABLE_PEERING)" \
+		-var="peer_vpc_id=$(PEER_VPC_ID)" \
+		-var="peer_vpc_cidr=$(PEER_VPC_CIDR)" \
+		-var="enable_bastion=$(ENABLE_BASTION)" \
+		-var="bastion_key_name=$(BASTION_KEY_NAME)" \
+		-var="bastion_allowed_cidr=$(BASTION_ALLOWED_CIDR)" \
 		-var="aws_region=$(REGION)" \
+		-var="region_ingress_endpoint=$(REGION_INGRESS_ENDPOINT)" \
 		$(if $(wildcard $(TF_VAR_FILE)),-var-file=../$(TF_VAR_FILE),)
 
 # Destroy terraform resources
@@ -84,9 +97,15 @@ destroy:
 		exit 1; \
 	fi
 	# BASTION_KEY_NAME is now optional and will be auto-generated if not provided
-	cd terraform && terraform destroy -var="enable_peering=$(ENABLE_PEERING)" -var="peer_vpc_id=$(PEER_VPC_ID)" -var="peer_vpc_cidr=$(PEER_VPC_CIDR)" \
-		-var="enable_bastion=$(ENABLE_BASTION)" -var="bastion_key_name=$(BASTION_KEY_NAME)" -var="bastion_allowed_cidr=$(BASTION_ALLOWED_CIDR)" \
+	cd terraform && terraform destroy \
+		-var="enable_peering=$(ENABLE_PEERING)" \
+		-var="peer_vpc_id=$(PEER_VPC_ID)" \
+		-var="peer_vpc_cidr=$(PEER_VPC_CIDR)" \
+		-var="enable_bastion=$(ENABLE_BASTION)" \
+		-var="bastion_key_name=$(BASTION_KEY_NAME)" \
+		-var="bastion_allowed_cidr=$(BASTION_ALLOWED_CIDR)" \
 		-var="aws_region=$(REGION)" \
+		-var="region_ingress_endpoint=$(REGION_INGRESS_ENDPOINT)" \
 		$(if $(wildcard $(TF_VAR_FILE)),-var-file=../$(TF_VAR_FILE),)
 
 output:
