@@ -13,6 +13,12 @@ variable "cluster_version" {
   default     = "1.32"
 }
 
+variable "region_ingress_endpoint" {
+  description = "Catalyst regional ingress endpoint"
+  type        = string
+  default     = null
+}
+
 variable "vpc_cidr" {
   description = "CIDR block for the VPC"
   default     = "10.0.0.0/16"
@@ -101,7 +107,7 @@ variable "enable_bastion_ssh_key" {
 variable "bastion_use_most_recent_ami" {
   description = "Whether to use the most recent AMI or stick to a specific version"
   type        = bool
-  default     = true
+  default     = false
 }
 
 # Variable for the specific AMI name when not using most recent
