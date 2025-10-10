@@ -236,7 +236,7 @@ variable "postgresql_multi_az" {
 variable "scheduler_rds" {
   description = "Enable Scheduler PostgreSQL RDS instance"
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "postgresql_scheduler_instance_class" {
