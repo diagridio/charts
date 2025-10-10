@@ -123,7 +123,7 @@ cat > ~/.alias << EOF
 alias k='kubectl'
 alias kp='kubectl get pods'
 alias kpa='kubectl get pods --all-namespaces'
-alias kf='kubectl logs'
+alias kf='kubectl logs -f'
 alias kx='k ctx'
 alias kns='k ns'
 EOF
@@ -336,11 +336,12 @@ make output region_ingress_endpoint
 diagrid region update my-aws-region --ingress "<value-from-region_ingress_endpoint-output>"
 ```
 
-Now you'll need to make further configurations to your DNS provider, the end result should be
-getting back a reply to with the NLB IP address when you run:
+Now you'll need to make further configurations to your top level domain in order to delegate the subdomain to Route53.
+This is done by creating NS records in your domain registrar's DNS settings that point to the Route53 hosted zone's nameservers.
+At the end you should be getting back a reply to with the NLB IP address when you run:
 
 ```bash
-dig <somename>.<domain that you own>
+dig whatever.<somename>.<domain that you own>
 ```
 
 ### Create a Let's Encrypt TLS certificate
@@ -364,7 +365,7 @@ spec:
     group: cert-manager.io
     kind: ClusterIssuer
     name: letsencrypt
-  secretName: certs-wildcard
+  secretName: cert-wildcard
   usages:
   - digital signature
   - key encipherment
