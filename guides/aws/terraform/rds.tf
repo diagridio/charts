@@ -110,7 +110,7 @@ resource "aws_db_parameter_group" "postgresql" {
 # Output the RDS connection information
 output "postgresql_endpoint" {
   description = "The connection endpoint for the PostgreSQL RDS instance"
-  value       = aws_db_instance.postgresql.endpoint
+  value       = aws_db_instance.postgresql.address
 }
 
 output "postgresql_port" {
@@ -128,9 +128,9 @@ output "postgresql_username" {
   value       = aws_db_instance.postgresql.username
 }
 
-output "postgresql_master_user_secret" {
-  description = "The master user secret for the PostgreSQL RDS instance"
-  value       = aws_db_instance.postgresql.master_user_secret
+output "postgresql_master_user_secret_arn" {
+  description = "The master user secret arn from secretmanager for the PostgreSQL RDS instance"
+  value       = aws_db_instance.postgresql.master_user_secret[0].secret_arn
   sensitive   = true
 }
 
@@ -257,7 +257,7 @@ resource "aws_db_parameter_group" "scheduler_postgresql" {
 # Output the RDS connection information
 output "scheduler_postgresql_endpoint" {
   description = "The connection endpoint for the Scheduler PostgreSQL RDS instance"
-  value       = var.scheduler_rds ? aws_db_instance.scheduler_postgresql[0].endpoint : null
+  value       = var.scheduler_rds ? aws_db_instance.scheduler_postgresql[0].address : null
 }
 
 output "scheduler_postgresql_port" {
@@ -275,8 +275,8 @@ output "scheduler_postgresql_username" {
   value       = var.scheduler_rds ? aws_db_instance.scheduler_postgresql[0].username : null
 }
 
-output "scheduler_postgresql_master_user_secret" {
-  description = "The master user secret for the Scheduler PostgreSQL RDS instance"
-  value       = var.scheduler_rds ? aws_db_instance.scheduler_postgresql[0].master_user_secret : null
+output "scheduler_postgresql_master_user_secret_arn" {
+  description = "The master user secret arn from secretmanager for the Scheduler PostgreSQL RDS instance"
+  value       = var.scheduler_rds ? aws_db_instance.scheduler_postgresql[0].master_user_secret[0].secret_arn : null
   sensitive   = true
 }
