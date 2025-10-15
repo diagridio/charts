@@ -170,7 +170,7 @@ helm upgrade -install \
   cert-manager jetstack/cert-manager \
   --namespace cert-manager \
   --create-namespace \
-  --version v1.17.2 \
+  --version 0.24.0 \
   --set crds.enabled=true \
   --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=<value-from-cert_manager_role_arn-output>
 ```
@@ -318,7 +318,7 @@ helm install catalyst oci://public.ecr.aws/diagrid/catalyst \
      --create-namespace \
      -f catalyst-values.yaml \
      --set join_token="${JOIN_TOKEN}" \
-     --version 0.23.0
+     --version 0.24.0
 ```
 
 ## Step 11: Setup ingress and wildcard TLS certificate
