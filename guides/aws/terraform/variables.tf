@@ -232,27 +232,27 @@ variable "postgresql_multi_az" {
   default     = true
 }
 
-# Scheduler RDS
-variable "scheduler_rds" {
-  description = "Enable Scheduler PostgreSQL RDS instance"
-  type        = bool
-  default     = false
+# Scheduler RDS - Multiple instances support
+variable "scheduler_postgresql_instances" {
+  description = "List of scheduler PostgreSQL instance names to create"
+  type        = list(string)
+  default     = ["pg1"]
 }
 
 variable "postgresql_scheduler_instance_class" {
-  description = "Instance class for the Scheduler PostgreSQL RDS instance"
+  description = "Instance class for all Scheduler PostgreSQL RDS instances"
   type        = string
   default     = "db.t3.medium"
 }
 
 variable "postgresql_scheduler_db_name" {
-  description = "Name of the Scheduler PostgreSQL database"
+  description = "Database name for all Scheduler PostgreSQL RDS instances"
   type        = string
   default     = "scheduler"
 }
 
 variable "postgresql_scheduler_username" {
-  description = "Master username for the Scheduler PostgreSQL RDS instance"
+  description = "Master username for all Scheduler PostgreSQL RDS instances"
   type        = string
   default     = "postgres"
 }

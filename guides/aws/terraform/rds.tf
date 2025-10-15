@@ -136,11 +136,11 @@ output "postgresql_master_user_secret_arn" {
 
 # Scheduler PostgreSQL RDS Configuration
 
-# Create a security group for the RDS instance
+# Create a security group for each scheduler RDS instance
 resource "aws_security_group" "scheduler_rds_sg" {
-  count       = var.scheduler_rds ? 1 : 0
-  name        = "${var.cluster_name}-scheduler-rds-sg"
-  description = "Security group for PostgreSQL RDS instance"
+  for_each    = toset(var.scheduler_postgresql_instances)
+  name        = "${var.cluster_name}-scheduler-${each.key}-rds-sg"
+  description = "Security group for ${each.key} Scheduler PostgreSQL RDS instance"
   vpc_id      = module.vpc.vpc_id
 
   # Allow PostgreSQL traffic from EKS worker nodes
@@ -171,26 +171,26 @@ resource "aws_security_group" "scheduler_rds_sg" {
   }
 
   tags = {
-    Name = "${var.cluster_name}-scheduler-rds-sg"
+    Name = "${var.cluster_name}-scheduler-${each.key}-rds-sg"
   }
 }
 
-# Create a subnet group for the RDS instance using private subnets
+# Create a subnet group for each scheduler RDS instance using private subnets
 resource "aws_db_subnet_group" "scheduler_rds_subnet_group" {
-  count       = var.scheduler_rds ? 1 : 0
-  name        = "${var.cluster_name}-scheduler-rds-subnet-group"
-  description = "Subnet group for Scheduler PostgreSQL RDS instance"
+  for_each    = toset(var.scheduler_postgresql_instances)
+  name        = "${var.cluster_name}-scheduler-${each.key}-rds-subnet-group"
+  description = "Subnet group for ${each.key} Scheduler PostgreSQL RDS instance"
   subnet_ids  = module.vpc.private_subnets
 
   tags = {
-    Name = "${var.cluster_name}-scheduler-rds-subnet-group"
+    Name = "${var.cluster_name}-scheduler-${each.key}-rds-subnet-group"
   }
 }
 
-# Create the Scheduler PostgreSQL RDS instance
+# Create each Scheduler PostgreSQL RDS instance
 resource "aws_db_instance" "scheduler_postgresql" {
-  count       = var.scheduler_rds ? 1 : 0
-  identifier             = "${var.cluster_name}-scheduler-postgresql"
+  for_each               = toset(var.scheduler_postgresql_instances)
+  identifier             = "${var.cluster_name}-scheduler-${each.key}-postgresql"
   engine                 = "postgres"
   engine_version         = var.postgresql_version
   instance_class         = var.postgresql_scheduler_instance_class
@@ -203,9 +203,9 @@ resource "aws_db_instance" "scheduler_postgresql" {
   manage_master_user_password = true
   master_user_secret_kms_key_id = module.eks.kms_key_id
   port                   = 5432
-  vpc_security_group_ids = [aws_security_group.scheduler_rds_sg[0].id]
-  db_subnet_group_name   = aws_db_subnet_group.scheduler_rds_subnet_group[0].name
-  parameter_group_name   = aws_db_parameter_group.scheduler_postgresql[0].name
+  vpc_security_group_ids = [aws_security_group.scheduler_rds_sg[each.key].id]
+  db_subnet_group_name   = aws_db_subnet_group.scheduler_rds_subnet_group[each.key].name
+  parameter_group_name   = aws_db_parameter_group.scheduler_postgresql[each.key].name
   skip_final_snapshot    = var.postgresql_skip_final_snapshot
   final_snapshot_identifier = var.postgresql_final_snapshot_identifier
   deletion_protection    = var.postgresql_deletion_protection
@@ -221,16 +221,16 @@ resource "aws_db_instance" "scheduler_postgresql" {
   performance_insights_retention_period = 7  # 7 days (free tier) or 731 days (paid)
 
   tags = {
-    Name = "${var.cluster_name}-scheduler-postgresql"
+    Name = "${var.cluster_name}-scheduler-${each.key}-postgresql"
   }
 }
 
-# Create a parameter group for Scheduler PostgreSQL
+# Create a parameter group for each Scheduler PostgreSQL instance
 resource "aws_db_parameter_group" "scheduler_postgresql" {
-  count       = var.scheduler_rds ? 1 : 0
-  name        = "${var.cluster_name}-scheduler-postgresql-params"
+  for_each    = toset(var.scheduler_postgresql_instances)
+  name        = "${var.cluster_name}-scheduler-${each.key}-postgresql-params"
   family      = "postgres${split(".", var.postgresql_version)[0]}"
-  description = "Parameter group for Scheduler PostgreSQL RDS instance"
+  description = "Parameter group for ${each.key} Scheduler PostgreSQL RDS instance"
 
   # Add any custom parameters here
   parameter {
@@ -250,33 +250,33 @@ resource "aws_db_parameter_group" "scheduler_postgresql" {
   }
 
   tags = {
-    Name = "${var.cluster_name}-scheduler-postgresql-params"
+    Name = "${var.cluster_name}-scheduler-${each.key}-postgresql-params"
   }
 }
 
-# Output the RDS connection information
-output "scheduler_postgresql_endpoint" {
-  description = "The connection endpoint for the Scheduler PostgreSQL RDS instance"
-  value       = var.scheduler_rds ? aws_db_instance.scheduler_postgresql[0].address : null
+# Output the RDS connection information for all scheduler instances
+output "scheduler_postgresql_endpoints" {
+  description = "Map of connection endpoints for all Scheduler PostgreSQL RDS instances"
+  value       = { for k, v in aws_db_instance.scheduler_postgresql : k => v.address }
 }
 
-output "scheduler_postgresql_port" {
-  description = "The port for the Scheduler PostgreSQL RDS instance"
-  value       = var.scheduler_rds ? aws_db_instance.scheduler_postgresql[0].port : null
+output "scheduler_postgresql_ports" {
+  description = "Map of ports for all Scheduler PostgreSQL RDS instances"
+  value       = { for k, v in aws_db_instance.scheduler_postgresql : k => v.port }
 }
 
-output "scheduler_postgresql_database_name" {
-  description = "The database name for the Scheduler PostgreSQL RDS instance"
-  value       = var.scheduler_rds ? aws_db_instance.scheduler_postgresql[0].db_name : null
+output "scheduler_postgresql_database_names" {
+  description = "Map of database names for all Scheduler PostgreSQL RDS instances"
+  value       = { for k, v in aws_db_instance.scheduler_postgresql : k => v.db_name }
 }
 
-output "scheduler_postgresql_username" {
-  description = "The master username for the Scheduler PostgreSQL RDS instance"
-  value       = var.scheduler_rds ? aws_db_instance.scheduler_postgresql[0].username : null
+output "scheduler_postgresql_usernames" {
+  description = "Map of master usernames for all Scheduler PostgreSQL RDS instances"
+  value       = { for k, v in aws_db_instance.scheduler_postgresql : k => v.username }
 }
 
-output "scheduler_postgresql_master_user_secret_arn" {
-  description = "The master user secret arn from secretmanager for the Scheduler PostgreSQL RDS instance"
-  value       = var.scheduler_rds ? aws_db_instance.scheduler_postgresql[0].master_user_secret[0].secret_arn : null
+output "scheduler_postgresql_master_user_secret_arns" {
+  description = "Map of master user secret arns from secretmanager for all Scheduler PostgreSQL RDS instances"
+  value       = { for k, v in aws_db_instance.scheduler_postgresql : k => v.master_user_secret[0].secret_arn }
   sensitive   = true
 }
