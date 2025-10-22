@@ -5,6 +5,7 @@ on:
     paths:
       - 'charts/**'
       - '.github/workflows/test.yaml'
+      - 'tests/**'
   push:
     branches:
       - main
