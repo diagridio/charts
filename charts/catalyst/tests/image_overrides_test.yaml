@@ -77,9 +77,9 @@ tests:
       global.consolidated_image.registry: "consolidated-registry.io"
       agent.image.registry: "agent-registry.io"
     asserts:
-      - equal:
+      - matchRegex:
           path: spec.template.spec.containers[0].image
-          value: "consolidated-registry.io/catalyst-all:0.469.0"
+          pattern: ^consolidated-registry\.io/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
         template: agent/deployment.yaml
 
   - it: should allow global registry to override consolidated registry
@@ -89,7 +89,7 @@ tests:
       global.consolidated_image.registry: "consolidated-registry.io"
       global.image.registry: "override-registry.io"
     asserts:
-      - equal:
+      - matchRegex:
           path: spec.template.spec.containers[0].image
-          value: "override-registry.io/catalyst-all:0.469.0"
+          pattern: ^override-registry\.io/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
         template: agent/deployment.yaml

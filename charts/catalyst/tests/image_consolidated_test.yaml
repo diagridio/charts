@@ -15,9 +15,9 @@ tests:
       join_token: "test-token"
       global.consolidated_image.enabled: true
     asserts:
-      - equal:
+      - matchRegex:
           path: spec.template.spec.containers[0].image
-          value: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-all:0.469.0"
+          pattern: ^us-central1-docker\.pkg\.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
         template: agent/deployment.yaml
 
   - it: should use consolidated image for management
@@ -25,9 +25,9 @@ tests:
       join_token: "test-token"
       global.consolidated_image.enabled: true
     asserts:
-      - equal:
+      - matchRegex:
           path: spec.template.spec.containers[0].image
-          value: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-all:0.469.0"
+          pattern: ^us-central1-docker\.pkg\.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
         template: management/deployment.yaml
 
   - it: should use consolidated image for gateway controlplane
@@ -36,9 +36,9 @@ tests:
       global.consolidated_image.enabled: true
       gateway.controlplane.xds.mtls.enabled: false
     asserts:
-      - equal:
+      - matchRegex:
           path: spec.template.spec.containers[0].image
-          value: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-all:0.469.0"
+          pattern: ^us-central1-docker\.pkg\.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
         template: gateway/deployment.yaml
         documentIndex: 1
 

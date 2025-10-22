@@ -80,7 +80,7 @@ global:
     # Example: "catalyst-all" or "diagrid/catalyst-all"
     repository: catalyst-all
     # tag is the image tag/version
-    tag: "0.469.0"
+    tag: "0.504.0"
     # pullPolicy is the image pull policy for the consolidated image
     # If not set, uses global.image.pullPolicy
     pullPolicy: ""

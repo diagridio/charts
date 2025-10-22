@@ -16,9 +16,9 @@ tests:
       global.consolidated_image.enabled: true
       global.image.registry: "my-registry.io"
     asserts:
-      - equal:
+      - matchRegex:
           path: spec.template.spec.containers[0].image
-          value: "my-registry.io/catalyst-all:0.469.0"
+          pattern: ^my-registry\.io/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
         template: agent/deployment.yaml
 
   - it: should combine global registry with consolidated image for management
@@ -27,9 +27,9 @@ tests:
       global.consolidated_image.enabled: true
       global.image.registry: "my-registry.io"
     asserts:
-      - equal:
+      - matchRegex:
           path: spec.template.spec.containers[0].image
-          value: "my-registry.io/catalyst-all:0.469.0"
+          pattern: ^my-registry\.io/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
         template: management/deployment.yaml
 
   - it: should combine global registry with consolidated image for gateway
@@ -39,9 +39,9 @@ tests:
       global.image.registry: "my-registry.io"
       gateway.controlplane.xds.mtls.enabled: false
     asserts:
-      - equal:
+      - matchRegex:
           path: spec.template.spec.containers[0].image
-          value: "my-registry.io/catalyst-all:0.469.0"
+          pattern: ^my-registry\.io/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
         template: gateway/deployment.yaml
         documentIndex: 1
 

@@ -20,7 +20,7 @@ spec:
         checksum/controlplane-config: {{ include (print $.Template.BasePath "/gateway/configmap.yaml") . | sha256sum }}
         dapr.io/app-id: gateway
         dapr.io/config: catalyst
-        {{- if and .Values.gateway.tls (not .Values.gateway.tls.existingSecret) }}
+        {{- if and (not .Values.gateway.tls.existingSecret) (or .Values.gateway.tls.cert .Values.gateway.tls.key) }}
         checksum/tls-secret: {{ include (print $.Template.BasePath "/gateway/tls-secret.yaml") . | sha256sum }}
         {{- end }}
       labels:
