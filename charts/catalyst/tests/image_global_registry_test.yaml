@@ -61,7 +61,7 @@ tests:
     asserts:
       - matchRegex:
           path: spec.template.spec.containers[0].image
-          pattern: ^my-registry\.io/andydunstall/piko:v[0-9]+\.[0-9]+\.[0-9]+$
+          pattern: ^my-registry\.io/piko:v[0-9]+\.[0-9]+\.[0-9]+$
         template: piko/statefulset.yaml
 
   - it: should override nested config image registries in agent configmap
