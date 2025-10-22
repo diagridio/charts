@@ -250,19 +250,16 @@ func validateDefaultInstall(t *testing.T, clientset *kubernetes.Clientset, rel *
 
 	// Validate that expected deployments exist
 	expectedDeployments := []string{
-		"catalyst-agent",
-		"catalyst-management",
+		"agent",
+		"management",
 	}
 
 	for _, deploymentName := range expectedDeployments {
 		deployment, err := clientset.AppsV1().Deployments(testNamespace).Get(ctx, deploymentName, metav1.GetOptions{})
-		if err != nil {
-			t.Logf("Deployment %s not found yet (this is expected as pods may still be starting): %v", deploymentName, err)
-			continue
-		}
-		if deployment != nil && deployment.Spec.Template.Spec.Containers != nil {
-			t.Logf("Found deployment: %s with %d replicas", deploymentName, *deployment.Spec.Replicas)
-		}
+		assert.NoError(t, err, "Should be able to get deployment: %s", deploymentName)
+		assert.NotNil(t, deployment, "Deployment should exist: %s", deploymentName)
+		assert.Greater(t, *deployment.Spec.Replicas, int32(0), "Deployment should have replicas: %s", deploymentName)
+		t.Logf("Found deployment: %s with %d replicas", deploymentName, *deployment.Spec.Replicas)
 	}
 
 	// Validate ConfigMaps exist
@@ -282,48 +279,41 @@ func validateGlobalRegistryOverride(t *testing.T, clientset *kubernetes.Clientse
 	ctx := context.Background()
 
 	// Get agent deployment
-	deployment, err := clientset.AppsV1().Deployments(testNamespace).Get(ctx, "catalyst-agent", metav1.GetOptions{})
-	if err != nil {
-		t.Logf("Warning: Could not get agent deployment: %v", err)
-		return
-	}
+	deployment, err := clientset.AppsV1().Deployments(testNamespace).Get(ctx, "agent", metav1.GetOptions{})
+	assert.NoError(t, err, "Should be able to get agent deployment")
 
 	// Validate that the image uses the custom registry
-	if len(deployment.Spec.Template.Spec.Containers) > 0 {
-		image := deployment.Spec.Template.Spec.Containers[0].Image
-		assert.Contains(t, image, "my-registry.io", "Image should use custom registry")
-		t.Logf("Agent image: %s", image)
-	}
+	assert.NotNil(t, deployment, "Agent deployment should exist")
+	assert.Greater(t, len(deployment.Spec.Template.Spec.Containers), 0, "Agent deployment should have containers")
+	assert.Contains(t, deployment.Spec.Template.Spec.Containers[0].Image, "my-registry.io", "Image should use custom registry")
+	t.Logf("Agent image: %s", deployment.Spec.Template.Spec.Containers[0].Image)
 
 	// Validate ConfigMap has custom registry
-	cm, err := clientset.CoreV1().ConfigMaps(testNamespace).Get(ctx, "catalyst-agent-config", metav1.GetOptions{})
-	if err == nil && cm.Data["config.yaml"] != "" {
-		assert.Contains(t, cm.Data["config.yaml"], "my-registry.io", "ConfigMap should reference custom registry")
-	}
+	cm, err := clientset.CoreV1().ConfigMaps(testNamespace).Get(ctx, "agent-config", metav1.GetOptions{})
+	assert.NoError(t, err, "Should be able to get agent ConfigMap")
+	assert.Contains(t, cm.Data["config.yaml"], "my-registry.io", "ConfigMap should reference custom registry")
 }
 
 func validateConsolidatedImage(t *testing.T, clientset *kubernetes.Clientset, rel *release.Release) {
 	ctx := context.Background()
 
 	// Get agent deployment
-	deployment, err := clientset.AppsV1().Deployments(testNamespace).Get(ctx, "catalyst-agent", metav1.GetOptions{})
-	if err != nil {
-		t.Logf("Warning: Could not get agent deployment: %v", err)
-		return
-	}
+	deployment, err := clientset.AppsV1().Deployments(testNamespace).Get(ctx, "agent", metav1.GetOptions{})
+	assert.NoError(t, err, "Should be able to get agent deployment")
 
 	// Validate that the image uses consolidated image
-	if len(deployment.Spec.Template.Spec.Containers) > 0 {
-		image := deployment.Spec.Template.Spec.Containers[0].Image
-		assert.Contains(t, image, "catalyst-all", "Image should use consolidated image")
-		t.Logf("Agent consolidated image: %s", image)
-	}
+	assert.NotNil(t, deployment, "Agent deployment should exist")
+	assert.Greater(t, len(deployment.Spec.Template.Spec.Containers), 0, "Agent deployment should have containers")
+	assert.Contains(t, deployment.Spec.Template.Spec.Containers[0].Image, "catalyst-all", "Image should use consolidated image")
+	t.Logf("Agent consolidated image: %s", deployment.Spec.Template.Spec.Containers[0].Image)
+
+	// Get management deployment
+	mgmtDeployment, err := clientset.AppsV1().Deployments(testNamespace).Get(ctx, "management", metav1.GetOptions{})
+	assert.NoError(t, err, "Should be able to get management deployment")
 
 	// Validate management also uses consolidated image
-	mgmtDeployment, err := clientset.AppsV1().Deployments(testNamespace).Get(ctx, "catalyst-management", metav1.GetOptions{})
-	if err == nil && len(mgmtDeployment.Spec.Template.Spec.Containers) > 0 {
-		image := mgmtDeployment.Spec.Template.Spec.Containers[0].Image
-		assert.Contains(t, image, "catalyst-all", "Management should use consolidated image")
-		t.Logf("Management consolidated image: %s", image)
-	}
+	assert.NotNil(t, mgmtDeployment, "Management deployment should exist")
+	assert.Greater(t, len(mgmtDeployment.Spec.Template.Spec.Containers), 0, "Management deployment should have containers")
+	assert.Contains(t, mgmtDeployment.Spec.Template.Spec.Containers[0].Image, "catalyst-all", "Management should use consolidated image")
+	t.Logf("Management consolidated image: %s", mgmtDeployment.Spec.Template.Spec.Containers[0].Image)
 }
