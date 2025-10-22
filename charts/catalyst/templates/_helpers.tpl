@@ -167,3 +167,63 @@ Inject additional YAML into a resource
   {{- end }}
 {{- end }}
 
+{{/*
+Generate the image reference for a component.
+Usage: include "catalyst.image" (dict "image" .Values.component.image "consolidated" .Values.global.consolidated_image "global" .Values.global.image "context" .)
+This helper:
+1. Uses global.image.registry if set, otherwise uses the component's registry (or consolidated registry if using consolidated image)
+2. Uses consolidated_image.repository if consolidated_image.enabled is true
+3. Properly constructs the full image reference as registry/repository:tag
+*/}}
+{{- define "catalyst.image" -}}
+{{- $registry := .image.registry -}}
+{{- $repository := .image.repository -}}
+{{- $tag := .image.tag -}}
+{{- if and .consolidated .consolidated.enabled -}}
+  {{- $repository = .consolidated.repository -}}
+  {{- $registry = .consolidated.registry -}}
+  {{- $tag = .image.tag -}}
+{{- end -}}
+{{- if .global.registry -}}
+  {{- $registry = .global.registry -}}
+{{- end -}}
+{{- if kindIs "string" $repository -}}
+  {{- $repository = tpl $repository .context -}}
+{{- end -}}
+{{- printf "%s/%s:%s" $registry $repository $tag -}}
+{{- end -}}
+
+{{/*
+Generate the image pull policy for a component.
+Usage: include "catalyst.imagePullPolicy" (dict "image" .Values.component.image "consolidated" .Values.global.consolidated_image "global" .Values.global.image)
+This helper:
+1. Uses component's pullPolicy if set
+2. Falls back to consolidated_image.pullPolicy if using consolidated image and it's set
+3. Falls back to global.image.pullPolicy as final default
+*/}}
+{{- define "catalyst.imagePullPolicy" -}}
+{{- if .image.pullPolicy -}}
+  {{- .image.pullPolicy -}}
+{{- else if and .consolidated .consolidated.enabled .consolidated.pullPolicy -}}
+  {{- .consolidated.pullPolicy -}}
+{{- else -}}
+  {{- .global.pullPolicy -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Replace registry in a full image reference.
+Usage: include "catalyst.replaceRegistry" (dict "image" "old-registry.com/path/to/image:tag" "registry" "new-registry.com")
+This helper extracts the repository:tag portion and prepends the new registry.
+*/}}
+{{- define "catalyst.replaceRegistry" -}}
+{{- if .registry -}}
+  {{- $parts := regexSplit "/" .image -1 -}}
+  {{- $repoAndTag := slice $parts 1 | join "/" -}}
+  {{- printf "%s/%s" .registry $repoAndTag -}}
+{{- else -}}
+  {{- .image -}}
+{{- end -}}
+{{- end -}}
+
+

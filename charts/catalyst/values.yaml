@@ -1,9 +1,12 @@
 ---
 #-----------------------------------------------------------------------------
-# JOIN_TOKEN: Required value for the agent to register with catalyst.
-#-----------------------------------------------------------------------------
-
+# JOIN_TOKEN [REQUIRED]: A join token can be obtained by creating a Region in
+# Diagrid Cloud. This token is used by the agent to enroll your installation with
+# the Cloud control plane. A join token can be regenerated before you successfully
+# complete the installation but not after.
+#------------------------------------------------------------------------------
 join_token: ""
+
 #------------------------------------------------------------------------------
 # Global Options
 #------------------------------------------------------------------------------
@@ -13,15 +16,20 @@ global:
   # Override the full name of the chart+release
   fullnameOverride: ""
   image:
-    # Global image pull policy for all container images in the chart
-    # Can be overridden by individual image pullPolicy
-    pullPolicy: Always
-    # Global list of secret names for image pull secrets across all pod specs
-    # Secrets must exist in the same namespace
-    # Reference: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
-    imagePullSecrets: []
-    # Global registry for all container images in the chart
+    # registry is the global default image registry for all container images in the chart.
+    # When set, this overrides all component-specific registry values.
+    # This is useful when using a private registry or mirror.
+    # Example: "my-registry.example.com" or "gcr.io/my-project"
     registry: ""
+    # pullPolicy is the global default image pull policy for all container images.
+    # Can be overridden by individual component image.pullPolicy settings.
+    # Valid values: Always, IfNotPresent, Never
+    pullPolicy: Always
+    # imagePullSecrets is a list of secret names for pulling images from private registries.
+    # These secrets must exist in the same namespace as the deployed resources.
+    # Reference: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+    # Example: [{"name": "my-registry-secret"}]
+    imagePullSecrets: []
   # Global labels applied to all resources deployed by the chart
   labels: {}
   serviceAccount:
@@ -50,7 +58,7 @@ global:
     trust_domain: prj-root.trust.diagrid.io
     namespace: root-dapr-system
     trust_anchors_file: "/var/run/secrets/diagrid.io/trust/ca.crt"
-  # Global nats configuration
+  # Global NATS configuration
   nats:
     endpoint: tls://client.events.prd.p.diagrid.io:443
     trust_domain: trust.diagrid.io
@@ -63,9 +71,19 @@ global:
   # This can be used when you need to reduce the number of
   # images you need to procure.
   consolidated_image:
-    enabled: false
-    name: catalyst-all
-    pull_policy: Always
+    # enabled determines whether to use a single consolidated image for all components
+    enabled: true
+    # registry is the default registry for the consolidated image.
+    # If global.image.registry is set, it will override this value.
+    registry: us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public
+    # repository is the image repository path (without registry or tag).
+    # Example: "catalyst-all" or "diagrid/catalyst-all"
+    repository: catalyst-all
+    # tag is the image tag/version
+    tag: "0.504.0"
+    # pullPolicy is the image pull policy for the consolidated image
+    # If not set, uses global.image.pullPolicy
+    pullPolicy: ""
 #------------------------------------------------------------------------------
 # Shared Configurations
 # TODO not implemented yet
@@ -97,9 +115,14 @@ agent:
     sidecar:
       # default to disable API validation because ingress could be not configured by users
       skip_api_validation: true
-      image_registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public"
+      # image_registry is the registry for the sidecar image.
+      # If global.image.registry is set, it will be used instead.
+      image_registry: us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public
+      # image_name is the image name within the registry.
+      # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
+      image_name: "{{ ternary .Values.global.consolidated_image.repository \"sidecar\" .Values.global.consolidated_image.enabled }}"
+      # image_tag is the sidecar image version
       image_tag: "0.504.0"
-      image_name: '{{ ternary .Values.global.consolidated_image.name "sidecar" .Values.global.consolidated_image.enabled }}'
       resources:
         limits:
           cpu: 300m
@@ -112,8 +135,13 @@ agent:
       enabled: false
     otel:
       enabled: true
-      image_registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public"
-      image_name: '{{ ternary .Values.global.consolidated_image.name "diagrid-otel-collector" .Values.global.consolidated_image.enabled }}'
+      # image_registry is the registry for the otel collector image.
+      # If global.image.registry is set, it will be used instead.
+      image_registry: us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public
+      # image_name is the image name within the registry.
+      # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
+      image_name: "{{ ternary .Values.global.consolidated_image.repository \"diagrid-otel-collector\" .Values.global.consolidated_image.enabled }}"
+      # image_tag is the otel collector image version
       image_tag: "0.504.0"
       metrics_endpoint: https://cra-metrics.prd.p.diagrid.io/api/v1/push
       loki_endpoint: https://cra-logs.prd.p.diagrid.io/loki/api/v1/push
@@ -136,10 +164,15 @@ agent:
           cpu: 75m
           memory: 500Mi
     upstream_dapr:
-      # images wil be pulled from a dockerhub proxy so we don't hit ratelimits
-      container_registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/daprio"
+      # container_registry is the registry for upstream Dapr images.
+      # Images will be pulled from a dockerhub proxy to avoid rate limits.
+      # If global.image.registry is set, it will be used instead.
+      # This registry hosts proxy images from daprio on DockerHub
+      container_registry: us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/daprio
     internal_dapr:
-      container_registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public"
+      # container_registry is the registry for internal Diagrid Dapr images.
+      # If global.image.registry is set, it will be used instead.
+      container_registry: us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public
       ca:
         trust_anchors_config_map_name: ca-certificates-bundle
       sentry_resources:
@@ -154,10 +187,15 @@ agent:
         # storage_class: ""
         storage_size: 8Gi
     artifacts:
-      # make sure the k8s container image version works with the vcluster chart version when updating these, best is to copy the container image version from the vcluster release
+      # vcluster_k0s_chart_version is the vcluster chart version
+      # make sure the k8s container image version works with the vcluster chart version when updating these
       vcluster_k0s_chart_version: "0.15.2"
-      vcluster_k0s_container_image: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/k0sproject/k0s:v1.26.0-k0s.0"
-      core_dns_container_image: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/coredns/coredns:1.10.1"
+      # vcluster_k0s_container_image is the full image reference for k0s
+      # If global.image.registry is set, only the registry portion will be replaced
+      vcluster_k0s_container_image: us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/k0sproject/k0s:v1.26.0-k0s.0
+      # core_dns_container_image is the full image reference for CoreDNS
+      # If global.image.registry is set, only the registry portion will be replaced
+      core_dns_container_image: us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/coredns/coredns:1.10.1
       internal_registry_username: ""
       internal_registry_password: ""
       internal_repo_url: oci://public.ecr.aws/diagrid
@@ -171,11 +209,19 @@ agent:
     port: 9090
   replicaCount: 1
   image:
-    registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public"
-    name: cra-agent
+    # registry is the container registry for the agent image.
+    # If global.image.registry is set, it will override this value.
+    # Example: "us-central1-docker.pkg.dev/my-project/my-repo"
+    registry: us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public
+    # repository is the image name/path within the registry (without registry prefix or tag).
+    # Example: "diagrid/cra-agent" or "cra-agent"
+    repository: cra-agent
+    # tag is the image tag/version to use
     tag: "0.504.0"
-    fullName: ""
-    pullPolicy: Always
+    # pullPolicy is the image pull policy for this specific image.
+    # If empty, uses global.image.pullPolicy.
+    # Valid values: Always, IfNotPresent, Never
+    pullPolicy: ""
   nameOverride: ""
   fullnameOverride: ""
   service:
@@ -248,9 +294,17 @@ gateway:
     minReplicas: 2
   identityInjector:
     image:
+      # registry is the container registry for the identity injector image.
+      # If global.image.registry is set, it will override this value.
+      registry: us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public
+      # repository is the image name/path within the registry.
+      # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
+      repository: identity-injector
+      # tag is the image tag/version to use
       tag: "0.504.0"
-      name: "identity-injector"
-      registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public"
+      # pullPolicy is the image pull policy for this specific image.
+      # If empty, uses global.image.pullPolicy.
+      pullPolicy: ""
     resources:
       limits:
         cpu: 50m
@@ -262,9 +316,17 @@ gateway:
     # If HA is enabled, this will be overridden by gateway.ha.minReplicas
     replicaCount: 1
     image:
+      # registry is the container registry for the Envoy proxy image.
+      # If global.image.registry is set, it will override this value.
+      # This uses a DockerHub proxy to avoid rate limits
+      registry: us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy
+      # repository is the image name/path within the registry.
+      repository: envoyproxy/envoy
+      # tag is the image tag/version to use
       tag: distroless-v1.33.0
-      name: envoyproxy/envoy
-      registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy"
+      # pullPolicy is the image pull policy for this specific image.
+      # If empty, uses global.image.pullPolicy.
+      pullPolicy: ""
     admin:
       enabled: true
       address: "127.0.0.1"
@@ -331,9 +393,17 @@ gateway:
       mtls:
         enabled: true
     image:
+      # registry is the container registry for the gateway control plane image.
+      # If global.image.registry is set, it will override this value.
+      registry: us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public
+      # repository is the image name/path within the registry.
+      # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
+      repository: catalyst-gateway
+      # tag is the image tag/version to use
       tag: "0.504.0"
-      name: catalyst-gateway
-      registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public"
+      # pullPolicy is the image pull policy for this specific image.
+      # If empty, uses global.image.pullPolicy.
+      pullPolicy: ""
     serviceAccount:
       name: gateway-controlplane
       annotations: {}
@@ -404,10 +474,18 @@ management:
     featureflags: {}
   replicaCount: 2
   image:
-    registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public"
-    name: '{{ ternary .Values.global.consolidated_image.name "catalyst-management" .Values.global.consolidated_image.enabled }}'
+    # registry is the container registry for the management image.
+    # If global.image.registry is set, it will override this value.
+    registry: us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public
+    # repository is the image name/path within the registry (without registry prefix or tag).
+    # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
+    # Deprecated: This field supports template evaluation for backwards compatibility.
+    repository: "{{ ternary .Values.global.consolidated_image.repository \"catalyst-management\" .Values.global.consolidated_image.enabled }}"
+    # tag is the image tag/version to use
     tag: "0.504.0"
-    pullPolicy: Always
+    # pullPolicy is the image pull policy for this specific image.
+    # If empty, uses global.image.pullPolicy.
+    pullPolicy: ""
   nameOverride: ""
   fullnameOverride: ""
   service:
@@ -456,6 +534,9 @@ management:
   extraEnvs: []
   merge: {}
   patch: {}
+#------------------------------------------------------------------------------
+# Piko Configurations
+#------------------------------------------------------------------------------
 piko:
   enabled: true
   replicaCount: 1
@@ -467,9 +548,16 @@ piko:
     url: https://tunnels.trust.diagrid.io/.well-known/jwks.json
     cacheTTL: "5m"
   image:
-    repository: ghcr.io/andydunstall/piko
-    pullPolicy: IfNotPresent
+    # registry is the container registry for the Piko image.
+    # If global.image.registry is set, it will override this value.
+    registry: ghcr.io/andydunstall
+    # repository is the image name/path within the registry.
+    repository: piko
+    # tag is the image tag/version to use
     tag: "v0.8.1"
+    # pullPolicy is the image pull policy for this specific image.
+    # If empty, uses global.image.pullPolicy.
+    pullPolicy: IfNotPresent
   serviceAccount:
     annotations: {}
     name: "diagrid-piko"

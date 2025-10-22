@@ -1,5 +1,3 @@
-{{- $envoyImage := printf "%s/%s:%s" .Values.gateway.envoy.image.registry .Values.gateway.envoy.image.name .Values.gateway.envoy.image.tag }}
-{{- $identityInjectorImage := printf "%s/%s:%s" .Values.gateway.identityInjector.image.registry .Values.gateway.identityInjector.image.name .Values.gateway.identityInjector.image.tag }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -22,7 +20,7 @@ spec:
         checksum/controlplane-config: {{ include (print $.Template.BasePath "/gateway/configmap.yaml") . | sha256sum }}
         dapr.io/app-id: gateway
         dapr.io/config: catalyst
-        {{- if and .Values.gateway.tls (not .Values.gateway.tls.existingSecret) }}
+        {{- if and (not .Values.gateway.tls.existingSecret) (or .Values.gateway.tls.cert .Values.gateway.tls.key) }}
         checksum/tls-secret: {{ include (print $.Template.BasePath "/gateway/tls-secret.yaml") . | sha256sum }}
         {{- end }}
       labels:
@@ -56,16 +54,8 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: metadata.namespace
-{{- if .Values.global.consolidated_image.enabled }}
-          image: "{{ .Values.gateway.identityInjector.image.registry }}/{{ .Values.global.consolidated_image.name }}:{{ .Values.gateway.identityInjector.image.tag }}"
-          imagePullPolicy: {{ .Values.global.consolidated_image.pull_policy }}
-{{- else if .Values.gateway.identityInjector.image.fullName }}
-          image: "{{ .Values.gateway.identityInjector.image.fullName }}"
-          imagePullPolicy: {{ .Values.gateway.identityInjector.image.pullPolicy }}
-{{- else }}
-          image: {{ $identityInjectorImage }}
-          imagePullPolicy: IfNotPresent
-{{- end }}
+          image: {{ include "catalyst.image" (dict "image" .Values.gateway.identityInjector.image "consolidated" .Values.global.consolidated_image "global" .Values.global.image "context" .) }}
+          imagePullPolicy: {{ include "catalyst.imagePullPolicy" (dict "image" .Values.gateway.identityInjector.image "consolidated" .Values.global.consolidated_image "global" .Values.global.image) }}
           resources:
             {{- toYaml .Values.gateway.identityInjector.resources | nindent 12 }}
           terminationMessagePath: /dev/termination-log
@@ -84,8 +74,8 @@ spec:
         - name: envoy
           securityContext:
             {{- toYaml .Values.gateway.envoy.securityContext | nindent 12 }}
-          image: "{{ $envoyImage }}"
-          imagePullPolicy: {{ .Values.gateway.envoy.image.pullPolicy }}
+          image: {{ include "catalyst.image" (dict "image" .Values.gateway.envoy.image "consolidated" nil "global" .Values.global.image "context" .) }}
+          imagePullPolicy: {{ include "catalyst.imagePullPolicy" (dict "image" .Values.gateway.envoy.image "consolidated" nil "global" .Values.global.image) }}
           args:
             - "-c"
             - "/etc/envoy/bootstrap-envoy.yaml"
@@ -154,7 +144,6 @@ spec:
       tolerations:
         {{- toYaml .Values.gateway.envoy.tolerations | nindent 8 }}
 ---
-{{- $controlplaneImage := printf "%s/%s:%s" .Values.gateway.controlplane.image.registry .Values.gateway.controlplane.image.name .Values.gateway.controlplane.image.tag }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -206,16 +195,8 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: metadata.namespace
-{{- if .Values.global.consolidated_image.enabled }}
-          image: "{{ .Values.gateway.identityInjector.image.registry }}/{{ .Values.global.consolidated_image.name }}:{{ .Values.gateway.identityInjector.image.tag }}"
-          imagePullPolicy: {{ .Values.global.consolidated_image.pull_policy }}
-{{- else if .Values.gateway.identityInjector.image.fullName }}
-          image: "{{ .Values.gateway.identityInjector.image.fullName }}"
-          imagePullPolicy: {{ .Values.gateway.identityInjector.image.pullPolicy }}
-{{- else }}
-          image: {{ $identityInjectorImage }}
-          imagePullPolicy: IfNotPresent
-{{- end }}
+          image: {{ include "catalyst.image" (dict "image" .Values.gateway.identityInjector.image "consolidated" .Values.global.consolidated_image "global" .Values.global.image "context" .) }}
+          imagePullPolicy: {{ include "catalyst.imagePullPolicy" (dict "image" .Values.gateway.identityInjector.image "consolidated" .Values.global.consolidated_image "global" .Values.global.image) }}
           resources:
             {{- toYaml .Values.gateway.identityInjector.resources | nindent 12 }}
           terminationMessagePath: /dev/termination-log
@@ -257,16 +238,8 @@ spec:
           {{- end }}
           securityContext:
             {{- toYaml .Values.gateway.controlplane.securityContext | nindent 12 }}
-{{- if .Values.global.consolidated_image.enabled }}
-          image: "{{ .Values.gateway.controlplane.image.registry }}/{{ .Values.global.consolidated_image.name }}:{{ .Values.gateway.controlplane.image.tag }}"
-          imagePullPolicy: {{ .Values.global.consolidated_image.pull_policy }}
-{{- else if .Values.gateway.controlplane.image.fullName }}
-          image: "{{ .Values.gateway.controlplane.image.fullName }}"
-          imagePullPolicy: {{ .Values.gateway.controlplane.image.pullPolicy }}
-{{- else }}
-          image: "{{ $controlplaneImage }}"
-          imagePullPolicy: Always
-{{- end }}
+          image: {{ include "catalyst.image" (dict "image" .Values.gateway.controlplane.image "consolidated" .Values.global.consolidated_image "global" .Values.global.image "context" .) }}
+          imagePullPolicy: {{ include "catalyst.imagePullPolicy" (dict "image" .Values.gateway.controlplane.image "consolidated" .Values.global.consolidated_image "global" .Values.global.image) }}
           command: ["./gateway-controlplane"]
           resources:
             {{- toYaml .Values.gateway.controlplane.resources | nindent 12 }}

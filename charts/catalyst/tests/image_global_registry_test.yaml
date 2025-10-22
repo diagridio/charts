@@ -1,0 +1,85 @@
+suite: Test Global Registry Override
+templates:
+  - agent/deployment.yaml
+  - agent/configmap.yaml
+  - management/deployment.yaml
+  - management/configmap.yaml
+  - gateway/deployment.yaml
+  - gateway/configmap.yaml
+  - gateway/gateway-controlplane-configmap.yaml
+  - piko/statefulset.yaml
+  - piko/configmap.yaml
+tests:
+  - it: should override agent image registry
+    set:
+      join_token: "test-token"
+      global.image.registry: "my-registry.io"
+      global.consolidated_image.enabled: false
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ^my-registry\.io/cra-agent:[0-9]+\.[0-9]+\.[0-9]+$
+        template: agent/deployment.yaml
+
+  - it: should override management image registry
+    set:
+      join_token: "test-token"
+      global.image.registry: "my-registry.io"
+      global.consolidated_image.enabled: false
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ^my-registry\.io/catalyst-management:[0-9]+\.[0-9]+\.[0-9]+$
+        template: management/deployment.yaml
+
+  - it: should override gateway controlplane image registry
+    set:
+      join_token: "test-token"
+      global.image.registry: "my-registry.io"
+      gateway.controlplane.xds.mtls.enabled: false
+      global.consolidated_image.enabled: false
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ^my-registry\.io/catalyst-gateway:[0-9]+\.[0-9]+\.[0-9]+$
+        template: gateway/deployment.yaml
+        documentIndex: 1
+
+  - it: should override envoy proxy image registry
+    set:
+      join_token: "test-token"
+      global.image.registry: "my-registry.io"
+      gateway.controlplane.xds.mtls.enabled: false
+      global.consolidated_image.enabled: false
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ^my-registry\.io/envoyproxy/envoy:distroless-v[0-9]+\.[0-9]+\.[0-9]+$
+        template: gateway/deployment.yaml
+        documentIndex: 0
+
+  - it: should override piko image registry
+    set:
+      join_token: "test-token"
+      global.image.registry: "my-registry.io"
+      global.consolidated_image.enabled: false
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ^my-registry\.io/piko:v[0-9]+\.[0-9]+\.[0-9]+$
+        template: piko/statefulset.yaml
+
+  - it: should override nested config image registries in agent configmap
+    set:
+      join_token: "test-token"
+      global.image.registry: "my-registry.io"
+      global.consolidated_image.enabled: false
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "image_registry: my-registry.io"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "container_registry: my-registry.io"
+        template: agent/configmap.yaml

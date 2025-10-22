@@ -1,0 +1,74 @@
+suite: Test Consolidated Image with Global Registry
+templates:
+  - agent/deployment.yaml
+  - agent/configmap.yaml
+  - management/deployment.yaml
+  - management/configmap.yaml
+  - gateway/deployment.yaml
+  - gateway/configmap.yaml
+  - gateway/gateway-controlplane-configmap.yaml
+  - piko/statefulset.yaml
+  - piko/configmap.yaml
+tests:
+  - it: should combine global registry with consolidated image for agent
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: true
+      global.image.registry: "my-registry.io"
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ^my-registry\.io/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
+        template: agent/deployment.yaml
+
+  - it: should combine global registry with consolidated image for management
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: true
+      global.image.registry: "my-registry.io"
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ^my-registry\.io/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
+        template: management/deployment.yaml
+
+  - it: should combine global registry with consolidated image for gateway
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: true
+      global.image.registry: "my-registry.io"
+      gateway.controlplane.xds.mtls.enabled: false
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ^my-registry\.io/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
+        template: gateway/deployment.yaml
+        documentIndex: 1
+
+  - it: should combine global registry with consolidated image in agent config
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: true
+      global.image.registry: "my-registry.io"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "image_registry: my-registry.io"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "image_name: 'catalyst-all'"
+        template: agent/configmap.yaml
+
+  - it: should still override envoy registry even in consolidated mode
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: true
+      global.image.registry: "my-registry.io"
+      gateway.controlplane.xds.mtls.enabled: false
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ^my-registry\.io/envoyproxy/envoy:distroless-v[0-9]+\.[0-9]+\.[0-9]+$
+        template: gateway/deployment.yaml
+        documentIndex: 0

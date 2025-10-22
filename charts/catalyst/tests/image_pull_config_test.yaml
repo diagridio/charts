@@ -1,0 +1,79 @@
+suite: Test Image Pull Configuration
+templates:
+  - agent/deployment.yaml
+  - agent/configmap.yaml
+  - management/deployment.yaml
+  - management/configmap.yaml
+  - gateway/deployment.yaml
+  - gateway/configmap.yaml
+  - gateway/gateway-controlplane-configmap.yaml
+tests:
+  - it: should apply global imagePullSecrets to all deployments
+    set:
+      join_token: "test-token"
+      global.image.imagePullSecrets:
+        - name: "my-registry-secret"
+      gateway.controlplane.xds.mtls.enabled: false
+    asserts:
+      - contains:
+          path: spec.template.spec.imagePullSecrets
+          content:
+            name: "my-registry-secret"
+        template: agent/deployment.yaml
+      - contains:
+          path: spec.template.spec.imagePullSecrets
+          content:
+            name: "my-registry-secret"
+        template: management/deployment.yaml
+      - contains:
+          path: spec.template.spec.imagePullSecrets
+          content:
+            name: "my-registry-secret"
+        template: gateway/deployment.yaml
+        documentIndex: 0
+      - contains:
+          path: spec.template.spec.imagePullSecrets
+          content:
+            name: "my-registry-secret"
+        template: gateway/deployment.yaml
+        documentIndex: 1
+
+  - it: should apply global pull policy when set
+    set:
+      join_token: "test-token"
+      global.image.pullPolicy: "Never"
+      gateway.controlplane.xds.mtls.enabled: false
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].imagePullPolicy
+          value: "Never"
+        template: agent/deployment.yaml
+      - equal:
+          path: spec.template.spec.containers[0].imagePullPolicy
+          value: "Never"
+        template: management/deployment.yaml
+      - equal:
+          path: spec.template.spec.containers[0].imagePullPolicy
+          value: "Never"
+        template: gateway/deployment.yaml
+        documentIndex: 0
+      - equal:
+          path: spec.template.spec.containers[0].imagePullPolicy
+          value: "Never"
+        template: gateway/deployment.yaml
+        documentIndex: 1
+
+  - it: should use consolidated pull policy when specified
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: true
+      global.consolidated_image.pullPolicy: "IfNotPresent"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].imagePullPolicy
+          value: "IfNotPresent"
+        template: agent/deployment.yaml
+      - equal:
+          path: spec.template.spec.containers[0].imagePullPolicy
+          value: "IfNotPresent"
+        template: management/deployment.yaml

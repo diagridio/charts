@@ -1,0 +1,146 @@
+suite: Test Consolidated Image Mode
+templates:
+  - agent/deployment.yaml
+  - agent/configmap.yaml
+  - management/deployment.yaml
+  - management/configmap.yaml
+  - gateway/deployment.yaml
+  - gateway/configmap.yaml
+  - gateway/gateway-controlplane-configmap.yaml
+  - piko/statefulset.yaml
+  - piko/configmap.yaml
+tests:
+  - it: should use consolidated image for agent
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: true
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ^us-central1-docker\.pkg\.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
+        template: agent/deployment.yaml
+
+  - it: should use consolidated image for management
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: true
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ^us-central1-docker\.pkg\.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
+        template: management/deployment.yaml
+
+  - it: should use consolidated image for gateway controlplane
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: true
+      gateway.controlplane.xds.mtls.enabled: false
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ^us-central1-docker\.pkg\.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
+        template: gateway/deployment.yaml
+        documentIndex: 1
+
+  - it: should use consolidated image for agent
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: true
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ^us-central1-docker\.pkg\.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
+        template: agent/deployment.yaml
+
+  - it: should use consolidated image for management
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: true
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ^us-central1-docker\.pkg\.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
+        template: management/deployment.yaml
+
+  - it: should use consolidated image for gateway controlplane
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: true
+      gateway.controlplane.xds.mtls.enabled: false
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ^us-central1-docker\.pkg\.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
+        template: gateway/deployment.yaml
+        documentIndex: 1
+
+  - it: should use consolidated image for identity-injector
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: true
+      gateway.controlplane.xds.mtls.enabled: true
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ^us-central1-docker\.pkg\.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
+        template: gateway/deployment.yaml
+        documentIndex: 0
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: "identity-injector"
+        template: gateway/deployment.yaml
+        documentIndex: 0
+
+  - it: should NOT use consolidated image for envoy (external component)
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: true
+      gateway.controlplane.xds.mtls.enabled: false
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ^us-central1-docker\.pkg\.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/envoyproxy/envoy:distroless-v[0-9]+\.[0-9]+\.[0-9]+$
+        template: gateway/deployment.yaml
+        documentIndex: 0
+
+  - it: should NOT use consolidated image for piko (external component)
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: true
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ^ghcr\.io/andydunstall/piko:v[0-9]+\.[0-9]+\.[0-9]+$
+        template: piko/statefulset.yaml
+
+  - it: should NOT use consolidated image for envoy (external component)
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: true
+      gateway.controlplane.xds.mtls.enabled: false
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/envoyproxy/envoy:distroless-v1.33.0"
+        template: gateway/deployment.yaml
+        documentIndex: 0
+
+  - it: should NOT use consolidated image for piko (external component)
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: "ghcr.io/andydunstall/piko:v0.8.1"
+        template: piko/statefulset.yaml
+
+  - it: should use consolidated image name in agent config
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: true
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "image_name: 'catalyst-all'"
+        template: agent/configmap.yaml

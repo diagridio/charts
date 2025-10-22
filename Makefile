@@ -25,11 +25,25 @@ VERSION ?= 0.0.0-edge
 CHART_DIR ?= ./charts/catalyst
 CHART_NAME ?= catalyst
 
-.PHONY: helm-lint ## Lint the helm chart
-helm-lint: helm-prereqs
+.PHONY: helm-lint
+helm-lint: helm-prereqs ## Lint the helm chart
 	cd $(CHART_DIR) && \
 	helm lint $(TARGET_PATH) \
 	--set join_token="fake_token"
+
+.PHONY: helm-test
+helm-test: ## Run helm unit tests
+	@command -v helm >/dev/null 2>&1 || { echo "helm is not installed. Please install helm first."; exit 1; }
+	@helm plugin list | grep -q unittest || { echo "Installing helm-unittest plugin..."; helm plugin install https://github.com/helm-unittest/helm-unittest; }
+	cd $(CHART_DIR) && \
+	helm unittest --color .
+
+.PHONY: helm-test-verbose
+helm-test-verbose: ## Run helm unit tests with verbose output
+	@command -v helm >/dev/null 2>&1 || { echo "helm is not installed. Please install helm first."; exit 1; }
+	@helm plugin list | grep -q unittest || { echo "Installing helm-unittest plugin..."; helm plugin install https://github.com/helm-unittest/helm-unittest; }
+	cd $(CHART_DIR) && \
+	helm unittest --color -d .
 
 .PHONY: helm-add-repos
 helm-add-repos: ## Add helm repos
@@ -45,8 +59,8 @@ helm-dependency-update: ## Update helm dependencies
 	cd $(CHART_DIR) && \
 	helm dependency update ./
 
-.PHONY: helm-prereqs ## Install helm dependencies
-helm-prereqs: helm-add-repos helm-dependency-build helm-dependency-update
+.PHONY: helm-prereqs
+helm-prereqs: helm-add-repos helm-dependency-build helm-dependency-update ## Install helm dependencies
 
 .PHONY: helm-template
 helm-template: helm-prereqs ## Render helm chart
@@ -55,6 +69,16 @@ helm-template: helm-prereqs ## Render helm chart
 		--namespace test \
 		--debug \
 		--set join_token="fake_token" > rendered.yaml
+
+.PHONY: helm-validate
+helm-validate: helm-lint helm-test ## Run lint and tests on the helm chart
+
+.PHONY: helm-test-integration
+helm-test-integration: ## Run integration tests (requires Docker)
+	@command -v docker >/dev/null 2>&1 || { echo "Docker is not installed or not running. Please install Docker first."; exit 1; }
+	@docker info >/dev/null 2>&1 || { echo "Docker daemon is not running. Please start Docker."; exit 1; }
+	cd tests/integration && \
+	go test -v -timeout 10m .
 
 .PHONE: helm-clean
 helm-clean: ## Clean up generated files

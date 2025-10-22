@@ -1,0 +1,99 @@
+suite: Test Component-Specific Overrides
+templates:
+  - agent/deployment.yaml
+  - agent/configmap.yaml
+  - management/deployment.yaml
+  - management/configmap.yaml
+  - gateway/deployment.yaml
+  - gateway/configmap.yaml
+  - gateway/gateway-controlplane-configmap.yaml
+  - piko/statefulset.yaml
+  - piko/configmap.yaml
+tests:
+  - it: should allow component-specific registry when global not set
+    set:
+      join_token: "test-token"
+      agent.image.registry: "agent-registry.io"
+      management.image.registry: "management-registry.io"
+      global.consolidated_image.enabled: false
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ^agent-registry\.io/cra-agent:[0-9]+\.[0-9]+\.[0-9]+$
+        template: agent/deployment.yaml
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ^management-registry\.io/catalyst-management:[0-9]+\.[0-9]+\.[0-9]+$
+        template: management/deployment.yaml
+
+  - it: should allow global registry to override component registry
+    set:
+      join_token: "test-token"
+      global.image.registry: "global-registry.io"
+      agent.image.registry: "agent-registry.io"
+      global.consolidated_image.enabled: false
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ^global-registry\.io/cra-agent:[0-9]+\.[0-9]+\.[0-9]+$
+        template: agent/deployment.yaml
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ^global-registry\.io/catalyst-management:[0-9]+\.[0-9]+\.[0-9]+$
+        template: management/deployment.yaml
+
+  - it: should allow component-specific tag override
+    set:
+      join_token: "test-token"
+      agent.image.tag: "1.0.0"
+      management.image.tag: "2.0.0"
+      global.consolidated_image.enabled: false
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/cra-agent:1.0.0"
+        template: agent/deployment.yaml
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-management:2.0.0"
+        template: management/deployment.yaml
+
+  - it: should allow component-specific pull policy
+    set:
+      join_token: "test-token"
+      global.image.pullPolicy: "Always"
+      agent.image.pullPolicy: "IfNotPresent"
+      global.consolidated_image.enabled: false
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].imagePullPolicy
+          value: "IfNotPresent"
+        template: agent/deployment.yaml
+      - equal:
+          path: spec.template.spec.containers[0].imagePullPolicy
+          value: "Always"
+        template: management/deployment.yaml
+
+  - it: should prioritize consolidated image registry over component registry
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: true
+      global.consolidated_image.registry: "consolidated-registry.io"
+      agent.image.registry: "agent-registry.io"
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ^consolidated-registry\.io/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
+        template: agent/deployment.yaml
+
+  - it: should allow global registry to override consolidated registry
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: true
+      global.consolidated_image.registry: "consolidated-registry.io"
+      global.image.registry: "override-registry.io"
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ^override-registry\.io/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
+        template: agent/deployment.yaml

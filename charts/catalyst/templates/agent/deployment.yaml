@@ -35,16 +35,8 @@ spec:
         - name: {{ .Chart.Name }}
           securityContext:
             {{- toYaml .Values.agent.securityContext | nindent 12 }}
-{{- if .Values.global.consolidated_image.enabled }}
-          image: "{{ .Values.agent.image.registry }}/{{ .Values.global.consolidated_image.name }}:{{ .Values.agent.image.tag }}"
-          imagePullPolicy: {{ .Values.global.consolidated_image.pull_policy }}
-{{- else if .Values.agent.image.fullName }}
-          image: "{{ .Values.agent.image.fullName }}"
-          imagePullPolicy: {{ .Values.agent.image.pullPolicy }}
-{{- else }}
-          image: "{{ .Values.agent.image.registry }}/{{ .Values.agent.image.name }}:{{ .Values.agent.image.tag }}"
-          imagePullPolicy: {{ .Values.agent.image.pullPolicy }}
-{{- end }}
+          image: {{ include "catalyst.image" (dict "image" .Values.agent.image "consolidated" .Values.global.consolidated_image "global" .Values.global.image "context" .) }}
+          imagePullPolicy: {{ include "catalyst.imagePullPolicy" (dict "image" .Values.agent.image "consolidated" .Values.global.consolidated_image "global" .Values.global.image) }}
           command: ["./agent"]
           args:
           - "--log-level={{ .Values.agent.logLevel }}"
