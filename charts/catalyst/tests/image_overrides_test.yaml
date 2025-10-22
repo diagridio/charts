@@ -15,6 +15,7 @@ tests:
       join_token: "test-token"
       agent.image.registry: "agent-registry.io"
       management.image.registry: "management-registry.io"
+      global.consolidated_image.enabled: false
     asserts:
       - matchRegex:
           path: spec.template.spec.containers[0].image
@@ -30,6 +31,7 @@ tests:
       join_token: "test-token"
       global.image.registry: "global-registry.io"
       agent.image.registry: "agent-registry.io"
+      global.consolidated_image.enabled: false
     asserts:
       - matchRegex:
           path: spec.template.spec.containers[0].image
@@ -45,6 +47,7 @@ tests:
       join_token: "test-token"
       agent.image.tag: "1.0.0"
       management.image.tag: "2.0.0"
+      global.consolidated_image.enabled: false
     asserts:
       - equal:
           path: spec.template.spec.containers[0].image
@@ -60,6 +63,7 @@ tests:
       join_token: "test-token"
       global.image.pullPolicy: "Always"
       agent.image.pullPolicy: "IfNotPresent"
+      global.consolidated_image.enabled: false
     asserts:
       - equal:
           path: spec.template.spec.containers[0].imagePullPolicy

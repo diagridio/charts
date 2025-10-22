@@ -80,7 +80,7 @@ jobs:
           echo "✓ Template rendering successful for ${{ matrix.scenario.name }}"
 
   integration-tests:
-    name: Integration Tests
+    name: Helm Integration Tests
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
