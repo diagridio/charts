@@ -145,7 +145,7 @@ declare -a IMAGES=(
   # Primary Component Images (Default Mode)
   "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/cra-agent:${CATALYST_VERSION}"
   "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-management:${CATALYST_VERSION}"
-  "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/gateway-controlplane:${CATALYST_VERSION}"
+  "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-gateway:${CATALYST_VERSION}"
   "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/identity-injector:${CATALYST_VERSION}"
   "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/k0sproject/k0s:${K0S_VERSION}"
   "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/coredns/coredns:${COREDNS_VERSION}"
@@ -232,7 +232,7 @@ mirror_image() {
 # Main execution
 echo ""
 echo -e "${BLUE}╔═══════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║          Catalyst Helm Chart Image Mirroring Tool            ║${NC}"
+echo -e "${BLUE}║          Catalyst Helm Chart Image Mirroring Tool             ║${NC}"
 echo -e "${BLUE}╚═══════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "${BLUE}Total images to process: ${#IMAGES[@]}${NC}"
