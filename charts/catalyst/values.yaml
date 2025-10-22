@@ -72,7 +72,7 @@ global:
   # images you need to procure.
   consolidated_image:
     # enabled determines whether to use a single consolidated image for all components
-    enabled: false
+    enabled: true
     # registry is the default registry for the consolidated image.
     # If global.image.registry is set, it will override this value.
     registry: us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public
