@@ -46,7 +46,7 @@ DRY_RUN=false
 SKIP_PULL=false
 TARGET_REGISTRY=""
 
-# Default versions
+# Default versions(these won't be updated frequently and should be passed explicitly)
 CATALYST_VERSION="0.469.0"
 DAPR_VERSION="1.16.1"
 INTERNAL_DAPR_VERSION="1.16.2-rc.1-catalyst.2"
@@ -161,10 +161,10 @@ declare -a IMAGES=(
   "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/sidecar:${CATALYST_VERSION}"
   "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/diagrid-otel-collector:${CATALYST_VERSION}"
   
-  # Upstream Dapr Images (control plane + runtime)
+  # Upstream Dapr Images
   "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/daprio/dapr:${DAPR_VERSION}"
   
-  # Internal Dapr Images (Catalyst-modified control plane - sidecar serves as runtime equivalent)
+  # Internal Dapr Images
   "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/dapr:${INTERNAL_DAPR_VERSION}"
 )
 
@@ -261,7 +261,7 @@ done
 # Print summary
 echo ""
 echo -e "${BLUE}╔═══════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║                          Summary                              ║${NC}"
+echo -e "${BLUE}║                          Summary                          ║${NC}"
 echo -e "${BLUE}╚═══════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "${GREEN}Successful: ${SUCCESS_COUNT}/${#IMAGES[@]}${NC}"
