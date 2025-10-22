@@ -187,15 +187,6 @@ agent:
         # storage_class: ""
         storage_size: 8Gi
     artifacts:
-      # vcluster_k0s_chart_version is the vcluster chart version
-      # make sure the k8s container image version works with the vcluster chart version when updating these
-      vcluster_k0s_chart_version: "0.15.2"
-      # vcluster_k0s_container_image is the full image reference for k0s
-      # If global.image.registry is set, only the registry portion will be replaced
-      vcluster_k0s_container_image: us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/k0sproject/k0s:v1.26.0-k0s.0
-      # core_dns_container_image is the full image reference for CoreDNS
-      # If global.image.registry is set, only the registry portion will be replaced
-      core_dns_container_image: us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/coredns/coredns:1.10.1
       internal_registry_username: ""
       internal_registry_password: ""
       internal_repo_url: oci://public.ecr.aws/diagrid

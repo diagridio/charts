@@ -60,12 +60,8 @@ The Catalyst agent configuration includes additional images for sidecars and dep
 
 | Component | Default Image | Description |
 |-----------|--------------|-------------|
-| **Sidecar** | `us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/sidecar:<tag>` | Catalyst sidecar injected into workloads |
+| **Sidecar** | `us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/sidecar:<tag>` | Catalyst dapr sidecar |
 | **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/diagrid-otel-collector:<tag>` | OTel collector for telemetry |
-| **vcluster k0s** | `us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/k0sproject/k0s:<tag>` | k0s distribution for vcluster |
-| **CoreDNS** | `us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/coredns/coredns:<tag>` | CoreDNS for vcluster |
-
-**Upstream Dapr Images** (from `upstream_dapr.container_registry`):
 
 | Component | Default Image | Description |
 |-----------|--------------|-------------|
@@ -91,9 +87,7 @@ The script is located at `scripts/catalyst/mirror-images.sh` and handles pulling
   --dapr-version 1.16.1 \
   --internal-dapr-version 1.16.2-rc.1-catalyst.2 \
   --envoy-version distroless-v1.33.0 \
-  --piko-version v0.8.1 \
-  --k0s-version v1.26.0-k0s.0 \
-  --coredns-version 1.10.1
+  --piko-version v0.8.1
 ```
 
 After mirroring, configure your values file with the global registry override pointing to your private registry:

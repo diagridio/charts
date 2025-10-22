@@ -19,8 +19,6 @@
 #   --internal-dapr-version VERSION  Internal Dapr version (default: 1.16.2-rc.1-catalyst.2)
 #   --envoy-version VERSION       Envoy version (default: distroless-v1.33.0)
 #   --piko-version VERSION        Piko version (default: v0.8.1)
-#   --k0s-version VERSION         k0s version (default: v1.26.0-k0s.0)
-#   --coredns-version VERSION     CoreDNS version (default: 1.10.1)
 #   --dry-run                     Print what would be done without executing
 #   --skip-pull                   Skip pulling images, only tag and push
 #
@@ -52,8 +50,6 @@ DAPR_VERSION="1.16.1"
 INTERNAL_DAPR_VERSION="1.16.2-rc.1-catalyst.2"
 ENVOY_VERSION="distroless-v1.33.0"
 PIKO_VERSION="v0.8.1"
-K0S_VERSION="v1.26.0-k0s.0"
-COREDNS_VERSION="1.10.1"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -76,14 +72,6 @@ while [[ $# -gt 0 ]]; do
       ;;
     --piko-version)
       PIKO_VERSION="$2"
-      shift 2
-      ;;
-    --k0s-version)
-      K0S_VERSION="$2"
-      shift 2
-      ;;
-    --coredns-version)
-      COREDNS_VERSION="$2"
       shift 2
       ;;
     --dry-run)
@@ -147,8 +135,6 @@ declare -a IMAGES=(
   "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-management:${CATALYST_VERSION}"
   "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-gateway:${CATALYST_VERSION}"
   "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/identity-injector:${CATALYST_VERSION}"
-  "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/k0sproject/k0s:${K0S_VERSION}"
-  "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/coredns/coredns:${COREDNS_VERSION}"
 
   # Consolidated Image (Alternative Mode)
   "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-all:${CATALYST_VERSION}"
