@@ -36,16 +36,8 @@ spec:
         - name: {{ .Chart.Name }}
           securityContext:
             {{ include "merge.maps" (dict "base" .Values.management.securityContext "overrides" .Values.management.merge.securityContext) | nindent 12 }}
-{{- if .Values.global.consolidated_image.enabled }}
-          image: "{{ .Values.management.image.registry }}/{{ .Values.global.consolidated_image.name }}:{{ .Values.management.image.tag }}"
-          imagePullPolicy: {{ .Values.global.consolidated_image.pull_policy }}
-{{- else if .Values.management.image.fullName }}
-          image: "{{ .Values.management.image.fullName }}"
-          imagePullPolicy: {{ .Values.management.image.pullPolicy }}
-{{- else }}
-          image: "{{ .Values.management.image.registry }}/{{ tpl .Values.management.image.name . }}:{{ .Values.management.image.tag }}"
-          imagePullPolicy: {{ .Values.management.image.pullPolicy }}
-{{- end }}
+          image: {{ include "catalyst.image" (dict "image" .Values.management.image "consolidated" .Values.global.consolidated_image "global" .Values.global.image "context" .) }}
+          imagePullPolicy: {{ include "catalyst.imagePullPolicy" (dict "image" .Values.management.image "consolidated" .Values.global.consolidated_image "global" .Values.global.image) }}
           command: ["./management"]
           args:
           - "--log-level={{ .Values.management.logLevel }}"
