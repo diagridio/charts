@@ -84,7 +84,9 @@ The Catalyst Helm chart deploys multiple container images across its components.
 ### Installation Images
 
 By default, the chart uses a consolidated Catalyst image that includes all necessary components:
+
 | Component | Default Image | Description |
+|-----------|--------------|-------------|
 | **Catalyst** | `us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-all:<tag>` | Catalyst services |
 
 It is possible to run the chart with separate images for each component:
@@ -97,6 +99,7 @@ It is possible to run the chart with separate images for each component:
 
 Catalyst also uses the following dependency images:
 | Component | Default Image | Description |
+|-----------|--------------|-------------|
 | **Envoy Proxy** | `us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/envoyproxy/envoy:<tag>` | Envoy proxy for gateway |
 | **Piko** | `ghcr.io/andydunstall/piko:<tag>` | Piko reverse tunneling service |
 
