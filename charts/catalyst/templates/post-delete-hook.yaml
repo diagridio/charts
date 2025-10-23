@@ -173,15 +173,13 @@ spec:
             echo "catalyst-otel-metrics-collector Helm release not found in {{ .Release.Namespace }}"
           fi
 
-          # Delete Dapr namespace (cleans up any remaining namespace-scoped resources)
+          # Delete region configmap from agent namespace
+          echo "Deleting region configmap from {{ .Release.Namespace }}..."
+          kubectl delete configmap region-details -n {{ .Release.Namespace }} --ignore-not-found=true || echo "Warning: Failed to delete region-details configmap"
+
+          # Delete Dapr namespace
           echo "Deleting {{ .Values.cleanup.namespaces.dapr }} namespace..."
           kubectl delete namespace {{ .Values.cleanup.namespaces.dapr }} --ignore-not-found=true --timeout=120s || echo "Warning: Failed to delete {{ .Values.cleanup.namespaces.dapr }} namespace"
-
-          # Note: We do NOT delete {{ .Release.Namespace }} here because:
-          # 1. Helm stores release metadata as secrets in this namespace
-          # 2. Deleting it would break Helm's ability to complete the uninstall/purge
-          # 3. Helm will automatically clean up the namespace resources during uninstall
-          echo "Skipping deletion of {{ .Release.Namespace }} namespace - Helm will clean it up during uninstall"
 
           # Delete project namespaces created by Catalyst
           echo "Deleting project namespaces with label cra.diagrid.io/project-namespace=true..."
