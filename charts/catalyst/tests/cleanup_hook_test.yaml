@@ -207,7 +207,7 @@ tests:
           value: Job
       - matchRegex:
           path: spec.template.spec.containers[0].command[2]
-          pattern: "Skipping deletion of my-catalyst-ns"
+          pattern: "kubectl delete configmap region-details -n my-catalyst-ns"
         documentSelector:
           path: kind
           value: Job
