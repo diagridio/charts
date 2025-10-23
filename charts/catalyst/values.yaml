@@ -84,6 +84,7 @@ global:
     # pullPolicy is the image pull policy for the consolidated image
     # If not set, uses global.image.pullPolicy
     pullPolicy: ""
+
 #------------------------------------------------------------------------------
 # Shared Configurations
 # TODO not implemented yet
@@ -92,6 +93,7 @@ shared:
   nodeSelector: {}
   tolerations: []
   affinity: {}
+
 #------------------------------------------------------------------------------
 # Agent Configurations
 #------------------------------------------------------------------------------
@@ -255,6 +257,7 @@ agent:
   extraEnvs: []
   merge: {}
   patch: {}
+
 #------------------------------------------------------------------------------
 # Gateway Configuration
 #------------------------------------------------------------------------------
@@ -274,8 +277,7 @@ gateway:
     # Optional: customize the generated secret name
     # secretName: ""
     #
-    # Only used if existingSecret is empty
-    # Path on local disk to TLS certificate and key in PEM format
+    # Inline TLS certificate and key (used if existingSecret is not provided)
     cert: ""
     key: ""
   # Enable High Availability mode for gateway components
@@ -442,6 +444,7 @@ gateway:
         cpu: 50m
         memory: 50Mi
     config: {}
+
 #------------------------------------------------------------------------------
 # Management Service Configurations
 #------------------------------------------------------------------------------
@@ -525,6 +528,7 @@ management:
   extraEnvs: []
   merge: {}
   patch: {}
+
 #------------------------------------------------------------------------------
 # Piko Configurations
 #------------------------------------------------------------------------------
@@ -581,3 +585,27 @@ piko:
   affinity: {}
   httpproxy:
     upstreamHostName: "tunnels.api.diagrid.io"
+
+#------------------------------------------------------------------------------
+# Cleanup Hook Configuration
+#------------------------------------------------------------------------------
+# Post-delete hook that cleans up resources created by Catalyst
+cleanup:
+  # enabled determines whether to run the cleanup hook after helm uninstall
+  enabled: true
+  # ttlSecondsAfterFinished is the TTL for the cleanup job after it finishes
+  ttlSecondsAfterFinished: 300
+  # namespaces that are created by Catalyst at runtime and should be cleaned up
+  namespaces:
+    # dapr is the namespace where internal Dapr components are installed
+    dapr: "root-dapr-system"
+  image:
+    # registry is the container registry for the cleanup job image
+    # The cleanup job needs both kubectl and helm CLI tools
+    registry: docker.io
+    # repository is the image repository path
+    repository: alpine/k8s
+    # tag is the image tag/version
+    tag: "1.28.3"
+    # pullPolicy is the image pull policy
+    pullPolicy: IfNotPresent

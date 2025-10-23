@@ -213,7 +213,7 @@ func installChart(t *testing.T, ctx context.Context, kubeConfig []byte, releaseN
 
 	// Create Helm action configuration using the K3s cluster's REST client getter
 	actionConfig := new(action.Configuration)
-	err = actionConfig.Init(restClientGetter, testNamespace, "memory", func(format string, v ...interface{}) {
+	err = actionConfig.Init(restClientGetter, testNamespace, "secret", func(format string, v ...interface{}) {
 		t.Logf(format, v...)
 	})
 	require.NoError(t, err, "Failed to initialize Helm action config")

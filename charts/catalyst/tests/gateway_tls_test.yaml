@@ -1,0 +1,202 @@
+suite: Test Gateway TLS Configuration
+templates:
+  - gateway/deployment.yaml
+  - gateway/tls-secret.yaml
+  - gateway/configmap.yaml
+tests:
+  - it: should create TLS secret when inline cert and key are provided
+    set:
+      join_token: "test-token"
+      gateway.tls.enabled: true
+      gateway.tls.cert: "-----BEGIN CERTIFICATE-----\nMIIBkTCB+wIJAKHHCgVZU65BMA0GCSqGSIb3DQEBCwUAMBExDzANBgNVBAMMBnRl\nc3RjYTAeFw0yMTEwMjUwMDAwMDBaFw0yMjEwMjUwMDAwMDBaMBExDzANBgNVBAMM\nBnRlc3RjYTCBnzANBgkqhkiG9w0BAQEFAAOBjQAwgYkCgYEAuWJvKpBmYBn1hDsY\n-----END CERTIFICATE-----"
+      gateway.tls.key: "-----BEGIN PRIVATE KEY-----\nMIICdwIBADANBgkqhkiG9w0BAQEFAASCAmEwggJdAgEAAoGBALlibypQZmAZ9YQ7\nGN5oq5y9jH8xHqTBfKJ+8LcN+/z/Vz6Vz6Vz6Vz6Vz6Vz6Vz6Vz6Vz6Vz6Vz6V\n-----END PRIVATE KEY-----"
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: gateway/tls-secret.yaml
+      - isKind:
+          of: Secret
+        template: gateway/tls-secret.yaml
+      - equal:
+          path: type
+          value: kubernetes.io/tls
+        template: gateway/tls-secret.yaml
+      - exists:
+          path: data["tls.crt"]
+        template: gateway/tls-secret.yaml
+      - exists:
+          path: data["tls.key"]
+        template: gateway/tls-secret.yaml
+      - matchRegex:
+          path: metadata.name
+          pattern: ^.*-gateway-tls$
+        template: gateway/tls-secret.yaml
+
+  - it: should not create TLS secret when existingSecret is specified
+    set:
+      join_token: "test-token"
+      gateway.tls.enabled: true
+      gateway.tls.existingSecret: "my-existing-tls-secret"
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: gateway/tls-secret.yaml
+
+  - it: should create TLS secret when cert and key are provided regardless of tls.enabled
+    set:
+      join_token: "test-token"
+      gateway.tls.enabled: false
+      gateway.tls.cert: "test-cert"
+      gateway.tls.key: "test-key"
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: gateway/tls-secret.yaml
+      - isKind:
+          of: Secret
+        template: gateway/tls-secret.yaml
+
+  - it: should mount TLS volume in gateway deployment when enabled with inline certs
+    set:
+      join_token: "test-token"
+      gateway.tls.enabled: true
+      gateway.tls.cert: "test-cert"
+      gateway.tls.key: "test-key"
+      gateway.controlplane.xds.mtls.enabled: false
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: wildcard-tls-certs
+            secret:
+              secretName: RELEASE-NAME-gateway-tls
+        template: gateway/deployment.yaml
+        documentIndex: 0
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: wildcard-tls-certs
+            mountPath: "/etc/ssl/certs"
+            readOnly: true
+        template: gateway/deployment.yaml
+        documentIndex: 0
+
+  - it: should mount TLS volume in gateway deployment when enabled with existingSecret
+    set:
+      join_token: "test-token"
+      gateway.tls.enabled: true
+      gateway.tls.existingSecret: "my-existing-tls-secret"
+      gateway.controlplane.xds.mtls.enabled: false
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: wildcard-tls-certs
+            secret:
+              secretName: my-existing-tls-secret
+        template: gateway/deployment.yaml
+        documentIndex: 0
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: wildcard-tls-certs
+            mountPath: "/etc/ssl/certs"
+            readOnly: true
+        template: gateway/deployment.yaml
+        documentIndex: 0
+
+  - it: should not mount TLS volume in gateway deployment when disabled
+    set:
+      join_token: "test-token"
+      gateway.tls.enabled: false
+      gateway.controlplane.xds.mtls.enabled: false
+    asserts:
+      - notContains:
+          path: spec.template.spec.volumes
+          content:
+            name: wildcard-tls-certs
+        template: gateway/deployment.yaml
+        documentIndex: 0
+
+  - it: should use custom secret name when specified
+    set:
+      join_token: "test-token"
+      gateway.tls.enabled: true
+      gateway.tls.secretName: "custom-tls-secret"
+      gateway.tls.cert: "test-cert"
+      gateway.tls.key: "test-key"
+    asserts:
+      - equal:
+          path: metadata.name
+          value: "custom-tls-secret"
+        template: gateway/tls-secret.yaml
+
+  - it: should have checksum annotations in TLS secret
+    set:
+      join_token: "test-token"
+      gateway.tls.enabled: true
+      gateway.tls.cert: "test-cert"
+      gateway.tls.key: "test-key"
+    asserts:
+      - exists:
+          path: metadata.annotations
+        template: gateway/tls-secret.yaml
+      - matchRegex:
+          path: metadata.annotations.checksum/tls-cert
+          pattern: ^[a-f0-9]{64}$
+        template: gateway/tls-secret.yaml
+      - matchRegex:
+          path: metadata.annotations.checksum/tls-key
+          pattern: ^[a-f0-9]{64}$
+        template: gateway/tls-secret.yaml
+
+  - it: should have TLS secret checksum in deployment annotations when using inline certs
+    set:
+      join_token: "test-token"
+      gateway.tls.enabled: true
+      gateway.tls.cert: "test-cert"
+      gateway.tls.key: "test-key"
+      gateway.controlplane.xds.mtls.enabled: false
+    asserts:
+      - exists:
+          path: spec.template.metadata.annotations.checksum/tls-secret
+        template: gateway/deployment.yaml
+        documentIndex: 0
+
+  - it: should not have TLS secret checksum in deployment annotations when using existingSecret
+    set:
+      join_token: "test-token"
+      gateway.tls.enabled: true
+      gateway.tls.existingSecret: "my-existing-tls-secret"
+      gateway.controlplane.xds.mtls.enabled: false
+    asserts:
+      - notExists:
+          path: spec.template.metadata.annotations.checksum/tls-secret
+        template: gateway/deployment.yaml
+        documentIndex: 0
+
+  - it: should create TLS secret with only cert provided
+    set:
+      join_token: "test-token"
+      gateway.tls.enabled: true
+      gateway.tls.cert: "test-cert"
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: gateway/tls-secret.yaml
+      - exists:
+          path: data["tls.crt"]
+        template: gateway/tls-secret.yaml
+
+  - it: should create TLS secret with only key provided
+    set:
+      join_token: "test-token"
+      gateway.tls.enabled: true
+      gateway.tls.key: "test-key"
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: gateway/tls-secret.yaml
+      - exists:
+          path: data["tls.key"]
+        template: gateway/tls-secret.yaml
