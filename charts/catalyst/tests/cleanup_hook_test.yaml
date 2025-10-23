@@ -1,0 +1,213 @@
+suite: Test Post-Delete Cleanup Hook
+templates:
+  - post-delete-hook.yaml
+tests:
+  - it: should create cleanup resources when cleanup is enabled
+    set:
+      join_token: "test-token"
+      cleanup.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 4
+      - isKind:
+          of: ServiceAccount
+        documentIndex: 0
+      - isKind:
+          of: ClusterRole
+        documentIndex: 1
+      - isKind:
+          of: ClusterRoleBinding
+        documentIndex: 2
+      - isKind:
+          of: Job
+        documentIndex: 3
+
+  - it: should not create cleanup resources when cleanup is disabled
+    set:
+      join_token: "test-token"
+      cleanup.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should have correct hook annotations on ServiceAccount
+    set:
+      join_token: "test-token"
+      cleanup.enabled: true
+    asserts:
+      - equal:
+          path: metadata.annotations["helm.sh/hook"]
+          value: post-delete
+        documentSelector:
+          path: kind
+          value: ServiceAccount
+      - equal:
+          path: metadata.annotations["helm.sh/hook-weight"]
+          value: "1"
+        documentSelector:
+          path: kind
+          value: ServiceAccount
+      - equal:
+          path: metadata.annotations["helm.sh/hook-delete-policy"]
+          value: hook-succeeded,hook-failed
+        documentSelector:
+          path: kind
+          value: ServiceAccount
+
+  - it: should have correct hook annotations on Job
+    set:
+      join_token: "test-token"
+      cleanup.enabled: true
+    asserts:
+      - equal:
+          path: metadata.annotations["helm.sh/hook"]
+          value: post-delete
+        documentSelector:
+          path: kind
+          value: Job
+      - equal:
+          path: metadata.annotations["helm.sh/hook-weight"]
+          value: "10"
+        documentSelector:
+          path: kind
+          value: Job
+
+  - it: should use custom cleanup image configuration
+    set:
+      join_token: "test-token"
+      cleanup.enabled: true
+      cleanup.image.registry: "my-registry.io"
+      cleanup.image.repository: "custom/helm"
+      cleanup.image.tag: "3.14.0"
+      cleanup.image.pullPolicy: "Always"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: "my-registry.io/custom/helm:3.14.0"
+        documentSelector:
+          path: kind
+          value: Job
+      - equal:
+          path: spec.template.spec.containers[0].imagePullPolicy
+          value: "Always"
+        documentSelector:
+          path: kind
+          value: Job
+
+  - it: should have correct ClusterRole permissions
+    set:
+      join_token: "test-token"
+      cleanup.enabled: true
+    asserts:
+      - contains:
+          path: rules
+          content:
+            apiGroups: [""]
+            resources: ["namespaces"]
+            verbs: ["get", "list", "delete"]
+        documentSelector:
+          path: kind
+          value: ClusterRole
+      - contains:
+          path: rules
+          content:
+            apiGroups: [""]
+            resources: ["secrets", "services", "configmaps", "serviceaccounts", "persistentvolumeclaims"]
+            verbs: ["get", "list", "delete", "update"]
+        documentSelector:
+          path: kind
+          value: ClusterRole
+      - contains:
+          path: rules
+          content:
+            apiGroups: ["policy"]
+            resources: ["poddisruptionbudgets"]
+            verbs: ["get", "list", "delete"]
+        documentSelector:
+          path: kind
+          value: ClusterRole
+      - contains:
+          path: rules
+          content:
+            apiGroups: ["apiextensions.k8s.io"]
+            resources: ["customresourcedefinitions"]
+            verbs: ["get", "list", "delete"]
+        documentSelector:
+          path: kind
+          value: ClusterRole
+      - contains:
+          path: rules
+          content:
+            apiGroups: ["rbac.authorization.k8s.io"]
+            resources: ["clusterroles", "clusterrolebindings", "roles", "rolebindings"]
+            verbs: ["get", "list", "delete"]
+        documentSelector:
+          path: kind
+          value: ClusterRole
+      - contains:
+          path: rules
+          content:
+            apiGroups: ["dapr.io"]
+            resources: ["*"]
+            verbs: ["get", "list", "delete"]
+        documentSelector:
+          path: kind
+          value: ClusterRole
+
+  - it: should use correct TTL for cleanup job
+    set:
+      join_token: "test-token"
+      cleanup.enabled: true
+      cleanup.ttlSecondsAfterFinished: 600
+    asserts:
+      - equal:
+          path: spec.ttlSecondsAfterFinished
+          value: 600
+        documentSelector:
+          path: kind
+          value: Job
+
+  - it: should reference the correct service account in ClusterRoleBinding
+    set:
+      join_token: "test-token"
+      cleanup.enabled: true
+    asserts:
+      - equal:
+          path: subjects[0].kind
+          value: ServiceAccount
+        documentSelector:
+          path: kind
+          value: ClusterRoleBinding
+      - equal:
+          path: subjects[0].name
+          value: RELEASE-NAME-cleanup
+        documentSelector:
+          path: kind
+          value: ClusterRoleBinding
+      - equal:
+          path: roleRef.kind
+          value: ClusterRole
+        documentSelector:
+          path: kind
+          value: ClusterRoleBinding
+
+  - it: should use configurable dapr namespace in cleanup script
+    set:
+      join_token: "test-token"
+      cleanup.enabled: true
+      cleanup.namespaces.dapr: "custom-dapr-ns"
+    release:
+      namespace: "my-catalyst-ns"
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: "kubectl delete namespace custom-dapr-ns"
+        documentSelector:
+          path: kind
+          value: Job
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: "kubectl delete configmap region-details -n my-catalyst-ns"
+        documentSelector:
+          path: kind
+          value: Job

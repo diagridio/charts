@@ -1,0 +1,198 @@
+{{- if .Values.cleanup.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Release.Name }}-cleanup
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": post-delete
+    "helm.sh/hook-weight": "1"
+    "helm.sh/hook-delete-policy": hook-succeeded,hook-failed
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ .Release.Name }}-cleanup
+  annotations:
+    "helm.sh/hook": post-delete
+    "helm.sh/hook-weight": "2"
+    "helm.sh/hook-delete-policy": hook-succeeded,hook-failed
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+rules:
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "delete"]
+  - apiGroups: [""]
+    resources: ["secrets", "services", "configmaps", "serviceaccounts", "persistentvolumeclaims"]
+    verbs: ["get", "list", "delete", "update"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets", "replicasets", "daemonsets"]
+    verbs: ["get", "list", "delete"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "delete"]
+  - apiGroups: ["policy"]
+    resources: ["poddisruptionbudgets"]
+    verbs: ["get", "list", "delete"]
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["get", "list", "delete"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterroles", "clusterrolebindings", "roles", "rolebindings"]
+    verbs: ["get", "list", "delete"]
+  - apiGroups: ["admissionregistration.k8s.io"]
+    resources: ["mutatingwebhookconfigurations", "validatingwebhookconfigurations"]
+    verbs: ["get", "list", "delete"]
+  - apiGroups: ["dapr.io"]
+    resources: ["*"]
+    verbs: ["get", "list", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Release.Name }}-cleanup
+  annotations:
+    "helm.sh/hook": post-delete
+    "helm.sh/hook-weight": "3"
+    "helm.sh/hook-delete-policy": hook-succeeded,hook-failed
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ .Release.Name }}-cleanup
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}-cleanup
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-cleanup
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    "helm.sh/hook": post-delete
+    "helm.sh/hook-weight": "10"
+    "helm.sh/hook-delete-policy": hook-succeeded,hook-failed
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  ttlSecondsAfterFinished: {{ .Values.cleanup.ttlSecondsAfterFinished }}
+  template:
+    metadata:
+      name: {{ .Release.Name }}-cleanup
+      labels:
+        app.kubernetes.io/name: {{ .Chart.Name }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/managed-by: {{ .Release.Service }}
+    spec:
+      serviceAccountName: {{ .Release.Name }}-cleanup
+      restartPolicy: OnFailure
+      containers:
+      - name: cleanup
+        image: {{ .Values.cleanup.image.registry }}/{{ .Values.cleanup.image.repository }}:{{ .Values.cleanup.image.tag }}
+        imagePullPolicy: {{ .Values.cleanup.image.pullPolicy }}
+        command:
+        - /bin/bash
+        - -c
+        - |
+          echo "Starting Catalyst cleanup..."
+
+          # Uninstall Dapr Helm releases to clean up CRDs, ClusterRoles, etc.
+          echo "Uninstalling Dapr Helm releases..."
+          if helm status dapr -n {{ .Values.cleanup.namespaces.dapr }} >/dev/null 2>&1; then
+            echo "Uninstalling dapr release from {{ .Values.cleanup.namespaces.dapr }}..."
+            DAPR_OUTPUT=$(helm uninstall dapr -n {{ .Values.cleanup.namespaces.dapr }} --wait --debug 2>&1)
+            DAPR_EXIT_CODE=$?
+            if [ $DAPR_EXIT_CODE -ne 0 ]; then
+              echo "Error uninstalling dapr (exit code: $DAPR_EXIT_CODE):"
+              echo "$DAPR_OUTPUT"
+            else
+              echo "Successfully uninstalled dapr release"
+            fi
+          else
+            echo "dapr Helm release not found in {{ .Values.cleanup.namespaces.dapr }}"
+          fi
+
+          if helm status dapr-ext -n {{ .Values.cleanup.namespaces.dapr }} >/dev/null 2>&1; then
+            echo "Uninstalling dapr-ext release from {{ .Values.cleanup.namespaces.dapr }}..."
+            DAPR_EXT_OUTPUT=$(helm uninstall dapr-ext -n {{ .Values.cleanup.namespaces.dapr }} --wait --debug 2>&1)
+            DAPR_EXT_EXIT_CODE=$?
+            if [ $DAPR_EXT_EXIT_CODE -ne 0 ]; then
+              echo "Error uninstalling dapr-ext (exit code: $DAPR_EXT_EXIT_CODE):"
+              echo "$DAPR_EXT_OUTPUT"
+            else
+              echo "Successfully uninstalled dapr-ext release"
+            fi
+          else
+            echo "dapr-ext Helm release not found in {{ .Values.cleanup.namespaces.dapr }}"
+          fi
+
+          
+          # Uninstall OTel collector Helm releases from the agent namespace
+          echo "Uninstalling OTel collector Helm releases from {{ .Release.Namespace }}..."
+          if helm status catalyst-otel-logs-collector -n {{ .Release.Namespace }} >/dev/null 2>&1; then
+            echo "Uninstalling catalyst-otel-logs-collector release from {{ .Release.Namespace }}..."
+            OTEL_LOGS_OUTPUT=$(helm uninstall catalyst-otel-logs-collector -n {{ .Release.Namespace }} --wait --debug 2>&1)
+            OTEL_LOGS_EXIT_CODE=$?
+            if [ $OTEL_LOGS_EXIT_CODE -ne 0 ]; then
+              echo "Error uninstalling catalyst-otel-logs-collector (exit code: $OTEL_LOGS_EXIT_CODE):"
+              echo "$OTEL_LOGS_OUTPUT"
+              echo "Warning: Will delete namespace to clean up remaining resources"
+            else
+              echo "Successfully uninstalled catalyst-otel-logs-collector release"
+            fi
+          else
+            echo "catalyst-otel-logs-collector Helm release not found in {{ .Release.Namespace }}"
+          fi
+
+          if helm status catalyst-otel-metrics-collector -n {{ .Release.Namespace }} >/dev/null 2>&1; then
+            echo "Uninstalling catalyst-otel-metrics-collector release from {{ .Release.Namespace }}..."
+            OTEL_METRICS_OUTPUT=$(helm uninstall catalyst-otel-metrics-collector -n {{ .Release.Namespace }} --wait --debug 2>&1)
+            OTEL_METRICS_EXIT_CODE=$?
+            if [ $OTEL_METRICS_EXIT_CODE -ne 0 ]; then
+              echo "Error uninstalling catalyst-otel-metrics-collector (exit code: $OTEL_METRICS_EXIT_CODE):"
+              echo "$OTEL_METRICS_OUTPUT"
+              echo "Warning: Will delete namespace to clean up remaining resources"
+            else
+              echo "Successfully uninstalled catalyst-otel-metrics-collector release"
+            fi
+          else
+            echo "catalyst-otel-metrics-collector Helm release not found in {{ .Release.Namespace }}"
+          fi
+
+          # Delete region configmap from agent namespace
+          echo "Deleting region configmap from {{ .Release.Namespace }}..."
+          kubectl delete configmap region-details -n {{ .Release.Namespace }} --ignore-not-found=true || echo "Warning: Failed to delete region-details configmap"
+
+          # Delete Dapr namespace
+          echo "Deleting {{ .Values.cleanup.namespaces.dapr }} namespace..."
+          kubectl delete namespace {{ .Values.cleanup.namespaces.dapr }} --ignore-not-found=true --timeout=120s || echo "Warning: Failed to delete {{ .Values.cleanup.namespaces.dapr }} namespace"
+
+          # Delete project namespaces created by Catalyst
+          echo "Deleting project namespaces with label cra.diagrid.io/project-namespace=true..."
+          PROJECT_NAMESPACES=$(kubectl get namespaces -l cra.diagrid.io/project-namespace=true -o name 2>&1)
+          if [ $? -ne 0 ]; then
+            echo "Error listing project namespaces: $PROJECT_NAMESPACES"
+          elif [ -n "$PROJECT_NAMESPACES" ]; then
+            echo "Found project namespaces to delete:"
+            echo "$PROJECT_NAMESPACES"
+            echo "$PROJECT_NAMESPACES" | xargs -r kubectl delete --timeout=120s || echo "Warning: Some project namespaces could not be deleted"
+          else
+            echo "No project namespaces found"
+          fi
+
+          echo "Catalyst cleanup completed successfully!"
+{{- end }}
