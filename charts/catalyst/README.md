@@ -41,7 +41,7 @@ diagrid login
 export JOIN_TOKEN=$(diagrid region create <region-name> --ingress "https://<ingress-domain>" | jq -r .joinToken)
 ```
 
-> **Note:** The join token can be regenerated before successfully completing the installation, but not after.
+> **NOTE:** The join token can be regenerated before successfully completing the installation, but not after.
 
 ### Installing the Chart
 
@@ -67,7 +67,7 @@ To uninstall Catalyst and clean up all associated resources, run the following c
 helm uninstall catalyst -n cra-agent
 ```
 
-The `region` resource is intended for a single installation, once you uninstall Catalyst, the region is no longer valid.
+> **WARNING:**  The `region` resource is intended for a single installation, once you uninstall Catalyst, the region is no longer valid.
 If you want to uninstall Catalyst but allow re-installation, remove the clean up hook by setting the values:
 
 ```bash
