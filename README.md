@@ -98,6 +98,20 @@ global:
     registry: my-registry.example.com
 ```
 
+## Dapr PKI
+
+Dapr has a control plane component called [Sentry](https://docs.dapr.io/concepts/dapr-services/sentry/) that issues identity credentials (X.509 certificates) to Dapr sidecars and other Dapr control plane services. By default, Sentry generates a self-signed root certificate authority (CA) to sign these certificates that is valid for 1 year. It is strongly recommended that you integrate with your own PKI solution. This can be done by providing an issuer (or intermediate) CA certificate and private key, as well as trust anchors (or root CA certificates) to the Dapr Sentry component. Use the following configuration in your Catalyst Helm Chart `values.yaml` to set up Dapr PKI with Catalyst:
+
+```yaml
+agent:
+  config:
+    internal_dapr:
+      ca:
+        issuer_secret_name: "issuer-secret" # Name of the Kubernetes Secret containing the CA issuer certificate and private key
+        trust_anchors_config_map_name: "trust-anchors" # Name of the Kubernetes ConfigMap containing the CA trust anchors
+        namespace: "catalyst" # Namespace where the CA resources are located
+```
+
 ## Contributing
 
 We welcome contributions to our Helm charts. Please feel free to submit issues or pull requests.
