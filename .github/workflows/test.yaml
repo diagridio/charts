@@ -69,7 +69,7 @@ jobs:
       - name: Lint chart
         run: |
           cd charts/catalyst
-          helm lint .
+          helm lint . --set join_token="test-token"
 
   helm-template:
     name: Helm Template Validation
