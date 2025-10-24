@@ -126,6 +126,17 @@ The Catalyst Agent provisions additional images at runtime, including:
 | **Dapr Control Plane (OSS)** | `us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/daprio/dapr:<tag>` | Dapr control plane services (operator, placement, sentry, scheduler) |
 | **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/dapr:<tag>` | Catalyst Dapr control plane services (operator, placement, sentry, scheduler) |
 
+### Optional Images
+
+When OpenTelemetry Collector addons are enabled, the following images are used:
+
+| Component | Default Image | Description |
+|-----------|--------------|-------------|
+| **OpenTelemetry Collector (Deployment)** | `ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s:<tag>` | OpenTelemetry Collector for traces and metrics (optional) |
+| **OpenTelemetry Collector (DaemonSet)** | `ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s:<tag>` | OpenTelemetry Collector for logs collection (optional) |
+
+These images are only deployed when explicitly enabled via `opentelemetry-deployment.enabled=true` or `opentelemetry-daemonset.enabled=true`.
+
 ### Mirroring Images to a Private Registry
 
 If you're deploying in an air-gapped environment or need to use a private registry, you can use the provided mirror script to copy all images.
@@ -140,8 +151,11 @@ The script is located at `scripts/catalyst/mirror-images.sh` and handles pulling
   --dapr-version 1.16.1 \
   --internal-dapr-version 1.16.2-rc.1-catalyst.2 \
   --envoy-version distroless-v1.33.0 \
-  --piko-version v0.8.1
+  --piko-version v0.8.1 \
+  --otel-version 0.112.0
 ```
+
+**Note:** The `--otel-version` parameter is optional and only needed if you plan to enable the OpenTelemetry Collector addons.
 
 After mirroring, configure your values file with the global registry override pointing to your private registry:
 
@@ -149,6 +163,22 @@ After mirroring, configure your values file with the global registry override po
 global:
   image:
     registry: my-registry.example.com
+```
+
+If you're using the OpenTelemetry Collector addons, you'll also need to configure the image repository explicitly:
+
+```yaml
+opentelemetry-deployment:
+  enabled: true
+  image:
+    repository: my-registry.example.com/opentelemetry-collector-k8s
+    tag: "0.112.0"
+
+opentelemetry-daemonset:
+  enabled: true
+  image:
+    repository: my-registry.example.com/opentelemetry-collector-k8s
+    tag: "0.112.0"
 ```
 
 ## Dapr PKI

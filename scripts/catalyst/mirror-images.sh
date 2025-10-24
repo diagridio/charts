@@ -19,12 +19,14 @@
 #   --internal-dapr-version VERSION  Internal Dapr version (default: 1.16.2-rc.1-catalyst.2)
 #   --envoy-version VERSION       Envoy version (default: distroless-v1.33.0)
 #   --piko-version VERSION        Piko version (default: v0.8.1)
+#   --otel-version VERSION        OpenTelemetry Collector version (default: 0.112.0)
 #   --dry-run                     Print what would be done without executing
 #   --skip-pull                   Skip pulling images, only tag and push
 #
 # Examples:
 #   ./mirror-images.sh my-registry.example.com
 #   ./mirror-images.sh my-registry.example.com --catalyst-version 0.470.0
+#   ./mirror-images.sh my-registry.example.com --otel-version 0.112.0
 #   ./mirror-images.sh my-registry.example.com --dry-run
 #   ./mirror-images.sh my-registry.example.com --skip-pull
 #
@@ -50,6 +52,7 @@ DAPR_VERSION="1.16.1"
 INTERNAL_DAPR_VERSION="1.16.2-rc.1-catalyst.2"
 ENVOY_VERSION="distroless-v1.33.0"
 PIKO_VERSION="v0.8.1"
+OTEL_VERSION="0.112.0"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -72,6 +75,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --piko-version)
       PIKO_VERSION="$2"
+      shift 2
+      ;;
+    --otel-version)
+      OTEL_VERSION="$2"
       shift 2
       ;;
     --dry-run)
@@ -126,6 +133,7 @@ echo -e "${BLUE}Target registry: ${TARGET_REGISTRY}${NC}"
 echo -e "${BLUE}Catalyst version: ${CATALYST_VERSION}${NC}"
 echo -e "${BLUE}Dapr version: ${DAPR_VERSION}${NC}"
 echo -e "${BLUE}Internal Dapr version: ${INTERNAL_DAPR_VERSION}${NC}"
+echo -e "${BLUE}OpenTelemetry Collector version: ${OTEL_VERSION}${NC}"
 
 # Define all images from the Catalyst Helm chart
 # Format: "SOURCE_IMAGE"
@@ -142,6 +150,9 @@ declare -a IMAGES=(
   # External Component Images
   "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/envoyproxy/envoy:${ENVOY_VERSION}"
   "ghcr.io/andydunstall/piko:${PIKO_VERSION}"
+  
+  # OpenTelemetry Collector Images (Optional)
+  "ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s:${OTEL_VERSION}"
   
   # Agent Nested Images
   "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/sidecar:${CATALYST_VERSION}"
