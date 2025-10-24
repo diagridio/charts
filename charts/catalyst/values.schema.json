@@ -1,0 +1,882 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Catalyst Helm Chart Values",
+  "description": "Schema for validating Diagrid Catalyst Helm chart values",
+  "type": "object",
+  "required": ["join_token"],
+  "properties": {
+    "join_token": {
+      "type": "string",
+      "description": "A join token obtained by creating a Region in Diagrid Cloud. Required for enrollment.",
+      "minLength": 1
+    },
+    "global": {
+      "type": "object",
+      "description": "Global configuration options applied across all components",
+      "properties": {
+        "nameOverride": {
+          "type": "string",
+          "description": "Override the name of the chart"
+        },
+        "fullnameOverride": {
+          "type": "string",
+          "description": "Override the full name of the chart+release"
+        },
+        "image": {
+          "type": "object",
+          "properties": {
+            "registry": {
+              "type": "string",
+              "description": "Global default image registry for all container images. Overrides component-specific registries."
+            },
+            "pullPolicy": {
+              "type": "string",
+              "enum": ["Always", "IfNotPresent", "Never"],
+              "default": "Always",
+              "description": "Global default image pull policy"
+            },
+            "imagePullSecrets": {
+              "type": "array",
+              "description": "List of secret names for pulling images from private registries",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": ["name"]
+              },
+              "default": []
+            }
+          }
+        },
+        "labels": {
+          "type": "object",
+          "description": "Global labels applied to all resources",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {}
+        },
+        "serviceAccount": {
+          "type": "object",
+          "properties": {
+            "annotations": {
+              "type": "object",
+              "description": "Annotations to add to agent and management service accounts",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "default": {}
+            }
+          }
+        },
+        "secrets": {
+          "type": "object",
+          "description": "Secrets provider configuration",
+          "properties": {
+            "provider": {
+              "type": "string",
+              "enum": ["kubernetes", "aws", "redis"],
+              "default": "kubernetes",
+              "description": "Secret provider type"
+            },
+            "aws": {
+              "type": "object",
+              "properties": {
+                "region": {
+                  "type": "string",
+                  "description": "AWS region for accessing Secrets Manager"
+                },
+                "access_key": {
+                  "type": "string",
+                  "description": "Optional AWS access key"
+                },
+                "secret_access_key": {
+                  "type": "string",
+                  "description": "Optional AWS secret access key"
+                }
+              }
+            },
+            "redis": {
+              "type": "object",
+              "properties": {
+                "host": {
+                  "type": "string",
+                  "description": "Redis host for secrets storage"
+                },
+                "username": {
+                  "type": "string",
+                  "description": "Redis username"
+                },
+                "password": {
+                  "type": "string",
+                  "description": "Redis password"
+                }
+              }
+            }
+          }
+        },
+        "control_plane_url": {
+          "type": "string",
+          "default": "cra-cloudgrid.prd.p.diagrid.io:443",
+          "description": "Global control plane URL"
+        },
+        "control_plane_http_url": {
+          "type": "string",
+          "default": "https://api.diagrid.io",
+          "description": "Global control plane HTTP URL"
+        },
+        "control_plane_http_insecure": {
+          "type": "boolean",
+          "description": "Allow insecure HTTP connections to control plane"
+        },
+        "sentry": {
+          "type": "object",
+          "description": "Dapr Sentry configuration for mTLS",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true
+            },
+            "endpoint": {
+              "type": "string",
+              "default": "dapr-sentry.root-dapr-system.svc.cluster.local:443"
+            },
+            "remote_endpoint": {
+              "type": "string",
+              "default": "sentry.prd.p.diagrid.io:443"
+            },
+            "diagrid_trust_anchors_endpoint": {
+              "type": "string",
+              "default": "https://pem.trust.diagrid.io"
+            },
+            "diagrid_trust_anchors_endpoint_insecure": {
+              "type": "boolean",
+              "default": false
+            },
+            "trust_domain": {
+              "type": "string",
+              "default": "prj-root.trust.diagrid.io"
+            },
+            "namespace": {
+              "type": "string",
+              "default": "root-dapr-system"
+            },
+            "trust_anchors_file": {
+              "type": "string",
+              "default": "/var/run/secrets/diagrid.io/trust/ca.crt"
+            }
+          }
+        },
+        "nats": {
+          "type": "object",
+          "description": "NATS configuration",
+          "properties": {
+            "endpoint": {
+              "type": "string",
+              "default": "tls://client.events.prd.p.diagrid.io:443"
+            },
+            "trust_domain": {
+              "type": "string",
+              "default": "trust.diagrid.io"
+            }
+          }
+        },
+        "featureflags": {
+          "type": "object",
+          "properties": {
+            "nats_enabled": {
+              "type": "boolean",
+              "default": true
+            },
+            "agent_component_validation": {
+              "type": "boolean",
+              "default": false
+            }
+          }
+        },
+        "consolidated_image": {
+          "type": "object",
+          "description": "Use a single consolidated image for all Catalyst components",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": true,
+              "description": "Enable consolidated image mode"
+            },
+            "registry": {
+              "type": "string",
+              "default": "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public"
+            },
+            "repository": {
+              "type": "string",
+              "default": "catalyst-all"
+            },
+            "tag": {
+              "type": "string",
+              "default": "0.504.0"
+            },
+            "pullPolicy": {
+              "type": "string",
+              "enum": ["Always", "IfNotPresent", "Never", ""],
+              "description": "Image pull policy for consolidated image"
+            }
+          }
+        }
+      }
+    },
+    "shared": {
+      "type": "object",
+      "description": "Shared configurations (not yet implemented)",
+      "properties": {
+        "nodeSelector": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {}
+        },
+        "tolerations": {
+          "type": "array",
+          "default": []
+        },
+        "affinity": {
+          "type": "object",
+          "default": {}
+        }
+      }
+    },
+    "agent": {
+      "type": "object",
+      "description": "Agent component configuration",
+      "properties": {
+        "logLevel": {
+          "type": "string",
+          "enum": ["debug", "info", "warn", "error"],
+          "default": "info"
+        },
+        "config": {
+          "type": "object",
+          "description": "Agent configuration written to ConfigMap"
+        },
+        "metrics": {
+          "type": "object",
+          "properties": {
+            "port": {
+              "type": "integer",
+              "default": 9090
+            }
+          }
+        },
+        "replicaCount": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        },
+        "image": {
+          "$ref": "#/definitions/imageSpec"
+        },
+        "nameOverride": {
+          "type": "string"
+        },
+        "fullnameOverride": {
+          "type": "string"
+        },
+        "service": {
+          "$ref": "#/definitions/serviceSpec"
+        },
+        "serviceAccount": {
+          "$ref": "#/definitions/serviceAccountSpec"
+        },
+        "podAnnotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "podSecurityContext": {
+          "type": "object"
+        },
+        "securityContext": {
+          "type": "object"
+        },
+        "resources": {
+          "$ref": "#/definitions/resourceRequirements"
+        },
+        "nodeSelector": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {}
+        },
+        "tolerations": {
+          "type": "array",
+          "default": []
+        },
+        "affinity": {
+          "type": "object",
+          "default": {}
+        },
+        "goSoftLimit": {
+          "type": "object",
+          "properties": {
+            "percent": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100,
+              "default": 90
+            },
+            "override": {
+              "type": "string",
+              "pattern": "^[0-9]+(B|KiB|MiB|GiB|TiB)?$"
+            }
+          }
+        },
+        "extraEnvs": {
+          "type": "array",
+          "default": []
+        },
+        "merge": {
+          "type": "object",
+          "default": {}
+        },
+        "patch": {
+          "type": "object",
+          "default": {}
+        }
+      }
+    },
+    "gateway": {
+      "type": "object",
+      "description": "Gateway component configuration",
+      "properties": {
+        "tls": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false
+            },
+            "existingSecret": {
+              "type": "string",
+              "description": "Name of existing TLS secret"
+            },
+            "certificates": {
+              "type": "object",
+              "properties": {
+                "certFile": {
+                  "type": "string",
+                  "default": "tls.crt"
+                },
+                "keyFile": {
+                  "type": "string",
+                  "default": "tls.key"
+                },
+                "caFile": {
+                  "type": "string"
+                }
+              }
+            },
+            "cert": {
+              "type": "string",
+              "description": "Inline TLS certificate"
+            },
+            "key": {
+              "type": "string",
+              "description": "Inline TLS key"
+            }
+          }
+        },
+        "ha": {
+          "type": "object",
+          "description": "High availability configuration",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false
+            },
+            "minReplicas": {
+              "type": "integer",
+              "minimum": 2,
+              "default": 2
+            }
+          }
+        },
+        "identityInjector": {
+          "type": "object",
+          "properties": {
+            "image": {
+              "$ref": "#/definitions/imageSpec"
+            },
+            "resources": {
+              "$ref": "#/definitions/resourceRequirements"
+            }
+          }
+        },
+        "envoy": {
+          "type": "object",
+          "properties": {
+            "replicaCount": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "image": {
+              "$ref": "#/definitions/imageSpec"
+            },
+            "admin": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": true
+                },
+                "address": {
+                  "type": "string",
+                  "default": "127.0.0.1"
+                },
+                "port": {
+                  "type": "integer",
+                  "default": 9090
+                }
+              }
+            },
+            "serviceAccount": {
+              "$ref": "#/definitions/serviceAccountSpec"
+            },
+            "service": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": ["ClusterIP", "NodePort", "LoadBalancer"],
+                  "default": "ClusterIP"
+                },
+                "port": {
+                  "type": "integer"
+                },
+                "targetPort": {
+                  "type": "integer"
+                },
+                "httpsPort": {
+                  "type": "integer"
+                },
+                "httpsTargetPort": {
+                  "type": "integer"
+                }
+              }
+            },
+            "resources": {
+              "$ref": "#/definitions/resourceRequirements"
+            },
+            "nodeSelector": {
+              "type": "object",
+              "default": {}
+            },
+            "affinity": {
+              "type": "object",
+              "default": {}
+            },
+            "tolerations": {
+              "type": "array",
+              "default": []
+            }
+          }
+        },
+        "controlplane": {
+          "type": "object",
+          "properties": {
+            "replicaCount": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            },
+            "xds": {
+              "type": "object",
+              "properties": {
+                "mtls": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean",
+                      "default": true
+                    }
+                  }
+                }
+              }
+            },
+            "image": {
+              "$ref": "#/definitions/imageSpec"
+            },
+            "serviceAccount": {
+              "$ref": "#/definitions/serviceAccountSpec"
+            },
+            "resources": {
+              "$ref": "#/definitions/resourceRequirements"
+            },
+            "config": {
+              "type": "object",
+              "default": {}
+            }
+          }
+        }
+      }
+    },
+    "management": {
+      "type": "object",
+      "description": "Management service configuration",
+      "properties": {
+        "logLevel": {
+          "type": "string",
+          "enum": ["debug", "info", "warn", "error"],
+          "default": "info"
+        },
+        "config": {
+          "type": "object",
+          "description": "Management configuration written to ConfigMap"
+        },
+        "replicaCount": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 2
+        },
+        "image": {
+          "$ref": "#/definitions/imageSpec"
+        },
+        "nameOverride": {
+          "type": "string"
+        },
+        "fullnameOverride": {
+          "type": "string"
+        },
+        "service": {
+          "$ref": "#/definitions/serviceSpec"
+        },
+        "serviceAccount": {
+          "$ref": "#/definitions/serviceAccountSpec"
+        },
+        "podAnnotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "podSecurityContext": {
+          "type": "object"
+        },
+        "securityContext": {
+          "type": "object"
+        },
+        "resources": {
+          "$ref": "#/definitions/resourceRequirements"
+        },
+        "nodeSelector": {
+          "type": "object",
+          "default": {}
+        },
+        "tolerations": {
+          "type": "array",
+          "default": []
+        },
+        "affinity": {
+          "type": "object",
+          "default": {}
+        },
+        "goSoftLimit": {
+          "type": "object",
+          "properties": {
+            "percent": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100,
+              "default": 90
+            },
+            "override": {
+              "type": "string"
+            }
+          }
+        },
+        "extraEnvs": {
+          "type": "array",
+          "default": []
+        },
+        "merge": {
+          "type": "object",
+          "default": {}
+        },
+        "patch": {
+          "type": "object",
+          "default": {}
+        }
+      }
+    },
+    "piko": {
+      "type": "object",
+      "description": "Piko reverse tunnel configuration",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "replicaCount": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        },
+        "pikoName": {
+          "type": "string",
+          "default": "piko"
+        },
+        "releaseName": {
+          "type": "string",
+          "default": "diagrid-piko"
+        },
+        "publicToken": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "default": "https://tunnels.trust.diagrid.io/.well-known/jwks.json"
+            },
+            "cacheTTL": {
+              "type": "string",
+              "default": "5m"
+            }
+          }
+        },
+        "image": {
+          "$ref": "#/definitions/imageSpec"
+        },
+        "serviceAccount": {
+          "$ref": "#/definitions/serviceAccountSpec"
+        },
+        "server": {
+          "type": "object",
+          "properties": {
+            "proxyPort": {
+              "type": "integer",
+              "default": 8000
+            },
+            "upstreamPort": {
+              "type": "integer",
+              "default": 8001
+            },
+            "adminPort": {
+              "type": "integer",
+              "default": 8002
+            },
+            "gossipPort": {
+              "type": "integer",
+              "default": 8003
+            }
+          }
+        },
+        "affinity": {
+          "type": "object",
+          "default": {}
+        }
+      }
+    },
+    "opentelemetry-deployment": {
+      "type": "object",
+      "description": "OpenTelemetry Collector deployment for traces and metrics",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["deployment", "daemonset", "statefulset"],
+          "default": "deployment"
+        },
+        "replicaCount": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1
+        },
+        "image": {
+          "type": "object",
+          "properties": {
+            "repository": {
+              "type": "string"
+            },
+            "pullPolicy": {
+              "type": "string",
+              "enum": ["Always", "IfNotPresent", "Never"]
+            },
+            "tag": {
+              "type": "string"
+            }
+          }
+        },
+        "resources": {
+          "$ref": "#/definitions/resourceRequirements"
+        },
+        "config": {
+          "type": "object",
+          "description": "OpenTelemetry Collector configuration"
+        }
+      }
+    },
+    "opentelemetry-daemonset": {
+      "type": "object",
+      "description": "OpenTelemetry Collector daemonset for logs",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["deployment", "daemonset", "statefulset"],
+          "default": "daemonset"
+        },
+        "image": {
+          "type": "object",
+          "properties": {
+            "repository": {
+              "type": "string"
+            },
+            "pullPolicy": {
+              "type": "string",
+              "enum": ["Always", "IfNotPresent", "Never"]
+            },
+            "tag": {
+              "type": "string"
+            }
+          }
+        },
+        "resources": {
+          "$ref": "#/definitions/resourceRequirements"
+        },
+        "config": {
+          "type": "object",
+          "description": "OpenTelemetry Collector configuration"
+        }
+      }
+    },
+    "cleanup": {
+      "type": "object",
+      "description": "Post-delete cleanup hook configuration",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable cleanup hook after helm uninstall"
+        },
+        "ttlSecondsAfterFinished": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 300,
+          "description": "TTL for cleanup job after completion"
+        },
+        "namespaces": {
+          "type": "object",
+          "properties": {
+            "dapr": {
+              "type": "string",
+              "default": "root-dapr-system",
+              "description": "Namespace where internal Dapr components are installed"
+            }
+          }
+        },
+        "image": {
+          "$ref": "#/definitions/imageSpec"
+        }
+      }
+    }
+  },
+  "definitions": {
+    "imageSpec": {
+      "type": "object",
+      "properties": {
+        "registry": {
+          "type": "string",
+          "description": "Container registry for the image"
+        },
+        "repository": {
+          "type": "string",
+          "description": "Image repository path without registry or tag"
+        },
+        "tag": {
+          "type": "string",
+          "description": "Image tag/version"
+        },
+        "pullPolicy": {
+          "type": "string",
+          "enum": ["Always", "IfNotPresent", "Never", ""],
+          "description": "Image pull policy"
+        }
+      }
+    },
+    "serviceSpec": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["ClusterIP", "NodePort", "LoadBalancer", "ExternalName"],
+          "default": "ClusterIP"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        }
+      }
+    },
+    "serviceAccountSpec": {
+      "type": "object",
+      "properties": {
+        "annotations": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {}
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of service account to use. If empty, one will be generated."
+        }
+      }
+    },
+    "resourceRequirements": {
+      "type": "object",
+      "properties": {
+        "limits": {
+          "type": "object",
+          "properties": {
+            "cpu": {
+              "type": ["string", "number"],
+              "description": "CPU limit (e.g., '1000m', '1')"
+            },
+            "memory": {
+              "type": "string",
+              "description": "Memory limit (e.g., '1Gi', '512Mi')"
+            }
+          }
+        },
+        "requests": {
+          "type": "object",
+          "properties": {
+            "cpu": {
+              "type": ["string", "number"],
+              "description": "CPU request (e.g., '100m', '0.1')"
+            },
+            "memory": {
+              "type": "string",
+              "description": "Memory request (e.g., '128Mi', '1Gi')"
+            }
+          }
+        }
+      }
+    }
+  }
+}
