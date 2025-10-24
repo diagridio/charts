@@ -242,6 +242,19 @@ Catalyst includes optional OpenTelemetry Collector addons that provide a flexibl
 
 For more information on how to configure the OpenTelemetry Collector, visit the [official documentation](https://opentelemetry.io/docs/collector/configuration/).
 
+## Networking
+
+In order for your Catalyst Private installation to function correctly, it needs to connect to some Diagrid Cloud endpoints. Please ensure that your network allows outbound connectivity to the following domains:
+- `api.diagrid.io` for management APIs
+- `cra-cloudgrid.prd.p.diagrid.io` for resource management
+- `sentry.prd.p.diagrid.io` for region enrollment
+- `pem.trust.diagrid.io` for diagrid trust anchors
+- `client.events.prd.p.diagrid.io` for events
+- `cra-metrics.prd.p.diagrid.io` for metrics
+- `cra-logs.prd.p.diagrid.io` for logs
+
+We use mutual TLS (mTLS) for secure communication between your Catalyst Private installation and Diagrid Cloud. Therefore, it is important to ensure your proxy or firewall does not inspect/intercept the TLS traffic.
+
 ## Development
 
 If you're developing or testing this chart locally from source:
