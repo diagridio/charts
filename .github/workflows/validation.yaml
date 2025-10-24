@@ -68,7 +68,7 @@ jobs:
           helm dependency build
 
       - name: Helm Lint
-        run: make helm-lint --set join_token="test-token"
+        run: make helm-lint
 
       - name: Helm Template
         run: |-
