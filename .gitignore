@@ -1,6 +1,5 @@
-Chart.lock
-charts/catalyst/charts
-charts/catalyst/dist
+charts/catalyst/charts/
+charts/catalyst/dist/
 .idea/
 charts/catalyst/rendered.yaml
 catalyst-values.yaml

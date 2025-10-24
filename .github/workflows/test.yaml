@@ -25,6 +25,16 @@ jobs:
         with:
           version: 'latest'
 
+      - name: Add Helm Repositories
+        run: |
+          helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+          helm repo update
+
+      - name: Build Helm Dependencies
+        run: |
+          cd charts/catalyst
+          helm dependency build
+
       - name: Install helm-unittest plugin
         run: |
           helm plugin install https://github.com/helm-unittest/helm-unittest
@@ -45,6 +55,16 @@ jobs:
         uses: azure/setup-helm@v4
         with:
           version: 'latest'
+
+      - name: Add Helm Repositories
+        run: |
+          helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+          helm repo update
+
+      - name: Build Helm Dependencies
+        run: |
+          cd charts/catalyst
+          helm dependency build
 
       - name: Lint chart
         run: |
@@ -73,6 +93,16 @@ jobs:
         uses: azure/setup-helm@v4
         with:
           version: 'latest'
+
+      - name: Add Helm Repositories
+        run: |
+          helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+          helm repo update
+
+      - name: Build Helm Dependencies
+        run: |
+          cd charts/catalyst
+          helm dependency build
 
       - name: Template chart - ${{ matrix.scenario.name }}
         run: |

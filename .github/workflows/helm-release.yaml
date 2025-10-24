@@ -45,6 +45,11 @@ jobs:
         with:
           registry-type: public
 
+      - name: Add Helm Repositories
+        run: |
+          helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+          helm repo update
+
       - name: Update tags to edge
         if: ${{ startsWith(github.ref, 'refs/heads/main') }}
         run: |

@@ -23,8 +23,16 @@ For step-by-step guides on deploying Catalyst to various Kubernetes environments
 ## Prerequisites
 
 - Kubernetes 1.20+
-- [Helm](https://helm.sh/)
+- [Helm](https://helm.sh/) v3.12.0+
 - [Diagrid CLI](https://docs.diagrid.io/catalyst/references/cli-reference/intro)
+
+## Chart Dependencies
+
+This chart includes the following dependencies:
+
+- **OpenTelemetry Collector** - Optional telemetry collection and export
+
+For local development or when working from source, see the [Development](#development) section below.
 
 ## Install
 
@@ -187,6 +195,60 @@ gateway:
       -----END PRIVATE KEY-----
 ```
 
+## OpenTelemetry Collector (Optional)
+
+Catalyst includes optional OpenTelemetry Collector addons that provide a flexible, vendor-neutral way to collect and export telemetry data (logs, metrics, and traces) from your Kubernetes cluster.
+
+### Why Use the OpenTelemetry Collector?
+
+- **Vendor Neutrality**: Send telemetry to any backend that supports OTLP or other standard protocols
+- **Flexibility**: Configure different exporters for traces, metrics, and logs independently
+- **Efficiency**: Process and filter telemetry before export to reduce costs and noise
+- **Standardization**: Use industry-standard OpenTelemetry instrumentation across all applications
+
+For more information on how to configure the OpenTelemetry Collector, visit the [official documentation](https://opentelemetry.io/docs/collector/configuration/).
+
+## Development
+
+If you're developing or testing this chart locally from source:
+
+### Build Dependencies
+
+Before testing or deploying the chart from source, build the chart dependencies:
+
+```bash
+# Add required Helm repositories
+helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+helm repo update
+
+# Build dependencies
+helm dependency build
+```
+
+Alternatively, use the Makefile from the repository root:
+
+```bash
+make helm-prereqs
+```
+
+### Testing
+
+```bash
+# From repository root
+make helm-test          # Run unit tests
+make helm-lint          # Run linting
+make helm-template      # Render templates
+make helm-validate      # Run all validation
+```
+
+### Dependency Management
+
+The `Chart.lock` file tracks exact dependency versions for reproducible builds. When modifying dependencies:
+
+1. Update `Chart.yaml` with changes
+2. Run `helm dependency update` to regenerate `Chart.lock`
+3. Commit both files to version control
+
 ## Documentation
 
 For more information about Diagrid Catalyst, including detailed usage instructions and examples, please visit:
@@ -195,3 +257,6 @@ For more information about Diagrid Catalyst, including detailed usage instructio
 - [Catalyst Support](https://docs.diagrid.io/catalyst/support)
 - [Diagrid Website](https://www.diagrid.io/)
 - [Diagrid Support](https://diagrid.io/support)
+- [OpenTelemetry Collector Documentation](https://opentelemetry.io/docs/collector/)
+- [OpenTelemetry Collector Helm Chart](https://github.com/open-telemetry/opentelemetry-helm-charts/tree/main/charts/opentelemetry-collector)
+- [Collector Configuration Reference](https://opentelemetry.io/docs/collector/configuration/)

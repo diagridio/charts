@@ -48,6 +48,8 @@ helm-test-verbose: ## Run helm unit tests with verbose output
 .PHONY: helm-add-repos
 helm-add-repos: ## Add helm repos
 	helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/ > /dev/null 2>&1 || true
+	helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts > /dev/null 2>&1 || true
+	helm repo update > /dev/null 2>&1 || true
 
 .PHONY: helm-dependency-build
 helm-dependency-build: ## Build helm dependencies
