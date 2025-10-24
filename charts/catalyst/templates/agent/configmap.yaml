@@ -6,6 +6,7 @@
 {{- $_ := set $agentConfig "control_plane_http_insecure" .Values.global.control_plane_http_insecure -}}
 {{- $_ := set $agentConfig "sentry" .Values.global.sentry -}}
 {{- $_ := set $agentConfig "nats" .Values.global.nats -}}
+{{- $_ := set $agentConfig "secrets" .Values.global.secrets -}}
 {{- $_ := set $agentConfig.featureflags "nats_enabled" .Values.global.featureflags.nats_enabled -}}
 {{- $_ := set $agentConfig.featureflags "agent_component_validation" .Values.global.featureflags.agent_component_validation -}}
 {{- /* Apply global registry override to nested image configurations */ -}}

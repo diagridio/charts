@@ -89,6 +89,14 @@ cleanup:
 
 ## Configuration
 
+## Kubernetes
+
+A Catalyst installation is not intended to be installed into a shared Kubernetes cluster with other workloads. This is because it handles some global resources and dynamically provisions new workloads on demand. This may lead to conflicts with other workloads and cause resource contention. It is recommended to install Catalyst into its own dedicated Kubernetes that has been sized appropriately for your expected workload.
+
+### RBAC
+
+The Catalyst components currently have wide-ranging permissions within the Kubernetes cluster they are installed into. This is because Catalyst needs to be able to dynamically create and manage resources on behalf of your applications. We wil be working to reduce the scope of these permissions in future releases.
+
 ### Images
 
 The Catalyst Helm chart deploys multiple container images across its components. This section documents all images used by the chart to help users understand what will be installed and what images may need to be mirrored to private registries.
@@ -241,6 +249,24 @@ Catalyst includes optional OpenTelemetry Collector addons that provide a flexibl
 - **Standardization**: Use industry-standard OpenTelemetry instrumentation across all applications
 
 For more information on how to configure the OpenTelemetry Collector, visit the [official documentation](https://opentelemetry.io/docs/collector/configuration/).
+
+## Secrets
+
+Catalyst currently supports 2 secrets providers:
+- **Kubernetes Secrets** (default)
+- **AWS Secrets Manager**
+
+To use AWS Secrets Manager, set the following configuration in your `values.yaml` file:
+
+```yaml
+global:
+  secrets:
+    provider: "aws_secretmanager"
+    aws:
+      region: "us-east-1"  # AWS region where your secrets are stored
+      access_key: ""
+      secret_access_key: ""
+```
 
 ## Networking
 

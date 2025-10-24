@@ -5,6 +5,7 @@ description: Helm chart for Diagrid Catalyst
 type: application
 version: '0.27.0'
 appVersion: '0.0.1'
+home: https://catalyst.diagrid.io
 
 dependencies:
   # OpenTelemetry Collector - Deployment mode for traces and metrics
