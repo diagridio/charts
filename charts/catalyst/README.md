@@ -6,6 +6,8 @@ Diagrid Catalyst is a collection of API-based programming patterns for messaging
 
 Diagrid Catalyst Private allows you to self-host a Catalyst region within your own environment whilst continuing to use it as a service via Diagrid Cloud. This works by separating the control plane (hosted by Diagrid Cloud) from the data plane (hosted within your Kubernetes cluster). The control plane only manages your configuration, whilst the data plane within your environment handles all application connectivity and data. Some specific telemetry data (metrics, api logs) is sent to Diagrid Cloud to enhance your experience in the web console.
 
+You will interact with your Catalyst Private installation via the Diagrid Cloud web console (https://catalyst.diagrid.io) and CLI, just like if you were using the fully managed service. The Diagrid Cloud web console uses a hybrid approach where it fetches app data directly from your Catalyst Private installation and not from our public services. Therefore, you must ensure that the machine you are using to access the web console can reach the ingress address of your Catalyst Private installation.
+
 ![Catalyst](../../assets/img/catalyst.svg)
 
 ## Components
