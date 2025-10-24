@@ -579,6 +579,302 @@ piko:
   affinity: {}
   httpproxy:
     upstreamHostName: "tunnels.api.diagrid.io"
+# OpenTelemetry Deployment Collector (Optional) - For Traces and Metrics
+#------------------------------------------------------------------------------
+# This collector runs as a deployment to handle service-level telemetry
+# that is not tied to individual nodes. This avoids the collector doing
+# duplicate scraping when used with Prometheus.
+opentelemetry-deployment:
+  # Set to true to enable traces and metrics collection
+  enabled: false
+  
+  mode: deployment
+  # Scale horizontally for high availability
+  replicaCount: 1
+
+  image:
+    repository: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s
+    pullPolicy: IfNotPresent
+
+  command:
+    name: otelcol-k8s
+
+  resources:
+    limits:
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+  # OpenTelemetry Collector configuration
+  # Customize receivers, processors, exporters, and pipelines as needed
+  config:
+    receivers:
+      # OTLP receiver listens for telemetry from applications
+      otlp:
+        protocols:
+          grpc:
+            endpoint: ${env:MY_POD_IP}:4317
+          http:
+            endpoint: ${env:MY_POD_IP}:4318
+
+      # Zipkin receiver for compatibility with Zipkin instrumentation
+      zipkin:
+        endpoint: ${env:MY_POD_IP}:9411
+
+      # Prometheus receiver scrapes metrics from Kubernetes service endpoints
+      prometheus:
+        config:
+          scrape_configs:
+            # Scrape pods with prometheus.io annotations
+            - job_name: 'kubernetes-pods'
+              kubernetes_sd_configs:
+                - role: pod
+              relabel_configs:
+                # Only scrape pods with prometheus.io/scrape=true annotation
+                - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+                  action: keep
+                  regex: true
+                # Use the prometheus.io/path annotation or default to /metrics
+                - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+                  action: replace
+                  target_label: __metrics_path__
+                  regex: (.+)
+                # Use the prometheus.io/port annotation or default to the pod port
+                - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+                  action: replace
+                  regex: ([^:]+)(?::\d+)?;(\d+)
+                  replacement: $1:$2
+                  target_label: __address__
+                # Add pod metadata as labels
+                - action: labelmap
+                  regex: __meta_kubernetes_pod_label_(.+)
+                - source_labels: [__meta_kubernetes_namespace]
+                  action: replace
+                  target_label: kubernetes_namespace
+                - source_labels: [__meta_kubernetes_pod_name]
+                  action: replace
+                  target_label: kubernetes_pod_name
+            
+            # Scrape services with prometheus.io annotations
+            - job_name: 'kubernetes-services'
+              kubernetes_sd_configs:
+                - role: service
+              relabel_configs:
+                # Only scrape services with prometheus.io/scrape=true annotation
+                - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scrape]
+                  action: keep
+                  regex: true
+                # Use the prometheus.io/path annotation or default to /metrics
+                - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_path]
+                  action: replace
+                  target_label: __metrics_path__
+                  regex: (.+)
+                # Use the prometheus.io/port annotation or default to the service port
+                - source_labels: [__address__, __meta_kubernetes_service_annotation_prometheus_io_port]
+                  action: replace
+                  regex: ([^:]+)(?::\d+)?;(\d+)
+                  replacement: $1:$2
+                  target_label: __address__
+                # Add service metadata as labels
+                - action: labelmap
+                  regex: __meta_kubernetes_service_label_(.+)
+                - source_labels: [__meta_kubernetes_namespace]
+                  action: replace
+                  target_label: kubernetes_namespace
+                - source_labels: [__meta_kubernetes_service_name]
+                  action: replace
+                  target_label: kubernetes_service_name
+
+    processors:
+      batch:
+        timeout: 10s
+        send_batch_size: 1024
+
+      memory_limiter:
+        check_interval: 1s
+        limit_mib: 400
+
+    exporters:
+      # Default: Debug exporter for development (writes to stdout)
+      # REPLACE THIS with your production backend
+      debug:
+        verbosity: detailed
+
+      # Example: Send to an OTLP-compatible backend
+      # otlphttp:
+      #   endpoint: "https://your-backend.example.com"
+      #   headers:
+      #     api-key: "${env:OTEL_EXPORTER_API_KEY}"
+
+      # Example: Send metrics to Prometheus Remote Write
+      # prometheusremotewrite:
+      #   endpoint: "https://prometheus.example.com/api/v1/write"
+      #   headers:
+      #     Authorization: "Bearer ${env:PROMETHEUS_API_KEY}"
+
+    service:
+      pipelines:
+        # Traces pipeline
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, batch]
+          exporters: [debug]  # REPLACE: Change to your traces backend
+        
+        # Metrics pipeline
+        metrics:
+          receivers: [otlp, prometheus]
+          processors: [memory_limiter, batch]
+          exporters: [debug]  # REPLACE: Change to your metrics backend
+
+  service:
+    type: ClusterIP
+
+  ports:
+    otlp:
+      enabled: true
+      containerPort: 4317
+      servicePort: 4317
+      protocol: TCP
+    otlp-http:
+      enabled: true
+      containerPort: 4318
+      servicePort: 4318
+      protocol: TCP
+    metrics:
+      enabled: true
+      containerPort: 8888
+      servicePort: 8888
+      protocol: TCP
+    health-check:
+      enabled: true
+      containerPort: 13133
+      servicePort: 13133
+      protocol: TCP
+    zipkin:
+      enabled: true
+      containerPort: 9411
+      servicePort: 9411
+      protocol: TCP
+
+  presets:
+    kubernetesAttributes:
+      enabled: true
+
+  podAnnotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8888"
+
+  serviceAccount:
+    create: true
+#------------------------------------------------------------------------------
+# OpenTelemetry DaemonSet Collector (Optional) - For Logs
+#------------------------------------------------------------------------------
+# This collector runs as a DaemonSet to collect logs from each node's filesystem.
+# This ensures comprehensive log collection across the cluster.
+opentelemetry-daemonset:
+  # Set to true to enable logs collection from all nodes
+  enabled: false
+
+  mode: daemonset
+
+  image:
+    repository: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s
+    pullPolicy: IfNotPresent
+
+  command:
+    name: otelcol-k8s
+
+  # Resources per node (each node runs one collector pod)
+  resources:
+    limits:
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+  # OpenTelemetry Collector configuration for logs
+  # Customize receivers, processors, exporters, and pipelines as needed
+  config:
+    receivers:
+      # OTLP receiver (optional, for application-sent logs)
+      otlp:
+        protocols:
+          grpc:
+            endpoint: ${env:MY_POD_IP}:4317
+          http:
+            endpoint: ${env:MY_POD_IP}:4318
+
+    processors:
+      batch:
+        timeout: 10s
+        send_batch_size: 1024
+
+      memory_limiter:
+        check_interval: 1s
+        limit_mib: 400
+
+    exporters:
+      # Default: Debug exporter for development (writes to stdout)
+      # REPLACE THIS with your production logs backend
+      debug:
+        verbosity: detailed
+
+      # Example: Send logs to Loki
+      # loki:
+      #   endpoint: "https://loki.example.com/loki/api/v1/push"
+      #   headers:
+      #     X-Scope-OrgID: "tenant-id"
+
+      # Example: Send to an OTLP-compatible backend
+      # otlphttp:
+      #   endpoint: "https://your-backend.example.com"
+      #   headers:
+      #     api-key: "${env:OTEL_EXPORTER_API_KEY}"
+
+    service:
+      pipelines:
+        # Logs pipeline - collects from local node filesystems
+        logs:
+          receivers: [otlp, filelog]
+          processors: [memory_limiter, k8sattributes, batch]
+          exporters: [debug]  # REPLACE: Change to your logs backend
+
+  ports:
+    otlp:
+      enabled: true
+      containerPort: 4317
+      servicePort: 4317
+      protocol: TCP
+    otlp-http:
+      enabled: true
+      containerPort: 4318
+      servicePort: 4318
+      protocol: TCP
+    metrics:
+      enabled: true
+      containerPort: 8888
+      servicePort: 8888
+      protocol: TCP
+    health-check:
+      enabled: true
+      containerPort: 13133
+      servicePort: 13133
+      protocol: TCP
+  
+  presets:
+    kubernetesAttributes:
+      enabled: true
+    logsCollection:
+      enabled: true
+      includeCollectorLogs: false
+  
+  podAnnotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8888"
+  
+  serviceAccount:
+    create: true
 #------------------------------------------------------------------------------
 # Cleanup Hook Configuration
 #------------------------------------------------------------------------------

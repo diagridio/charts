@@ -1,0 +1,204 @@
+suite: Test OpenTelemetry Collector Configuration
+templates:
+  - agent/deployment.yaml
+  - agent/configmap.yaml
+  - management/deployment.yaml
+  - management/configmap.yaml
+  - gateway/deployment.yaml
+  - gateway/configmap.yaml
+  - gateway/gateway-controlplane-configmap.yaml
+
+tests:
+  - it: should render catalyst chart when OpenTelemetry is disabled (default)
+    set:
+      join_token: "test-token"
+      opentelemetry-deployment.enabled: false
+      opentelemetry-daemonset.enabled: false
+    asserts:
+      - isKind:
+          of: Deployment
+        template: agent/deployment.yaml
+
+  - it: should render catalyst chart successfully with OpenTelemetry deployment enabled
+    set:
+      join_token: "test-token"
+      opentelemetry-deployment.enabled: true
+      opentelemetry-deployment.mode: deployment
+      opentelemetry-deployment.replicaCount: 1
+      opentelemetry-deployment.image.repository: "ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s"
+      opentelemetry-deployment.image.tag: ""
+    asserts:
+      # Verify catalyst chart still renders correctly
+      - isKind:
+          of: Deployment
+        template: agent/deployment.yaml
+      - isKind:
+          of: Deployment
+        template: management/deployment.yaml
+
+  - it: should render catalyst chart successfully with OpenTelemetry daemonset enabled
+    set:
+      join_token: "test-token"
+      opentelemetry-daemonset.enabled: true
+      opentelemetry-daemonset.mode: daemonset
+      opentelemetry-daemonset.image.repository: "ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s"
+      opentelemetry-daemonset.image.tag: ""
+    asserts:
+      # Verify catalyst chart still renders correctly
+      - isKind:
+          of: Deployment
+        template: agent/deployment.yaml
+      - isKind:
+          of: Deployment
+        template: management/deployment.yaml
+
+  - it: should render catalyst chart successfully with both OpenTelemetry collectors enabled
+    set:
+      join_token: "test-token"
+      opentelemetry-deployment.enabled: true
+      opentelemetry-deployment.mode: deployment
+      opentelemetry-deployment.image.repository: "ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s"
+      opentelemetry-deployment.image.tag: ""
+      opentelemetry-daemonset.enabled: true
+      opentelemetry-daemonset.mode: daemonset
+      opentelemetry-daemonset.image.repository: "ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s"
+      opentelemetry-daemonset.image.tag: ""
+    asserts:
+      # Verify catalyst chart still renders correctly with both enabled
+      - isKind:
+          of: Deployment
+        template: agent/deployment.yaml
+      - isKind:
+          of: Deployment
+        template: management/deployment.yaml
+      - isKind:
+          of: Deployment
+        template: gateway/deployment.yaml
+
+  - it: should configure OpenTelemetry deployment with custom settings
+    set:
+      join_token: "test-token"
+      opentelemetry-deployment.enabled: true
+      opentelemetry-deployment.mode: deployment
+      opentelemetry-deployment.replicaCount: 2
+      opentelemetry-deployment.image.repository: "ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s"
+      opentelemetry-deployment.image.tag: "0.112.0"
+      opentelemetry-deployment.resources.limits.memory: "512Mi"
+      opentelemetry-deployment.resources.requests.cpu: "100m"
+      opentelemetry-deployment.resources.requests.memory: "128Mi"
+      opentelemetry-deployment.serviceAccount.create: true
+      opentelemetry-deployment.presets.kubernetesAttributes.enabled: true
+    asserts:
+      - isKind:
+          of: Deployment
+        template: agent/deployment.yaml
+
+  - it: should configure OpenTelemetry daemonset with custom settings
+    set:
+      join_token: "test-token"
+      opentelemetry-daemonset.enabled: true
+      opentelemetry-daemonset.mode: daemonset
+      opentelemetry-daemonset.image.repository: "ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s"
+      opentelemetry-daemonset.image.tag: "0.112.0"
+      opentelemetry-daemonset.resources.limits.memory: "512Mi"
+      opentelemetry-daemonset.resources.requests.cpu: "100m"
+      opentelemetry-daemonset.resources.requests.memory: "128Mi"
+      opentelemetry-daemonset.serviceAccount.create: true
+      opentelemetry-daemonset.presets.logsCollection.enabled: true
+      opentelemetry-daemonset.presets.kubernetesAttributes.enabled: true
+    asserts:
+      - isKind:
+          of: Deployment
+        template: agent/deployment.yaml
+
+  - it: should configure OpenTelemetry with prometheus annotations
+    set:
+      join_token: "test-token"
+      opentelemetry-deployment.enabled: true
+      opentelemetry-deployment.image.repository: "ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s"
+      opentelemetry-deployment.image.tag: ""
+      opentelemetry-deployment.podAnnotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8888"
+    asserts:
+      - isKind:
+          of: Deployment
+        template: agent/deployment.yaml
+
+  - it: should validate OpenTelemetry deployment image repository is set
+    set:
+      join_token: "test-token"
+      opentelemetry-deployment.enabled: true
+      opentelemetry-deployment.image.repository: "ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s"
+    asserts:
+      - isKind:
+          of: Deployment
+        template: agent/deployment.yaml
+
+  - it: should validate OpenTelemetry daemonset image repository is set
+    set:
+      join_token: "test-token"
+      opentelemetry-daemonset.enabled: true
+      opentelemetry-daemonset.image.repository: "ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s"
+    asserts:
+      - isKind:
+          of: Deployment
+        template: agent/deployment.yaml
+
+  - it: should configure OpenTelemetry with OTLP receivers
+    set:
+      join_token: "test-token"
+      opentelemetry-deployment.enabled: true
+      opentelemetry-deployment.image.repository: "ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s"
+      opentelemetry-deployment.image.tag: ""
+      opentelemetry-deployment.config:
+        receivers:
+          otlp:
+            protocols:
+              grpc:
+                endpoint: "${env:MY_POD_IP}:4317"
+              http:
+                endpoint: "${env:MY_POD_IP}:4318"
+    asserts:
+      - isKind:
+          of: Deployment
+        template: agent/deployment.yaml
+
+  - it: should configure OpenTelemetry deployment ports
+    set:
+      join_token: "test-token"
+      opentelemetry-deployment.enabled: true
+      opentelemetry-deployment.image.repository: "ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s"
+      opentelemetry-deployment.image.tag: ""
+      opentelemetry-deployment.ports:
+        otlp:
+          enabled: true
+          containerPort: 4317
+          servicePort: 4317
+          protocol: TCP
+        otlp-http:
+          enabled: true
+          containerPort: 4318
+          servicePort: 4318
+          protocol: TCP
+    asserts:
+      - isKind:
+          of: Deployment
+        template: agent/deployment.yaml
+
+  - it: should configure OpenTelemetry daemonset ports
+    set:
+      join_token: "test-token"
+      opentelemetry-daemonset.enabled: true
+      opentelemetry-daemonset.image.repository: "ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s"
+      opentelemetry-daemonset.image.tag: ""
+      opentelemetry-daemonset.ports:
+        otlp:
+          enabled: true
+          containerPort: 4317
+          servicePort: 4317
+          protocol: TCP
+    asserts:
+      - isKind:
+          of: Deployment
+        template: agent/deployment.yaml
