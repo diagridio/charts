@@ -4,11 +4,11 @@
 
 Diagrid Catalyst is a collection of API-based programming patterns for messaging, data, and workflow that is fully compliant with the Dapr open source project. It provides managed components and runtime that streamline cloud-native application development.
 
-Diagrid Catalyst Private allows you to self-host a Catalyst region within your own environment whilst continuing to use it as a service via Diagrid Cloud. This works by separating the control plane (hosted by Diagrid Cloud) from the data plane (hosted within your Kubernetes cluster). The control plane only manages your configuration, whilst the data plane within your environment handles all application connectivity and data. Some specific telemetry data (metrics, api logs) is sent to Diagrid Cloud to enhance your experience in the management console.
+Diagrid Catalyst Private allows you to self-host a Catalyst region within your own environment whilst continuing to use it as a service via Diagrid Cloud. This works by separating the control plane (hosted by Diagrid Cloud) from the data plane (hosted within your Kubernetes cluster). The control plane only manages your configuration, whilst the data plane within your environment handles all application connectivity and data. Some specific telemetry data (metrics, api logs) is sent to Diagrid Cloud to enhance your experience in the web console.
 
 ![Catalyst](../../assets/img/catalyst.svg)
 
-## Guides
+## Components
 
 A Catalyst installation consists of the following components:
 - **Agent**: Manages the configuration of Dapr projects.
@@ -79,8 +79,7 @@ To uninstall Catalyst and clean up all associated resources, run the following c
 helm uninstall catalyst -n cra-agent
 ```
 
-> **WARNING:**  The `region` resource is intended for a single installation, once you uninstall Catalyst, the region is no longer valid.
-If you want to uninstall Catalyst but allow re-installation, remove the clean up hook by setting the values:
+> **WARNING:**  The `region` resource is intended for a single installation, once you uninstall Catalyst, the region is no longer valid. If you want to uninstall Catalyst but allow re-installation, remove the clean up hook by setting the values:
 
 ```bash
 cleanup:
