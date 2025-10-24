@@ -217,17 +217,7 @@ If you're developing or testing this chart locally from source:
 Before testing or deploying the chart from source, build the chart dependencies:
 
 ```bash
-# Add required Helm repositories
-helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
-helm repo update
-
-# Build dependencies
-helm dependency build
-```
-
-Alternatively, use the Makefile from the repository root:
-
-```bash
+# Install Helm dependencies (run from repository root)
 make helm-prereqs
 ```
 
