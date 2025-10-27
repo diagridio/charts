@@ -319,8 +319,6 @@ diagrid listen -a app1
 
 Send messages between your App IDs:
 
-> **Warning:** The Catalyst Gateway currently does not support TLS and expects it to be terminated externally. This will be fixed soon.
-
 ```bash
 # From the original SSH session, call app1 from app2
 diagrid call invoke get app1.hello -a app2
