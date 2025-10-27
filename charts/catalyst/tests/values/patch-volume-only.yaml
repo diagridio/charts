@@ -1,0 +1,5 @@
+agent:
+  patch:
+    volumes:
+      - name: volume-only
+        emptyDir: {}

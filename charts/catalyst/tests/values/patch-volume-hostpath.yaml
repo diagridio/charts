@@ -1,0 +1,11 @@
+agent:
+  patch:
+    volumes:
+      - name: host-logs
+        hostPath:
+          path: /var/log/myapp
+          type: DirectoryOrCreate
+    volumeMounts:
+      - name: host-logs
+        mountPath: /var/log/myapp
+        readOnly: false

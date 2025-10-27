@@ -1,0 +1,9 @@
+agent:
+  patch:
+    volumes:
+      - name: temp-data
+        emptyDir:
+          sizeLimit: 1Gi
+    volumeMounts:
+      - name: temp-data
+        mountPath: /tmp/data

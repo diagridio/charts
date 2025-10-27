@@ -1,0 +1,10 @@
+agent:
+  patch:
+    volumes:
+      - name: custom-config
+        configMap:
+          name: my-custom-config
+    volumeMounts:
+      - name: custom-config
+        mountPath: /etc/custom-config
+        readOnly: true

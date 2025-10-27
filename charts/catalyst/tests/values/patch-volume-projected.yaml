@@ -1,0 +1,19 @@
+agent:
+  patch:
+    volumes:
+      - name: multi-source
+        projected:
+          defaultMode: 420
+          sources:
+            - configMap:
+                name: config1
+            - secret:
+                name: secret1
+            - serviceAccountToken:
+                audience: my-audience
+                expirationSeconds: 3600
+                path: token
+    volumeMounts:
+      - name: multi-source
+        mountPath: /etc/multi-source
+        readOnly: true
