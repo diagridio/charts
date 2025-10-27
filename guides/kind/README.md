@@ -248,9 +248,6 @@ diagrid appid list
 
 Send messages between your App Identities
 
-> [!WARNING]
-> The Catalyst Gateway currently does not support TLS and expects it to be terminated externally. This will be fixed soon.
-
 ```bash
 # Start a listener for app1, wait until a log line like:
 # ✅ Connected App ID "app1" to http://localhost:61016 ⚡️
