@@ -10,6 +10,20 @@ You will interact with your Catalyst Private installation via the Diagrid Cloud 
 
 ![Catalyst](../../assets/img/catalyst.svg)
 
+## Dapr API Compatibility
+
+Diagrid Catalyst currently supports the following Dapr APIs:
+- [Workflows](https://docs.dapr.io/reference/api/workflow_api/)
+- [Conversation](https://docs.dapr.io/reference/api/conversation_api/)
+- [Service Invocation](https://docs.dapr.io/reference/api/service_invocation_api/)
+- [State Management](https://docs.dapr.io/reference/api/state_api/)
+- [Pub/Sub](https://docs.dapr.io/reference/api/pubsub_api/)
+- [Bindings](https://docs.dapr.io/reference/api/bindings_api/)
+- [Actors](https://docs.dapr.io/reference/api/actors_api/)
+- [Secrets](https://docs.dapr.io/reference/api/secrets_api/)
+- [Jobs](https://docs.dapr.io/reference/api/jobs_api/)
+- [Distributed Lock](https://docs.dapr.io/reference/api/distributed_lock_api/)
+
 ## Components
 
 A Catalyst installation consists of the following components:
@@ -252,6 +266,8 @@ Catalyst includes optional OpenTelemetry Collector addons that provide a flexibl
 For more information on how to configure the OpenTelemetry Collector, visit the [official documentation](https://opentelemetry.io/docs/collector/configuration/).
 
 ## Secrets
+
+When using Dapr components in Catalyst, you can use [Dapr's built-in secret references](https://docs.dapr.io/operations/components/component-secrets) to securely access secrets from supported secret stores. This allows you to keep sensitive information out of your application code and configuration files. In Catalyst, if you do not explicitly use Dapr's secret references, it will implicitly use one to ensure your secrets are only ever persisted in your own Catalyst Private installation and never in Diagrid Cloud.
 
 Catalyst currently supports 2 secrets providers:
 - **Kubernetes Secrets** (default)
