@@ -1,0 +1,277 @@
+suite: Test Agent Deployment Volume Patch
+templates:
+  - agent/deployment.yaml
+  - agent/configmap.yaml
+
+tests:
+  - it: should inject a patch volume and volumeMount to the agent deployment
+    set:
+      join_token: "test-token"
+    values:
+      - ./values/patch-volume.yaml
+    asserts:
+      - template: agent/deployment.yaml
+        isKind:
+          of: Deployment
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.volumes[?(@.name == "custom-config")].name
+          value: custom-config
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.volumes[?(@.name == "custom-config")].configMap.name
+          value: my-custom-config
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.containers[0].volumeMounts[?(@.name == "custom-config")].name
+          value: custom-config
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.containers[0].volumeMounts[?(@.name == "custom-config")].mountPath
+          value: /etc/custom-config
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.containers[0].volumeMounts[?(@.name == "custom-config")].readOnly
+          value: true
+
+  - it: should inject multiple patch volumes and volumeMounts to the agent deployment
+    set:
+      join_token: "test-token"
+    values:
+      - ./values/patch-volume-multiple.yaml
+    asserts:
+      - template: agent/deployment.yaml
+        isKind:
+          of: Deployment
+      # Assert first volume (custom-config)
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.volumes[?(@.name == "custom-config")].name
+          value: custom-config
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.volumes[?(@.name == "custom-config")].configMap.name
+          value: my-custom-config
+      # Assert second volume (secret-data)
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.volumes[?(@.name == "secret-data")].name
+          value: secret-data
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.volumes[?(@.name == "secret-data")].secret.secretName
+          value: my-secret
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.volumes[?(@.name == "secret-data")].secret.defaultMode
+          value: 420
+      # Assert first volumeMount
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.containers[0].volumeMounts[?(@.name == "custom-config")].name
+          value: custom-config
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.containers[0].volumeMounts[?(@.name == "custom-config")].mountPath
+          value: /etc/custom-config
+      # Assert second volumeMount
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.containers[0].volumeMounts[?(@.name == "secret-data")].name
+          value: secret-data
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.containers[0].volumeMounts[?(@.name == "secret-data")].mountPath
+          value: /etc/secret-data
+
+  - it: should inject an emptyDir volume to the agent deployment
+    set:
+      join_token: "test-token"
+    values:
+      - ./values/patch-volume-emptydir.yaml
+    asserts:
+      - template: agent/deployment.yaml
+        isKind:
+          of: Deployment
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.volumes[?(@.name == "temp-data")].name
+          value: temp-data
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.volumes[?(@.name == "temp-data")].emptyDir.sizeLimit
+          value: 1Gi
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.containers[0].volumeMounts[?(@.name == "temp-data")].name
+          value: temp-data
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.containers[0].volumeMounts[?(@.name == "temp-data")].mountPath
+          value: /tmp/data
+
+  - it: should inject a secret volume to the agent deployment
+    set:
+      join_token: "test-token"
+    values:
+      - ./values/patch-volume-secret.yaml
+    asserts:
+      - template: agent/deployment.yaml
+        isKind:
+          of: Deployment
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.volumes[?(@.name == "app-secret")].name
+          value: app-secret
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.volumes[?(@.name == "app-secret")].secret.secretName
+          value: my-app-secret
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.containers[0].volumeMounts[?(@.name == "app-secret")].name
+          value: app-secret
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.containers[0].volumeMounts[?(@.name == "app-secret")].mountPath
+          value: /etc/secrets
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.containers[0].volumeMounts[?(@.name == "app-secret")].readOnly
+          value: true
+
+  - it: should inject a hostPath volume to the agent deployment
+    set:
+      join_token: "test-token"
+    values:
+      - ./values/patch-volume-hostpath.yaml
+    asserts:
+      - template: agent/deployment.yaml
+        isKind:
+          of: Deployment
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.volumes[?(@.name == "host-logs")].name
+          value: host-logs
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.volumes[?(@.name == "host-logs")].hostPath.path
+          value: /var/log/myapp
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.volumes[?(@.name == "host-logs")].hostPath.type
+          value: DirectoryOrCreate
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.containers[0].volumeMounts[?(@.name == "host-logs")].name
+          value: host-logs
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.containers[0].volumeMounts[?(@.name == "host-logs")].mountPath
+          value: /var/log/myapp
+
+  - it: should inject a PVC volume to the agent deployment
+    set:
+      join_token: "test-token"
+    values:
+      - ./values/patch-volume-pvc.yaml
+    asserts:
+      - template: agent/deployment.yaml
+        isKind:
+          of: Deployment
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.volumes[?(@.name == "data-volume")].name
+          value: data-volume
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.volumes[?(@.name == "data-volume")].persistentVolumeClaim.claimName
+          value: my-pvc
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.containers[0].volumeMounts[?(@.name == "data-volume")].name
+          value: data-volume
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.containers[0].volumeMounts[?(@.name == "data-volume")].mountPath
+          value: /data
+
+  - it: should preserve default volumes when injecting patch volumes
+    set:
+      join_token: "test-token"
+    values:
+      - ./values/patch-volume.yaml
+    asserts:
+      - template: agent/deployment.yaml
+        isKind:
+          of: Deployment
+      # Check default volumes are still present
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.volumes[?(@.name == "agent-config")].name
+          value: agent-config
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.volumes[?(@.name == "sentry-identity-token")].name
+          value: sentry-identity-token
+      # Check patch volume is added
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.volumes[?(@.name == "custom-config")].name
+          value: custom-config
+      # Check default volumeMounts are still present
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.containers[0].volumeMounts[?(@.name == "agent-config")].name
+          value: agent-config
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.containers[0].volumeMounts[?(@.name == "sentry-identity-token")].name
+          value: sentry-identity-token
+      # Check patch volumeMount is added
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.containers[0].volumeMounts[?(@.name == "custom-config")].name
+          value: custom-config
+
+  - it: should work with volume only (no volumeMount)
+    set:
+      join_token: "test-token"
+    values:
+      - ./values/patch-volume-only.yaml
+    asserts:
+      - template: agent/deployment.yaml
+        isKind:
+          of: Deployment
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.volumes[?(@.name == "volume-only")].name
+          value: volume-only
+
+  - it: should inject a projected volume with multiple sources
+    set:
+      join_token: "test-token"
+    values:
+      - ./values/patch-volume-projected.yaml
+    asserts:
+      - template: agent/deployment.yaml
+        isKind:
+          of: Deployment
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.volumes[?(@.name == "multi-source")].name
+          value: multi-source
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.volumes[?(@.name == "multi-source")].projected.defaultMode
+          value: 420
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.containers[0].volumeMounts[?(@.name == "multi-source")].name
+          value: multi-source
+      - template: agent/deployment.yaml
+        equal:
+          path: spec.template.spec.containers[0].volumeMounts[?(@.name == "multi-source")].mountPath
+          value: /etc/multi-source
+
+

@@ -99,7 +99,7 @@ spec:
           - name: sentry-identity-token
             mountPath: /var/run/secrets/dapr.io/sentrytoken
             readOnly: true
-          {{- include "inject.patch" (dict "patch" .Values.agent.patch.volumeMounts "indent" 6) }}
+          {{- include "inject.patch" (dict "patch" .Values.agent.patch.volumeMounts "indent" 10) }}
         {{- include "inject.patch" (dict "patch" .Values.agent.patch.containers "indent" 6) }}
       volumes:
       - name: agent-config

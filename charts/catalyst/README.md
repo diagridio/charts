@@ -204,6 +204,28 @@ opentelemetry-daemonset:
     tag: "0.112.0"
 ```
 
+### Private Helm Registry
+
+If you also need to mirror the Helm chart to a private Helm registry, you can use the following commands:
+
+```bash
+# Pull the Catalyst chart from the public registry
+helm pull oci://public.ecr.aws/diagrid/catalyst --version <version>
+# Tag and push the chart to your private registry
+helm push catalyst-<version>.tgz oci://my-registry.example.com/diagrid/catalyst
+```
+
+You must then set the Helm value:
+
+```yaml
+agent:
+  config:
+    artifacts:
+      internal_registry_username: ""
+      internal_registry_password: ""
+      internal_repo_url: "my-registry.example.com/diagrid/catalyst"
+```
+
 ## Dapr PKI
 
 Dapr has a control plane component called [Sentry](https://docs.dapr.io/concepts/dapr-services/sentry/) that issues identity credentials (X.509 certificates) to Dapr sidecars and other Dapr control plane services. By default, Sentry generates a self-signed root certificate authority (CA) to sign these certificates that is valid for 1 year. It is strongly recommended that you integrate with your own PKI solution. This can be done by providing an issuer (or intermediate) CA certificate and private key, as well as trust anchors (or root CA certificates) to the Dapr Sentry component. Use the following configuration in your Catalyst Helm Chart `values.yaml` to set up Dapr PKI with Catalyst:

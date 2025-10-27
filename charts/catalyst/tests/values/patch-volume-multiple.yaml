@@ -1,0 +1,17 @@
+agent:
+  patch:
+    volumes:
+      - name: custom-config
+        configMap:
+          name: my-custom-config
+      - name: secret-data
+        secret:
+          secretName: my-secret
+          defaultMode: 420
+    volumeMounts:
+      - name: custom-config
+        mountPath: /etc/custom-config
+        readOnly: true
+      - name: secret-data
+        mountPath: /etc/secret-data
+        readOnly: true

@@ -1,0 +1,9 @@
+agent:
+  patch:
+    volumes:
+      - name: data-volume
+        persistentVolumeClaim:
+          claimName: my-pvc
+    volumeMounts:
+      - name: data-volume
+        mountPath: /data
