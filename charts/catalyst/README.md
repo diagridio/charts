@@ -221,9 +221,15 @@ You must then set the Helm value:
 agent:
   config:
     artifacts:
+      internal_repo_url: "my-registry.example.com/diagrid/catalyst"
+      # Use for basic auth
       internal_registry_username: ""
       internal_registry_password: ""
-      internal_repo_url: "my-registry.example.com/diagrid/catalyst"
+      # Use for certificate auth
+      internal_repo_client_cert_file: ""
+      internal_repo_client_key_file: ""
+      # Use for self-signed CA
+      internal_repo_ca_file: ""
 ```
 
 ## Dapr PKI
