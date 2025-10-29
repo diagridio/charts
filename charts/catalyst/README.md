@@ -310,13 +310,16 @@ global:
 ## Networking
 
 In order for your Catalyst Private installation to function correctly, it needs to connect to some Diagrid Cloud endpoints. Please ensure that your network allows outbound connectivity to the following domains:
-- `api.diagrid.io` for management APIs
-- `cra-cloudgrid.prd.p.diagrid.io` for resource management
-- `sentry.prd.p.diagrid.io` for region enrollment
-- `pem.trust.diagrid.io` for diagrid trust anchors
-- `client.events.prd.p.diagrid.io` for events
-- `cra-metrics.prd.p.diagrid.io` for metrics
-- `cra-logs.prd.p.diagrid.io` for logs
+
+| Domain | Description | Required |
+|--------|-------------|----------|
+| `api.diagrid.io` | Used once by the Catalyst Agent on installation to join your region to Diagrid Cloud. | Yes |
+| `cra-cloudgrid.prd.p.diagrid.io` | Allows the Catalyst Agent to receive resource configurations such as new Projects, App IDs, and Components. | Yes |
+| `sentry.prd.p.diagrid.io` | Used by all Catalyst components to fetch a workload identity for establishing mTLS to Diagrid Cloud endpoints. | Yes |
+| `pem.trust.diagrid.io` | Used to distribute Diagrid Cloud trust anchors for establishing mTLS to Diagrid Cloud endpoints. | Yes |
+| `client.events.prd.p.diagrid.io` | Allows Catalyst components to publish events such as Dapr Component validation statuses to Diagrid Cloud. | Yes |
+| `cra-metrics.prd.p.diagrid.io` | Used to send [Dapr runtime](https://github.com/dapr/dapr/blob/master/docs/development/dapr-metrics.md#dapr-runtime-metrics) API metrics to Diagrid Cloud. | No |
+| `cra-logs.prd.p.diagrid.io` | Used to send Dapr sidecar API logs to Diagrid Cloud. | No |
 
 We use mutual TLS (mTLS) for secure communication between your Catalyst Private installation and Diagrid Cloud. Therefore, it is important to ensure your proxy or firewall does not inspect/intercept the TLS traffic.
 
