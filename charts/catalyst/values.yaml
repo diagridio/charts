@@ -14,6 +14,7 @@ global:
   nameOverride: ""
   # Override the full name of the chart+release
   fullnameOverride: ""
+  # Artifacts configuration for container images
   image:
     # registry is the global default image registry for all container images in the chart.
     # When set, this overrides all component-specific registry values.
@@ -29,6 +30,32 @@ global:
     # Reference: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
     # Example: [{"name": "my-registry-secret"}]
     imagePullSecrets: []
+  # Artifacts configuration for Helm charts
+  charts:
+    # Registry URL for artifact storage
+    # Example: "oci://my-registry.example.com/diagrid/catalyst"
+    registry: "oci://public.ecr.aws/diagrid"
+    # Basic authentication credentials
+    username: ""
+    password: ""
+    # Certificate-based authentication
+    # Inline certificate content (PEM format)
+    clientCert: ""
+    # Inline private key content (PEM format)
+    clientKey: ""
+    # Custom CA certificate (PEM format) for self-signed certificates
+    customCA: ""
+    # Reference to an existing secret containing authentication credentials
+    # If provided, inline credentials above will be ignored
+    # Expected secret keys:
+    #   - username (optional, for basic auth)
+    #   - password (optional, for basic auth)
+    #   - tls.crt (optional, for cert auth)
+    #   - tls.key (optional, for cert auth)
+    #   - ca.crt (optional, for custom CA)
+    existingSecret: ""
+    # Optional: customize the generated secret name
+    # secretName: ""
   # Global labels applied to all resources deployed by the chart
   labels: {}
   serviceAccount:
@@ -185,10 +212,6 @@ agent:
       scheduler:
         # storage_class: ""
         storage_size: 8Gi
-    artifacts:
-      internal_registry_username: ""
-      internal_registry_password: ""
-      internal_repo_url: oci://public.ecr.aws/diagrid
     kubernetes:
       qps: 25
       burst: 10

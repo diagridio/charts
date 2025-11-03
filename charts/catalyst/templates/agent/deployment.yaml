@@ -99,6 +99,11 @@ spec:
           - name: sentry-identity-token
             mountPath: /var/run/secrets/dapr.io/sentrytoken
             readOnly: true
+          {{- if or .Values.global.charts.clientCert .Values.global.charts.clientKey .Values.global.charts.customCA .Values.global.charts.existingSecret }}
+          - name: charts-secret
+            mountPath: /var/run/secrets/charts
+            readOnly: true
+          {{- end }}
           {{- include "inject.patch" (dict "patch" .Values.agent.patch.volumeMounts "indent" 10) }}
         {{- include "inject.patch" (dict "patch" .Values.agent.patch.containers "indent" 6) }}
       volumes:
@@ -113,6 +118,12 @@ spec:
               audience: dapr.io/sentry
               expirationSeconds: 7200
               path: token
+      {{- if or .Values.global.charts.clientCert .Values.global.charts.clientKey .Values.global.charts.customCA .Values.global.charts.existingSecret }}
+      - name: charts-secret
+        secret:
+          secretName: {{ include "agent.chartsSecretName" . }}
+          defaultMode: 0400
+      {{- end }}
       {{- include "inject.patch" (dict "patch" .Values.agent.patch.volumes "indent" 6) }}
       nodeSelector:
         {{- include "merge.maps" (dict "base" .Values.agent.nodeSelector "overrides" .Values.agent.merge.nodeSelector) | nindent 8 }}

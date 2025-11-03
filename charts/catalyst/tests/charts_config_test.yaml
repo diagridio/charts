@@ -1,0 +1,203 @@
+suite: Test Charts Configuration
+templates:
+  - agent/deployment.yaml
+  - agent/charts-secret.yaml
+  - agent/configmap.yaml
+tests:
+  - it: should create charts secret when inline credentials are provided
+    set:
+      join_token: "test-token"
+      global.charts.registry: "oci://my-registry.example.com/diagrid/catalyst"
+      global.charts.username: "test-user"
+      global.charts.password: "test-password"
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: agent/charts-secret.yaml
+      - isKind:
+          of: Secret
+        template: agent/charts-secret.yaml
+      - equal:
+          path: type
+          value: Opaque
+        template: agent/charts-secret.yaml
+      - exists:
+          path: data.username
+        template: agent/charts-secret.yaml
+      - exists:
+          path: data.password
+        template: agent/charts-secret.yaml
+      - matchRegex:
+          path: metadata.name
+          pattern: ^.*-charts$
+        template: agent/charts-secret.yaml
+
+  - it: should create charts secret with certificates when provided
+    set:
+      join_token: "test-token"
+      global.charts.clientCert: "-----BEGIN CERTIFICATE-----\ntest-cert\n-----END CERTIFICATE-----"
+      global.charts.clientKey: "-----BEGIN PRIVATE KEY-----\ntest-key\n-----END PRIVATE KEY-----"
+      global.charts.customCA: "-----BEGIN CERTIFICATE-----\ntest-ca\n-----END CERTIFICATE-----"
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: agent/charts-secret.yaml
+      - exists:
+          path: data["tls.crt"]
+        template: agent/charts-secret.yaml
+      - exists:
+          path: data["tls.key"]
+        template: agent/charts-secret.yaml
+      - exists:
+          path: data["ca.crt"]
+        template: agent/charts-secret.yaml
+
+  - it: should not create charts secret when existingSecret is specified
+    set:
+      join_token: "test-token"
+      global.charts.existingSecret: "my-existing-charts-secret"
+      global.charts.username: "test-user"
+      global.charts.password: "test-password"
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: agent/charts-secret.yaml
+
+  - it: should not create charts secret when no credentials are provided
+    set:
+      join_token: "test-token"
+      global.charts.registry: "oci://my-registry.example.com/diagrid/catalyst"
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: agent/charts-secret.yaml
+
+  - it: should mount charts secret volume when certificates are provided
+    set:
+      join_token: "test-token"
+      global.charts.clientCert: "test-cert"
+      global.charts.clientKey: "test-key"
+      global.charts.customCA: "test-ca"
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: charts-secret
+            secret:
+              secretName: RELEASE-NAME-charts
+              defaultMode: 0400
+        template: agent/deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: charts-secret
+            mountPath: /var/run/secrets/charts
+            readOnly: true
+        template: agent/deployment.yaml
+
+  - it: should mount charts secret volume when existingSecret is specified
+    set:
+      join_token: "test-token"
+      global.charts.existingSecret: "my-existing-charts-secret"
+    asserts:
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: charts-secret
+            secret:
+              secretName: my-existing-charts-secret
+              defaultMode: 0400
+        template: agent/deployment.yaml
+
+  - it: should configure agent configmap with charts registry URL
+    set:
+      join_token: "test-token"
+      global.charts.registry: "oci://my-registry.example.com/diagrid/catalyst"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "internal_repo_url: oci://my-registry.example.com/diagrid/catalyst"
+        template: agent/configmap.yaml
+
+  - it: should configure agent configmap with basic auth credentials
+    set:
+      join_token: "test-token"
+      global.charts.username: "test-user"
+      global.charts.password: "test-password"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "internal_registry_username: test-user"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "internal_registry_password: test-password"
+        template: agent/configmap.yaml
+
+  - it: should configure agent configmap with certificate file paths
+    set:
+      join_token: "test-token"
+      global.charts.clientCert: "test-cert"
+      global.charts.clientKey: "test-key"
+      global.charts.customCA: "test-ca"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "internal_repo_client_cert_file: /var/run/secrets/charts/tls.crt"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "internal_repo_client_key_file: /var/run/secrets/charts/tls.key"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "internal_repo_ca_file: /var/run/secrets/charts/ca.crt"
+        template: agent/configmap.yaml
+
+  - it: should configure agent configmap with all charts settings combined
+    set:
+      join_token: "test-token"
+      global.charts.registry: "oci://my-registry.example.com/diagrid/catalyst"
+      global.charts.username: "test-user"
+      global.charts.password: "test-password"
+      global.charts.clientCert: "test-cert"
+      global.charts.clientKey: "test-key"
+      global.charts.customCA: "test-ca"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "internal_repo_url: oci://my-registry.example.com/diagrid/catalyst"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "internal_registry_username: test-user"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "internal_registry_password: test-password"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "internal_repo_client_cert_file: /var/run/secrets/charts/tls.crt"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "internal_repo_client_key_file: /var/run/secrets/charts/tls.key"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "internal_repo_ca_file: /var/run/secrets/charts/ca.crt"
+        template: agent/configmap.yaml
+
+  - it: should not mount charts secret volume when no certificates are provided
+    set:
+      join_token: "test-token"
+      global.charts.registry: "oci://my-registry.example.com/diagrid/catalyst"
+      global.charts.username: "test-user"
+      global.charts.password: "test-password"
+    asserts:
+      - notContains:
+          path: spec.template.spec.volumes
+          content:
+            name: charts-secret
+        template: agent/deployment.yaml
