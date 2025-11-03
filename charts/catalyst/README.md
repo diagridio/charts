@@ -160,19 +160,19 @@ When OpenTelemetry Collector addons are enabled, the following images are used:
 
 These images are only deployed when explicitly enabled via `opentelemetry-deployment.enabled=true` or `opentelemetry-daemonset.enabled=true`.
 
-### Mirroring Images to a Private Registry
+### Private Image Registry
 
-If you're deploying in an air-gapped environment or need to use a private registry, you can use the provided mirror script to copy all images.
+If you're deploying in an air-gapped environment or need to use a private image registry, you can use the provided script to copy all images.
 
 The script is located at `scripts/catalyst/mirror-images.sh` and handles pulling all Catalyst images and pushing them to your private registry.
 
-**Basic usage with current versions:**
+> **NOTE**: The versions below may be out of date, please check the docs for the latest versions.
 
 ```bash
 ./scripts/catalyst/mirror-images.sh my-registry.example.com \
   --catalyst-version 0.469.0 \
-  --dapr-version 1.16.1 \
-  --internal-dapr-version 1.16.2-rc.1-catalyst.2 \
+  --dapr-version 1.16.2 \
+  --internal-dapr-version 1.16.2-catalyst.1 \
   --envoy-version distroless-v1.33.0 \
   --piko-version v0.8.1 \
   --otel-version 0.112.0

@@ -18,6 +18,9 @@
 {{- end -}}
 {{- /* Apply global charts configuration */ -}}
 {{- if or .Values.global.charts.registry .Values.global.charts.username .Values.global.charts.password .Values.global.charts.clientCert .Values.global.charts.clientKey .Values.global.charts.customCA .Values.global.charts.existingSecret -}}
+  {{- if not $agentConfig.artifacts -}}
+    {{- $_ := set $agentConfig "artifacts" (dict) -}}
+  {{- end -}}
   {{- if .Values.global.charts.registry -}}
     {{- $_ := set $agentConfig.artifacts "internal_repo_url" .Values.global.charts.registry -}}
   {{- end -}}
