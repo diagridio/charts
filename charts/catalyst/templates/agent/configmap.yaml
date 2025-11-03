@@ -16,6 +16,27 @@
   {{- $_ := set $agentConfig.upstream_dapr "container_registry" .Values.global.image.registry -}}
   {{- $_ := set $agentConfig.internal_dapr "container_registry" .Values.global.image.registry -}}
 {{- end -}}
+{{- /* Apply global charts configuration */ -}}
+{{- if or .Values.global.charts.registry .Values.global.charts.username .Values.global.charts.password .Values.global.charts.clientCert .Values.global.charts.clientKey .Values.global.charts.customCA .Values.global.charts.existingSecret -}}
+  {{- if .Values.global.charts.registry -}}
+    {{- $_ := set $agentConfig.artifacts "internal_repo_url" .Values.global.charts.registry -}}
+  {{- end -}}
+  {{- if or .Values.global.charts.username .Values.global.charts.existingSecret -}}
+    {{- $_ := set $agentConfig.artifacts "internal_registry_username" .Values.global.charts.username -}}
+  {{- end -}}
+  {{- if or .Values.global.charts.password .Values.global.charts.existingSecret -}}
+    {{- $_ := set $agentConfig.artifacts "internal_registry_password" .Values.global.charts.password -}}
+  {{- end -}}
+  {{- if or .Values.global.charts.clientCert .Values.global.charts.existingSecret -}}
+    {{- $_ := set $agentConfig.artifacts "internal_repo_client_cert_file" (printf "/var/run/secrets/charts/tls.crt") -}}
+  {{- end -}}
+  {{- if or .Values.global.charts.clientKey .Values.global.charts.existingSecret -}}
+    {{- $_ := set $agentConfig.artifacts "internal_repo_client_key_file" (printf "/var/run/secrets/charts/tls.key") -}}
+  {{- end -}}
+  {{- if or .Values.global.charts.customCA .Values.global.charts.existingSecret -}}
+    {{- $_ := set $agentConfig.artifacts "internal_repo_ca_file" (printf "/var/run/secrets/charts/ca.crt") -}}
+  {{- end -}}
+{{- end -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:

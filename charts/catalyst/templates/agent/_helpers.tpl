@@ -62,3 +62,14 @@ Validate values
         {{- fail "A valid join_token value is required to deploy this chart!" -}}
     {{- end -}}
 {{- end -}}
+
+{{/*
+Get the name of the charts secret to use
+*/}}
+{{- define "agent.chartsSecretName" -}}
+{{- if .Values.global.charts.existingSecret }}
+  {{- .Values.global.charts.existingSecret }}
+{{- else }}
+  {{- .Values.global.charts.secretName | default (printf "%s-charts" .Release.Name) }}
+{{- end }}
+{{- end }}

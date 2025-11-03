@@ -215,21 +215,31 @@ helm pull oci://public.ecr.aws/diagrid/catalyst --version <version>
 helm push catalyst-<version>.tgz oci://my-registry.example.com/diagrid/catalyst
 ```
 
-You must then set the Helm value:
+You can then configure authentication for your private Helm registry using `global.charts`:
 
 ```yaml
-agent:
-  config:
-    artifacts:
-      internal_repo_url: "my-registry.example.com/diagrid/catalyst"
-      # Use for basic auth
-      internal_registry_username: ""
-      internal_registry_password: ""
-      # Use for certificate auth
-      internal_repo_client_cert_file: ""
-      internal_repo_client_key_file: ""
-      # Use for self-signed CA
-      internal_repo_ca_file: ""
+global:
+  charts:
+    registry: "oci://my-registry.example.com/diagrid/catalyst"
+    # For basic authentication
+    username: "my-username"
+    password: "my-password"
+    # For certificate-based authentication
+    clientCert: |
+      -----BEGIN CERTIFICATE-----
+      ...
+      -----END CERTIFICATE-----
+    clientKey: |
+      -----BEGIN PRIVATE KEY-----
+      ...
+      -----END PRIVATE KEY-----
+    # For self-signed CA
+    customCA: |
+      -----BEGIN CERTIFICATE-----
+      ...
+      -----END CERTIFICATE-----
+    # Or use an existing secret
+    existingSecret: "my-charts-secret"
 ```
 
 ## Dapr PKI
