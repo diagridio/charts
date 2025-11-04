@@ -72,6 +72,7 @@ global:
       access_key: ""
       secret_access_key: ""
   # Global control plane URL
+  control_plane_namespace: ""
   control_plane_url: cra-cloudgrid.prd.p.diagrid.io:443
   control_plane_http_url: https://api.diagrid.io
   # Global sentry configuration
@@ -79,6 +80,7 @@ global:
     enabled: true
     endpoint: dapr-sentry.root-dapr-system.svc.cluster.local:443
     remote_endpoint: sentry.prd.p.diagrid.io:443
+    remote_namespace: ""
     diagrid_trust_anchors_endpoint: https://pem.trust.diagrid.io
     diagrid_trust_anchors_endpoint_insecure: false
     trust_domain: prj-root.trust.diagrid.io
@@ -88,6 +90,7 @@ global:
   nats:
     endpoint: tls://client.events.prd.p.diagrid.io:443
     trust_domain: trust.diagrid.io
+    namespace: ""
   # Global feature flags
   featureflags:
     nats_enabled: true
