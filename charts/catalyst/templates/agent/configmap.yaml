@@ -1,6 +1,7 @@
 {{- include "agent.validateValues" . -}}
 {{- $agentConfig := deepCopy .Values.agent.config -}}
 {{- $_ := set $agentConfig.host "join_token" .Values.join_token -}}
+{{- $_ := set $agentConfig "control_plane_namespace" .Values.global.control_plane_namespace -}}
 {{- $_ := set $agentConfig "control_plane_url" .Values.global.control_plane_url -}}
 {{- $_ := set $agentConfig "control_plane_http_url" .Values.global.control_plane_http_url -}}
 {{- $_ := set $agentConfig "control_plane_http_insecure" .Values.global.control_plane_http_insecure -}}
