@@ -1,4 +1,5 @@
 {{- $configMap := deepCopy .Values.management.config -}}
+{{- $_ := set $configMap "control_plane_namespace" .Values.global.control_plane_namespace -}}
 {{- $_ := set $configMap "control_plane_url" .Values.global.control_plane_url -}}
 {{- $_ := set $configMap "control_plane_http_url" .Values.global.control_plane_http_url -}}
 {{- $_ := set $configMap "control_plane_http_insecure" .Values.global.control_plane_http_insecure -}}

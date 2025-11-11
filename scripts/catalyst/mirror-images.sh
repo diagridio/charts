@@ -48,8 +48,8 @@ TARGET_REGISTRY=""
 
 # Default versions(these won't be updated frequently and should be passed explicitly)
 CATALYST_VERSION="0.469.0"
-DAPR_VERSION="1.16.1"
-INTERNAL_DAPR_VERSION="1.16.2-rc.1-catalyst.2"
+DAPR_VERSION="1.16.2"
+INTERNAL_DAPR_VERSION="1.16.2-catalyst.1"
 ENVOY_VERSION="distroless-v1.33.0"
 PIKO_VERSION="v0.8.1"
 OTEL_VERSION="0.112.0"

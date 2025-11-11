@@ -160,19 +160,19 @@ When OpenTelemetry Collector addons are enabled, the following images are used:
 
 These images are only deployed when explicitly enabled via `opentelemetry-deployment.enabled=true` or `opentelemetry-daemonset.enabled=true`.
 
-### Mirroring Images to a Private Registry
+### Private Image Registry
 
-If you're deploying in an air-gapped environment or need to use a private registry, you can use the provided mirror script to copy all images.
+If you're deploying in an air-gapped environment or need to use a private image registry, you can use the provided script to copy all images.
 
 The script is located at `scripts/catalyst/mirror-images.sh` and handles pulling all Catalyst images and pushing them to your private registry.
 
-**Basic usage with current versions:**
+> **NOTE**: The versions below may be out of date, please check the docs for the latest versions.
 
 ```bash
 ./scripts/catalyst/mirror-images.sh my-registry.example.com \
   --catalyst-version 0.469.0 \
-  --dapr-version 1.16.1 \
-  --internal-dapr-version 1.16.2-rc.1-catalyst.2 \
+  --dapr-version 1.16.2 \
+  --internal-dapr-version 1.16.2-catalyst.1 \
   --envoy-version distroless-v1.33.0 \
   --piko-version v0.8.1 \
   --otel-version 0.112.0
@@ -215,15 +215,31 @@ helm pull oci://public.ecr.aws/diagrid/catalyst --version <version>
 helm push catalyst-<version>.tgz oci://my-registry.example.com/diagrid/catalyst
 ```
 
-You must then set the Helm value:
+You can then configure authentication for your private Helm registry using `global.charts`:
 
 ```yaml
-agent:
-  config:
-    artifacts:
-      internal_registry_username: ""
-      internal_registry_password: ""
-      internal_repo_url: "my-registry.example.com/diagrid/catalyst"
+global:
+  charts:
+    registry: "oci://my-registry.example.com/diagrid/catalyst"
+    # For basic authentication
+    username: "my-username"
+    password: "my-password"
+    # For certificate-based authentication
+    clientCert: |
+      -----BEGIN CERTIFICATE-----
+      ...
+      -----END CERTIFICATE-----
+    clientKey: |
+      -----BEGIN PRIVATE KEY-----
+      ...
+      -----END PRIVATE KEY-----
+    # For self-signed CA
+    customCA: |
+      -----BEGIN CERTIFICATE-----
+      ...
+      -----END CERTIFICATE-----
+    # Or use an existing secret
+    existingSecret: "my-charts-secret"
 ```
 
 ## Dapr PKI

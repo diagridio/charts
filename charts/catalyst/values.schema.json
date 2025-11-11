@@ -51,6 +51,52 @@
             }
           }
         },
+        "charts": {
+          "type": "object",
+          "description": "Configuration for Helm chart registry authentication",
+          "properties": {
+            "registry": {
+              "type": "string",
+              "description": "Registry URL for chart storage (e.g., 'oci://my-registry.example.com/diagrid/catalyst')",
+              "default": "oci://public.ecr.aws/diagrid"
+            },
+            "username": {
+              "type": "string",
+              "description": "Username for basic authentication to the chart registry",
+              "default": ""
+            },
+            "password": {
+              "type": "string",
+              "description": "Password for basic authentication to the chart registry",
+              "default": ""
+            },
+            "clientCert": {
+              "type": "string",
+              "description": "Inline client certificate content in PEM format for certificate-based authentication",
+              "default": ""
+            },
+            "clientKey": {
+              "type": "string",
+              "description": "Inline client private key content in PEM format for certificate-based authentication",
+              "default": ""
+            },
+            "customCA": {
+              "type": "string",
+              "description": "Custom CA certificate in PEM format for self-signed certificate registries",
+              "default": ""
+            },
+            "existingSecret": {
+              "type": "string",
+              "description": "Name of an existing Kubernetes secret containing authentication credentials. If provided, inline credentials will be ignored. Expected keys: username, password, tls.crt, tls.key, ca.crt",
+              "default": ""
+            },
+            "secretName": {
+              "type": "string",
+              "description": "Custom name for the generated secret. If not provided, defaults to '<release-name>-charts'",
+              "default": ""
+            }
+          }
+        },
         "labels": {
           "type": "object",
           "description": "Global labels applied to all resources",
