@@ -61,6 +61,8 @@ spec:
             - /proxy-certs/tls.key
             - --proxy.tls.cert
             - /proxy-certs/tls.crt
+            - --proxy.tls.client.server-name
+            - {{ .Values.piko.httpproxy.upstreamHostName }}
 {{- end }}
             - --upstream.auth.jwks.endpoint
             - {{ .Values.piko.publicToken.url }}
