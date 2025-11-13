@@ -149,7 +149,7 @@ declare -a IMAGES=(
   
   # External Component Images
   "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/envoyproxy/envoy:${ENVOY_VERSION}"
-  "docker.io/dotjson/piko:${PIKO_VERSION}"
+  "us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy/dotjson/piko:${PIKO_VERSION}"
   
   # OpenTelemetry Collector Images (Optional)
   "ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s:${OTEL_VERSION}"

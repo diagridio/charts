@@ -566,7 +566,7 @@ piko:
   image:
     # registry is the container registry for the Piko image.
     # If global.image.registry is set, it will override this value.
-    registry: docker.io/dotjson
+    registry: us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy/dotjson
     # repository is the image name/path within the registry.
     repository: piko
     # tag is the image tag/version to use
