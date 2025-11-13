@@ -18,7 +18,7 @@
 #   --dapr-version VERSION        Dapr version (default: 1.16.2)
 #   --internal-dapr-version VERSION  Internal Dapr version (default: 1.16.2-rc.1-catalyst.2)
 #   --envoy-version VERSION       Envoy version (default: distroless-v1.33.0)
-#   --piko-version VERSION        Piko version (default: v0.8.1)
+#   --piko-version VERSION        Piko version (default: v0.8.2)
 #   --otel-version VERSION        OpenTelemetry Collector version (default: 0.112.0)
 #   --dry-run                     Print what would be done without executing
 #   --skip-pull                   Skip pulling images, only tag and push
@@ -51,7 +51,7 @@ CATALYST_VERSION="0.469.0"
 DAPR_VERSION="1.16.2"
 INTERNAL_DAPR_VERSION="1.16.2-catalyst.1"
 ENVOY_VERSION="distroless-v1.33.0"
-PIKO_VERSION="v0.8.1"
+PIKO_VERSION="v0.8.2"
 OTEL_VERSION="0.112.0"
 
 # Parse arguments
@@ -149,7 +149,7 @@ declare -a IMAGES=(
   
   # External Component Images
   "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/envoyproxy/envoy:${ENVOY_VERSION}"
-  "ghcr.io/andydunstall/piko:${PIKO_VERSION}"
+  "us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy/dotjson/piko:${PIKO_VERSION}"
   
   # OpenTelemetry Collector Images (Optional)
   "ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s:${OTEL_VERSION}"

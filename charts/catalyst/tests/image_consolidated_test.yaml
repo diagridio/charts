@@ -110,7 +110,7 @@ tests:
     asserts:
       - matchRegex:
           path: spec.template.spec.containers[0].image
-          pattern: ^ghcr\.io/andydunstall/piko:v[0-9]+\.[0-9]+\.[0-9]+$
+          pattern: ^us-central1-docker\.pkg\.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy/dotjson/piko:v[0-9]+\.[0-9]+\.[0-9]+$
         template: piko/statefulset.yaml
 
   - it: should NOT use consolidated image for envoy (external component)
@@ -132,7 +132,7 @@ tests:
     asserts:
       - equal:
           path: spec.template.spec.containers[0].image
-          value: "ghcr.io/andydunstall/piko:v0.8.1"
+          value: "us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy/dotjson/piko:v0.8.2"
         template: piko/statefulset.yaml
 
   - it: should use consolidated image name in agent config
