@@ -132,7 +132,7 @@ tests:
     asserts:
       - equal:
           path: spec.template.spec.containers[0].image
-          value: "docker.io/dotjson/piko:v0.8.1"
+          value: "docker.io/dotjson/piko:v0.8.2"
         template: piko/statefulset.yaml
 
   - it: should use consolidated image name in agent config

@@ -174,7 +174,7 @@ The script is located at `scripts/catalyst/mirror-images.sh` and handles pulling
   --dapr-version 1.16.2 \
   --internal-dapr-version 1.16.2-catalyst.1 \
   --envoy-version distroless-v1.33.0 \
-  --piko-version v0.8.1 \
+  --piko-version v0.8.2 \
   --otel-version 0.112.0
 ```
 
