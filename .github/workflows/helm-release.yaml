@@ -76,7 +76,7 @@ jobs:
             --target "${{ github.sha }}"
 
       - name: Upload Chart to GitHub Release
-        if: ${{ !startsWith(github.ref, 'refs/heads/main') }}
+        if: ${{ !startsWith(github.ref, 'refs/heads/main') && !startsWith(github.ref, 'refs/heads/candidate-release-') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
