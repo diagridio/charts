@@ -66,7 +66,7 @@ else
     if [ -z "$LATEST_TAG" ]; then
       VERSION="${MAJOR}.${MINOR}.0-rc.1"
     else
-      VERSION="${LATEST_TAG}"
+      VERSION=$(echo "$LATEST_TAG" | sed 's/^v//')
     fi
 
     echo "New version: $VERSION"
