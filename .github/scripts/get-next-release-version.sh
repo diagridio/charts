@@ -15,12 +15,13 @@ if [ -z "$BASE_RELEASE_VERSION" ]; then
 fi
 
 echo "Using base release version: $BASE_RELEASE_VERSION"
-if [[ "$BASE_RELEASE_VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+# support semver eg. v0.31.0-rc.1
+if [[ "$BASE_RELEASE_VERSION" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
   MAJOR="${BASH_REMATCH[1]}"
   MINOR="${BASH_REMATCH[2]}"
   BASE_RELEASE_BRANCH="release-${MAJOR}.${MINOR}"
 else
-  echo "Error: BASE_RELEASE_VERSION does not match expected pattern e.g. 0.3.0"
+  echo "Error: BASE_RELEASE_VERSION does not match expected pattern e.g. v0.31.0-rc.1"
   exit 1
 fi
 
@@ -46,7 +47,7 @@ if [[ "$BASE_RELEASE_BRANCH" =~ ^release-([0-9]+)\.([0-9]+)$ ]]; then
     PATCH=$((PATCH + 1)) # Increment patch
   fi
 
-  VERSION="${MAJOR}.${MINOR}.${PATCH}"
+  VERSION="v${MAJOR}.${MINOR}.${PATCH}"
   echo "Setting VERSION=$VERSION for downstream steps"
   echo "VERSION=$VERSION" >> "$GITHUB_ENV" # For GitHub Actions
 
