@@ -56,6 +56,21 @@ else
     VERSION="${MAJOR}.${MINOR}.${PATCH}"
     echo "New version: $VERSION"
     yq -i ".version = \"$VERSION\"" "$TEMP_CHART_YAML"
+  elif [[ "$BRANCH" =~ ^candidate-release-([0-9]+)\.([0-9]+)$ ]]; then
+    MAJOR="${BASH_REMATCH[1]}"
+    MINOR="${BASH_REMATCH[2]}"
+    echo "Packaging candidate release version for $BRANCH"
+
+    # Find the latest patch version for this major.minor from git tags
+    LATEST_TAG=$(git tag -l "v${MAJOR}.${MINOR}.*" | sort -V | tail -n1)
+    if [ -z "$LATEST_TAG" ]; then
+      VERSION="${MAJOR}.${MINOR}.0-rc.1"
+    else
+      VERSION=$(echo "$LATEST_TAG" | sed 's/^v//')
+    fi
+
+    echo "New version: $VERSION"
+    yq -i ".version = \"$VERSION\"" "$TEMP_CHART_YAML"
   else
     [ -z "$CHART_VERSION" ] && { echo "Error: CHART_VERSION environment variable is required."; exit 1; }
     VERSION="$CHART_VERSION"
