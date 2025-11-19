@@ -5,6 +5,10 @@ concurrency: "automated-release"
 on:
   workflow_dispatch:
     inputs:
+      source_branch:
+        description: "Source branch to create the release from."
+        type: string
+        required: true
       release_branch:
         description: "Release branch to create the release on."
         type: string
@@ -26,6 +30,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         fetch-depth: 0 # Full history for git tag checking
+        ref: ${{ inputs.source_branch }}
 
     # will create a new release branch. CI won't trigger on this branch because it was created by an workflow.
     - name: Checkout release branch
