@@ -1,0 +1,35 @@
+suite: Test Agent App Tunnel Configuration
+templates:
+  - agent/configmap.yaml
+tests:
+  - it: should configure app tunnel with default values
+    set:
+      join_token: "test-token"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "app_tunnel:[\\s\\S]*supported: true"
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "app_tunnel:[\\s\\S]*dns_prefix: tunnels"
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "app_tunnel:[\\s\\S]*proxy_tls: false"
+
+  - it: should disable app tunnel support when piko is disabled
+    set:
+      join_token: "test-token"
+      piko.enabled: false
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "app_tunnel:[\\s\\S]*supported: false"
+
+  - it: should enable proxy tls when configured
+    set:
+      join_token: "test-token"
+      piko.certificates.proxy.enabled: true
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "app_tunnel:[\\s\\S]*proxy_tls: true"

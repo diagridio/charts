@@ -1,6 +1,12 @@
 {{- include "agent.validateValues" . -}}
 {{- $agentConfig := deepCopy .Values.agent.config -}}
 {{- $_ := set $agentConfig.host "join_token" .Values.join_token -}}
+{{- if not (hasKey $agentConfig.host "app_tunnel") -}}
+  {{- $_ := set $agentConfig.host "app_tunnel" (dict) -}}
+{{- end -}}
+{{- $_ := set $agentConfig.host.app_tunnel "supported" .Values.piko.enabled -}}
+{{- $_ := set $agentConfig.host.app_tunnel "dns_prefix" "tunnels" -}}
+{{- $_ := set $agentConfig.host.app_tunnel "proxy_tls" .Values.piko.certificates.proxy.enabled -}}
 {{- $_ := set $agentConfig "control_plane_namespace" .Values.global.control_plane_namespace -}}
 {{- $_ := set $agentConfig "control_plane_url" .Values.global.control_plane_url -}}
 {{- $_ := set $agentConfig "control_plane_http_url" .Values.global.control_plane_http_url -}}
