@@ -1,12 +1,9 @@
 name: Publish Catalyst Helm Chart
 
 on:
-  # Only trigger on main branch and release branches
   push:
     branches:
       - main
-      - 'release-[0-9]+.[0-9]+'
-      - 'candidate-release-[0-9]+.[0-9]+'
 
 env:
   REGISTRY: ${{ vars.AWS_PUBLIC_ECR_HOST }}
@@ -68,40 +65,3 @@ jobs:
           VERSION: ${{ steps.get-version.outputs.VERSION }}
         run: |
           make helm-prereqs helm-package helm-push
-
-      - name: Create GitHub Release ${{ steps.get-version.outputs.VERSION }}
-        if: ${{ startsWith(github.ref, 'refs/heads/release-') }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ steps.get-version.outputs.VERSION }}
-        run: |
-          echo "Creating GitHub release for $VERSION"
-          gh release create "$VERSION" \
-            --title "Release $VERSION" \
-            --notes "Helm chart version $VERSION from ${{ github.ref }}" \
-            --target "${{ github.sha }}"
-      - name: Upload Chart to GitHub Release
-        if: ${{ startsWith(github.ref, 'refs/heads/release-') }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ steps.get-version.outputs.VERSION }}
-        run: |
-          CHART_NAME=$(yq '.name' "charts/catalyst/Chart.yaml")
-          CHART_FILE="charts/catalyst/dist/${CHART_NAME}-${VERSION}.tgz"
-          if [ -f "$CHART_FILE" ]; then
-            echo "Uploading $CHART_FILE to release $VERSION"
-            gh release upload "$VERSION" "$CHART_FILE"
-          else
-            echo "Error: Chart file not found for upload"
-            exit 1
-          fi
-
-      - name: Create git tag ${{ steps.get-version.outputs.VERSION }}
-        if: ${{ startsWith(github.ref, 'refs/heads/candidate-release-') }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ steps.get-version.outputs.VERSION }}
-        run: |
-          echo "Creating git tag for $VERSION"
-          git tag "$VERSION"
-          git push origin "$VERSION"

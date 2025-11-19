@@ -22,17 +22,46 @@ on:
         type: string
         required: true
 
+env:
+  REGISTRY: ${{ vars.AWS_PUBLIC_ECR_HOST }}
+  REPO: ${{ vars.AWS_PUBLIC_ECR_ALIAS }}
+
 jobs:
   release:
     runs-on: ubuntu-latest
+    environment: shared-production
+    permissions: write-all # Needed to create GitHub releases and tags
     steps:
+    - name: Validate release branch
+      # release branch must start with release- or candidate-release-
+      run: |
+        if [[ ! ${{ inputs.release_branch }} =~ ^(release-|candidate-release-)[0-9]+\.[0-9]+$ ]]; then
+          echo "Error: Release branch must start with release- or candidate-release-"
+          exit 1
+        fi
     - name: Checkout code
       uses: actions/checkout@v4
       with:
         fetch-depth: 0 # Full history for git tag checking
         ref: ${{ inputs.source_branch }}
 
-    # will create a new release branch. CI won't trigger on this branch because it was created by an workflow.
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ vars.AWS_CI_ROLE }}
+        aws-region: ${{ vars.AWS_CI_REGION }}
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+      with:
+        registry-type: public
+
+    - name: Add Helm Repositories
+      run: |
+        helm repo add open-telemetry https://open-telemetry.github.io/opentelemetry-helm-charts
+        helm repo update
+
     - name: Checkout release branch
       run: |
         git config --global user.email "bot@diagrid.io"
@@ -53,9 +82,51 @@ jobs:
         chmod +x .github/scripts/update-guides.sh
         ./.github/scripts/update-guides.sh
 
-    # Push to release branch, then helm-release.yaml will pick it up and create a github release.
     - name: Push to release branch
       run: |
         git add .
         git commit -m "Update release branch to ${{ inputs.release_version }} and images to ${{ inputs.images_tag }}"
         git push origin ${{ inputs.release_branch }}
+    
+    - name: Package and Push Helm Chart
+      env:
+        VERSION: ${{ inputs.release_version }}
+      run: |
+        make helm-prereqs helm-package helm-push
+
+    - name: Create GitHub Release ${{ inputs.release_version }}
+      if: ${{ startsWith(inputs.release_branch, 'release-') }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        VERSION: ${{ inputs.release_version }}
+      run: |
+        echo "Creating GitHub release for $VERSION"
+        gh release create "$VERSION" \
+          --title "Release $VERSION" \
+          --notes "Helm chart version $VERSION from ${{ inputs.release_version }}" \
+          --target "$(git rev-parse HEAD)"
+    - name: Upload Chart to GitHub Release
+      if: ${{ startsWith(inputs.release_branch, 'release-') }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        VERSION: ${{ inputs.release_version }}
+      run: |
+        CHART_NAME=$(yq '.name' "charts/catalyst/Chart.yaml")
+        CHART_FILE="charts/catalyst/dist/${CHART_NAME}-${VERSION}.tgz"
+        if [ -f "$CHART_FILE" ]; then
+          echo "Uploading $CHART_FILE to release $VERSION"
+          gh release upload "$VERSION" "$CHART_FILE"
+        else
+          echo "Error: Chart file not found for upload"
+          exit 1
+        fi
+
+    - name: Create git tag ${{ inputs.release_version }}
+      if: ${{ startsWith(inputs.release_branch, 'candidate-release-') }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        VERSION: ${{ inputs.release_version }}
+      run: |
+        echo "Creating git tag for $VERSION"
+        git tag "$VERSION"
+        git push origin "$VERSION"
