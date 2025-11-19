@@ -9,9 +9,8 @@ on:
       - 'candidate-release-[0-9]+.[0-9]+'
 
 env:
-  CHART_DIR: charts/catalyst
-  CHART_REGISTRY: ${{ vars.AWS_PUBLIC_ECR_HOST }}
-  CHART_ALIAS: ${{ vars.AWS_PUBLIC_ECR_ALIAS }}
+  REGISTRY: ${{ vars.AWS_PUBLIC_ECR_HOST }}
+  REPO: ${{ vars.AWS_PUBLIC_ECR_ALIAS }}
 
 jobs:
   publish-helm-chart:
@@ -55,34 +54,40 @@ jobs:
         if: ${{ startsWith(github.ref, 'refs/heads/main') }}
         run: |
           make update-catalyst-tags IMAGES_TAG=edge
+          make update-catalyst-chart-version VERSION=0.0.0-edge
+
+      - name: Get version
+        id: get-version
+        run: |
+          VERSION=$(yq '.version' "charts/catalyst/Chart.yaml")
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Package and Push Helm Chart
         env:
-          BRANCH: ${{ github.event.pull_request.base.ref || github.ref_name }}
+          VERSION: ${{ steps.get-version.outputs.VERSION }}
         run: |
-          chmod +x .github/scripts/package-helm-chart.sh
-          ./.github/scripts/package-helm-chart.sh
+          make helm-prereqs helm-package helm-push
 
-      - name: Create GitHub Release
-        if: ${{ !startsWith(github.ref, 'refs/heads/main') && !startsWith(github.ref, 'refs/heads/candidate-release-') }}
+      - name: Create GitHub Release ${{ steps.get-version.outputs.VERSION }}
+        if: ${{ startsWith(github.ref, 'refs/heads/release-') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.get-version.outputs.VERSION }}
         run: |
-          VERSION="${{ env.VERSION }}"
           echo "Creating GitHub release for $VERSION"
           gh release create "$VERSION" \
             --title "Release $VERSION" \
-            --notes "Helm chart version $VERSION from ${{ github.event.pull_request.base.ref }}" \
+            --notes "Helm chart version $VERSION from ${{ github.ref }}" \
             --target "${{ github.sha }}"
-
       - name: Upload Chart to GitHub Release
-        if: ${{ !startsWith(github.ref, 'refs/heads/main') && !startsWith(github.ref, 'refs/heads/candidate-release-') }}
+        if: ${{ startsWith(github.ref, 'refs/heads/release-') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.get-version.outputs.VERSION }}
         run: |
-          VERSION="${{ env.VERSION }}"
-          CHART_NAME=$(yq '.name' "$CHART_DIR/Chart.yaml")
-          CHART_FILE="$CHART_DIR/dist/${CHART_NAME}-${VERSION}.tgz"
+          CHART_NAME=$(yq '.name' "charts/catalyst/Chart.yaml")
+          CHART_FILE="charts/catalyst/dist/${CHART_NAME}-${VERSION}.tgz"
           if [ -f "$CHART_FILE" ]; then
             echo "Uploading $CHART_FILE to release $VERSION"
             gh release upload "$VERSION" "$CHART_FILE"
@@ -91,3 +96,12 @@ jobs:
             exit 1
           fi
 
+      - name: Create git tag ${{ steps.get-version.outputs.VERSION }}
+        if: ${{ startsWith(github.ref, 'refs/heads/candidate-release-') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.get-version.outputs.VERSION }}
+        run: |
+          echo "Creating git tag for $VERSION"
+          git tag "$VERSION"
+          git push origin "$VERSION"
