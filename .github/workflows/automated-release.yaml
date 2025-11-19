@@ -95,7 +95,7 @@ jobs:
         make helm-prereqs helm-package helm-push
 
     - name: Create GitHub Release ${{ inputs.release_version }}
-      if: ${{ startsWith(inputs.release_branch, 'refs/heads/release-') }}
+      if: ${{ startsWith(inputs.release_branch, 'release-') }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         VERSION: ${{ inputs.release_version }}
@@ -106,7 +106,7 @@ jobs:
           --notes "Helm chart version $VERSION from ${{ inputs.release_version }}" \
           --target "$(git rev-parse HEAD)"
     - name: Upload Chart to GitHub Release
-      if: ${{ startsWith(inputs.release_branch, 'refs/heads/release-') }}
+      if: ${{ startsWith(inputs.release_branch, 'release-') }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         VERSION: ${{ inputs.release_version }}
@@ -122,7 +122,7 @@ jobs:
         fi
 
     - name: Create git tag ${{ inputs.release_version }}
-      if: ${{ startsWith(inputs.release_branch, 'refs/heads/candidate-release-') }}
+      if: ${{ startsWith(inputs.release_branch, 'candidate-release-') }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         VERSION: ${{ inputs.release_version }}
