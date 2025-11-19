@@ -31,7 +31,7 @@ A Catalyst installation consists of the following components:
 - **Management**: Provides access to service providers such as secrets stores.
 - **Gateway**: Provides routing to Dapr runtime instances.
 - **Telemetry**: Collectors export telemetry from Dapr.
-- **Piko**: Provides tunnels to connect to applications on private networks.
+- **Piko**: Provides app tunnels to connect to applications on private networks.
 
 ## Guides
 For step-by-step guides on deploying Catalyst to various Kubernetes environments, please refer to the following:
@@ -104,7 +104,7 @@ cleanup:
 
 ## Configuration
 
-## Kubernetes
+### Kubernetes
 
 A Catalyst installation is not intended to be installed into a shared Kubernetes cluster with other workloads. This is because it handles some global resources and dynamically provisions new workloads on demand. This may lead to conflicts with other workloads and cause resource contention. It is recommended to install Catalyst into its own dedicated Kubernetes that has been sized appropriately for your expected workload.
 
@@ -242,7 +242,7 @@ global:
     existingSecret: "my-charts-secret"
 ```
 
-## Dapr PKI
+### Dapr PKI
 
 Dapr has a control plane component called [Sentry](https://docs.dapr.io/concepts/dapr-services/sentry/) that issues identity credentials (X.509 certificates) to Dapr sidecars and other Dapr control plane services. By default, Sentry generates a self-signed root certificate authority (CA) to sign these certificates that is valid for 1 year. It is strongly recommended that you integrate with your own PKI solution. This can be done by providing an issuer (or intermediate) CA certificate and private key, as well as trust anchors (or root CA certificates) to the Dapr Sentry component. Use the following configuration in your Catalyst Helm Chart `values.yaml` to set up Dapr PKI with Catalyst:
 
@@ -256,11 +256,11 @@ agent:
         namespace: "cra-agent" # Namespace where the CA resources are located
 ```
 
-## Gateway TLS
+### Gateway TLS
 
 If you wish to terminate TLS at the Catalyst Gateway, you can provide your own TLS certificate and private key using the following configuration in your Catalyst Helm Chart `values.yaml`.
 
-### Using an Existing TLS Secret
+#### Using an Existing TLS Secret
 
 For an existing TLS secret:
 ```yaml
@@ -270,7 +270,7 @@ gateway:
     existingSecret: "my-tls-secret" # Name of the existing Kubernetes Secret containing the TLS certificate and private key
 ```
 
-### Using Inline Certificate and Key
+#### Using Inline Certificate and Key
 
 You can also provide the certificate and key inline or via file references:
 
@@ -290,11 +290,11 @@ gateway:
       -----END PRIVATE KEY-----
 ```
 
-## OpenTelemetry Collector (Optional)
+### OpenTelemetry Collector (Optional)
 
 Catalyst includes optional OpenTelemetry Collector addons that provide a flexible, vendor-neutral way to collect and export telemetry data (logs, metrics, and traces) from your Kubernetes cluster.
 
-### Why Use the OpenTelemetry Collector?
+#### Why Use the OpenTelemetry Collector?
 
 - **Vendor Neutrality**: Send telemetry to any backend that supports OTLP or other standard protocols
 - **Flexibility**: Configure different exporters for traces, metrics, and logs independently
@@ -303,7 +303,7 @@ Catalyst includes optional OpenTelemetry Collector addons that provide a flexibl
 
 For more information on how to configure the OpenTelemetry Collector, visit the [official documentation](https://opentelemetry.io/docs/collector/configuration/).
 
-## Secrets
+### Secrets
 
 When using Dapr components in Catalyst, you can use [Dapr's built-in secret references](https://docs.dapr.io/operations/components/component-secrets) to securely access secrets from supported secret stores. This allows you to keep sensitive information out of your application code and configuration files. In Catalyst, if you do not explicitly use Dapr's secret references, it will implicitly use one to ensure your secrets are only ever persisted in your own Catalyst Private installation and never in Diagrid Cloud.
 
@@ -321,6 +321,19 @@ global:
       region: "us-east-1"  # AWS region where your secrets are stored
       access_key: ""
       secret_access_key: ""
+```
+
+### App Tunnels
+
+App tunnels in Catalyst allow you to connect an application to your Catalyst App IDs without exposing it directly on the network. This is particularly useful for applications running on private networks or behind firewalls. The tunnels themselves are provided by a service called Piko that runs within your Catalyst Private installation. This service is enabled by default but does not have TLS enabled for proxy connections. The contents of the tunnel itself is always secured using mTLS. If you wish to enable TLS for the proxy connections, you can do so by setting the following configuration in your `values.yaml` file:
+
+```yaml
+piko:
+  enabled: true
+  certificates:
+    proxy:
+      enabled: true  # Enable TLS for proxy connections
+      secretName: "piko-proxy-tls"  # Name of the Kubernetes Secret containing the TLS certificate and private key
 ```
 
 ## Networking
