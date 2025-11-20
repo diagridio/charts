@@ -31,7 +31,6 @@
 
 - **Azure CLI** (v2.45.0+): For managing Azure resources and authentication
 - **Diagrid CLI** (v0.12.0+): For managing Catalyst regions and projects
-- **AWS CLI** (v2.0+): Required for OCI registry login to pull Catalyst images from AWS ECR
 - **Helm** (v3.12.0+): For deploying Catalyst to Kubernetes
 - **kubectl** (v1.28+): For interacting with the Kubernetes cluster
 - **jq** (v1.6+): For JSON parsing in shell scripts

@@ -2,17 +2,17 @@
 
 ## Overview
 
-Diagrid Catalyst is a collection of API-based programming patterns for messaging, data, and workflow that is fully compliant with the Dapr open source project. It provides managed components and runtime that streamline cloud-native application development.
+Catalyst is an enterprise platform for workflow orchestration, service discovery and pub/sub, powered by Dapr. Build apps and AI agents that are compliant, secure and failure-proof. Find out more at [diagrid.io/catalyst](https://www.diagrid.io/catalyst).
 
-Diagrid Catalyst Private allows you to self-host a Catalyst region within your own environment whilst continuing to use it as a service via Diagrid Cloud. This works by separating the control plane (hosted by Diagrid Cloud) from the data plane (hosted within your Kubernetes cluster). The control plane only manages your configuration, whilst the data plane within your environment handles all application connectivity and data. Some specific telemetry data (metrics, api logs) is sent to Diagrid Cloud to enhance your experience in the web console.
+**Catalyst Private** enables you to self-host a Catalyst region within your own environment while using it as a service via Diagrid Cloud. This architecture separates the control plane (hosted by Diagrid Cloud) from the data plane (hosted in your Kubernetes cluster). The control plane manages configuration, while the data plane handles application connectivity and data.
 
-You will interact with your Catalyst Private installation via the Diagrid Cloud web console (https://catalyst.diagrid.io) and CLI, just like if you were using the fully managed service. The Diagrid Cloud web console uses a hybrid approach where it fetches app data directly from your Catalyst Private installation and not from our public services. Therefore, you must ensure that the machine you are using to access the web console can reach the ingress address of your Catalyst Private installation.
+You interact with your Catalyst Private installation via the [Diagrid Cloud web console](https://catalyst.diagrid.io) and CLI. The console fetches app data directly from your installation, so your machine must be able to reach your Catalyst Private ingress.
 
 ![Catalyst](../../assets/img/catalyst.svg)
 
 ## Dapr API Compatibility
 
-Diagrid Catalyst currently supports the following Dapr APIs:
+Diagrid Catalyst supports the following Dapr APIs:
 - [Workflows](https://docs.dapr.io/reference/api/workflow_api/)
 - [Conversation](https://docs.dapr.io/reference/api/conversation_api/)
 - [Service Invocation](https://docs.dapr.io/reference/api/service_invocation_api/)
@@ -26,12 +26,11 @@ Diagrid Catalyst currently supports the following Dapr APIs:
 
 ## Components
 
-A Catalyst installation consists of the following components:
-- **Agent**: Manages the configuration of Dapr projects.
-- **Management**: Provides access to service providers such as secrets stores.
-- **Gateway**: Provides routing to Dapr runtime instances.
-- **Telemetry**: Collectors export telemetry from Dapr.
-- **Piko**: Provides tunnels to connect to applications on private networks.
+- **Agent**: Manages Dapr project configuration.
+- **Management**: Accesses service providers (e.g., secrets stores).
+- **Gateway**: Routes to Dapr runtime instances.
+- **Telemetry**: Exports telemetry from Dapr.
+- **Piko**: Tunnels to applications on private networks.
 
 ## Guides
 For step-by-step guides on deploying Catalyst to various Kubernetes environments, please refer to the following:
@@ -74,12 +73,6 @@ export JOIN_TOKEN=$(diagrid region create <region-name> --ingress "https://<ingr
 ### Installing the Chart
 
 ```bash
-# Authenticate with the public AWS registry
-aws ecr-public get-login-password \
-     --region us-east-1 | helm registry login \
-     --username AWS \
-     --password-stdin public.ecr.aws
-
 # Install Catalyst using the Helm chart
 helm install catalyst oci://public.ecr.aws/diagrid/catalyst \
      -n cra-agent \
@@ -104,69 +97,67 @@ cleanup:
 
 ## Configuration
 
-## Kubernetes
+### Cluster Requirements
 
-A Catalyst installation is not intended to be installed into a shared Kubernetes cluster with other workloads. This is because it handles some global resources and dynamically provisions new workloads on demand. This may lead to conflicts with other workloads and cause resource contention. It is recommended to install Catalyst into its own dedicated Kubernetes that has been sized appropriately for your expected workload.
+Catalyst should be installed in a dedicated Kubernetes cluster. It manages global resources and dynamically provisions workloads, which may conflict with other applications in a shared cluster.
 
-### RBAC
+### Permissions
 
-The Catalyst components currently have wide-ranging permissions within the Kubernetes cluster they are installed into. This is because Catalyst needs to be able to dynamically create and manage resources on behalf of your applications. We wil be working to reduce the scope of these permissions in future releases.
+Catalyst components require broad permissions to dynamically manage resources. We are working to reduce this scope in future releases.
 
 ### Images
 
-The Catalyst Helm chart deploys multiple container images across its components. This section documents all images used by the chart to help users understand what will be installed and what images may need to be mirrored to private registries.
+The chart deploys multiple images. Below is a reference for users who need to mirror images to private registries.
 
-### Installation Images
+#### Installation Images
 
-By default, the chart uses a consolidated Catalyst image that includes all necessary components:
+Most images are hosted in the Diagrid public repository:
+`REPO=us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public`
 
-| Component | Default Image | Description |
-|-----------|--------------|-------------|
-| **Catalyst** | `us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-all:<tag>` | Catalyst services |
-
-It is possible to run the chart with separate images for each component:
-| Component | Default Image | Description |
-|-----------|--------------|-------------|
-| **Catalyst Agent** | `us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/cra-agent:<tag>` | Catalyst agent service |
-| **Catalyst Management** | `us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-management:<tag>` | Catalyst management service |
-| **Gateway Control Plane** | `us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-gateway:<tag>` | Gateway control plane service |
-| **Gateway Identity Injector** | `us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/identity-injector:<tag>` | Identity injection service |
-
-Catalyst also uses the following dependency images:
-| Component | Default Image | Description |
-|-----------|--------------|-------------|
-| **Envoy Proxy** | `us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/envoyproxy/envoy:<tag>` | Envoy proxy for gateway |
-| **Piko** | `ghcr.io/andydunstall/piko:<tag>` | Piko reverse tunneling service |
-
-### Runtime Images
-
-The Catalyst Agent provisions additional images at runtime, including:
+By default, a consolidated image is used:
 
 | Component | Default Image | Description |
 |-----------|--------------|-------------|
-| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/sidecar:<tag>` | Catalyst dapr server |
-| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/diagrid-otel-collector:<tag>` | OTel collector for telemetry |
-| **Dapr Control Plane (OSS)** | `us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/daprio/dapr:<tag>` | Dapr control plane services (operator, placement, sentry, scheduler) |
-| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/dapr:<tag>` | Catalyst Dapr control plane services (operator, placement, sentry, scheduler) |
+| **Catalyst** | `$REPO/catalyst-all:<tag>` | Catalyst services |
 
-### Optional Images
-
-When OpenTelemetry Collector addons are enabled, the following images are used:
+Alternatively, separate images can be used:
 
 | Component | Default Image | Description |
 |-----------|--------------|-------------|
-| **OpenTelemetry Collector (Deployment)** | `ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s:<tag>` | OpenTelemetry Collector for traces and metrics (optional) |
-| **OpenTelemetry Collector (DaemonSet)** | `ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s:<tag>` | OpenTelemetry Collector for logs collection (optional) |
+| **Catalyst Agent** | `$REPO/cra-agent:<tag>` | Catalyst agent service |
+| **Catalyst Management** | `$REPO/catalyst-management:<tag>` | Catalyst management service |
+| **Gateway Control Plane** | `$REPO/catalyst-gateway:<tag>` | Gateway control plane service |
+| **Gateway Identity Injector** | `$REPO/identity-injector:<tag>` | Identity injection service |
 
-These images are only deployed when explicitly enabled via `opentelemetry-deployment.enabled=true` or `opentelemetry-daemonset.enabled=true`.
+Dependencies:
+
+| Component | Default Image | Description |
+|-----------|--------------|-------------|
+| **Envoy Proxy** | `envoyproxy/envoy:<tag>` | Envoy proxy for gateway |
+| **Piko** | `dotjson/piko:<tag>` | Piko reverse tunneling service |
+
+#### Runtime Images
+
+The Agent provisions these at runtime:
+
+| Component | Default Image | Description |
+|-----------|--------------|-------------|
+| **Dapr Server** | `$REPO/sidecar:<tag>` | Catalyst dapr server |
+| **OpenTelemetry Collector** | `$REPO/diagrid-otel-collector:<tag>` | OTel collector for telemetry |
+| **Dapr Control Plane (Catalyst)** | `$REPO/dapr:<tag>` | Catalyst Dapr control plane services |
+| **Dapr Control Plane (OSS)** | `daprio/dapr:<tag>` | Dapr control plane services |
+
+#### Optional Images
+
+Used when OpenTelemetry addons are enabled:
+
+| Component | Default Image | Description |
+|-----------|--------------|-------------|
+| **OpenTelemetry Collector (OSS)** | `ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s:<tag>` | Collector for traces, metrics, and logs |
 
 ### Private Image Registry
 
-If you're deploying in an air-gapped environment or need to use a private image registry, you can use the provided script to copy all images.
-
-The script is located at `scripts/catalyst/mirror-images.sh` and handles pulling all Catalyst images and pushing them to your private registry.
-
-> **NOTE**: The versions below may be out of date, please check the docs for the latest versions.
+For air-gapped environments, use the provided script to mirror images to your private registry.
 
 ```bash
 ./scripts/catalyst/mirror-images.sh my-registry.example.com \
@@ -178,9 +169,7 @@ The script is located at `scripts/catalyst/mirror-images.sh` and handles pulling
   --otel-version 0.112.0
 ```
 
-**Note:** The `--otel-version` parameter is optional and only needed if you plan to enable the OpenTelemetry Collector addons.
-
-After mirroring, configure your values file with the global registry override pointing to your private registry:
+Configure your values file:
 
 ```yaml
 global:
@@ -188,7 +177,7 @@ global:
     registry: my-registry.example.com
 ```
 
-If you're using the OpenTelemetry Collector addons, you'll also need to configure the image repository explicitly:
+If using OpenTelemetry addons:
 
 ```yaml
 opentelemetry-deployment:
@@ -206,178 +195,126 @@ opentelemetry-daemonset:
 
 ### Private Helm Registry
 
-If you also need to mirror the Helm chart to a private Helm registry, you can use the following commands:
+To mirror the chart to a private registry:
 
 ```bash
-# Pull the Catalyst chart from the public registry
 helm pull oci://public.ecr.aws/diagrid/catalyst --version <version>
-# Tag and push the chart to your private registry
 helm push catalyst-<version>.tgz oci://my-registry.example.com/diagrid/catalyst
 ```
 
-You can then configure authentication for your private Helm registry using `global.charts`:
+Configure authentication in `values.yaml`:
 
 ```yaml
 global:
   charts:
     registry: "oci://my-registry.example.com/diagrid/catalyst"
-    # For basic authentication
     username: "my-username"
     password: "my-password"
-    # For certificate-based authentication
-    clientCert: |
-      -----BEGIN CERTIFICATE-----
-      ...
-      -----END CERTIFICATE-----
-    clientKey: |
-      -----BEGIN PRIVATE KEY-----
-      ...
-      -----END PRIVATE KEY-----
-    # For self-signed CA
-    customCA: |
-      -----BEGIN CERTIFICATE-----
-      ...
-      -----END CERTIFICATE-----
-    # Or use an existing secret
-    existingSecret: "my-charts-secret"
+    # Or use existingSecret, clientCert, clientKey, customCA
 ```
 
-## Dapr PKI
+### Dapr PKI
 
-Dapr has a control plane component called [Sentry](https://docs.dapr.io/concepts/dapr-services/sentry/) that issues identity credentials (X.509 certificates) to Dapr sidecars and other Dapr control plane services. By default, Sentry generates a self-signed root certificate authority (CA) to sign these certificates that is valid for 1 year. It is strongly recommended that you integrate with your own PKI solution. This can be done by providing an issuer (or intermediate) CA certificate and private key, as well as trust anchors (or root CA certificates) to the Dapr Sentry component. Use the following configuration in your Catalyst Helm Chart `values.yaml` to set up Dapr PKI with Catalyst:
+By default, Dapr Sentry generates a self-signed root CA. For production, integrate with your own PKI by providing an issuer CA and trust anchors:
 
 ```yaml
 agent:
   config:
     internal_dapr:
       ca:
-        issuer_secret_name: "issuer-secret" # Name of the Kubernetes TLS Secret containing the CA issuer certificate and private key
-        trust_anchors_config_map_name: "trust-anchors" # Name of the Kubernetes ConfigMap containing the CA trust anchors
-        namespace: "cra-agent" # Namespace where the CA resources are located
+        issuer_secret_name: "issuer-secret"
+        trust_anchors_config_map_name: "trust-anchors"
+        namespace: "cra-agent"
 ```
 
-## Gateway TLS
+### Gateway TLS
 
-If you wish to terminate TLS at the Catalyst Gateway, you can provide your own TLS certificate and private key using the following configuration in your Catalyst Helm Chart `values.yaml`.
-
-### Using an Existing TLS Secret
-
-For an existing TLS secret:
-```yaml
-gateway:
-  tls:
-    enabled: true
-    existingSecret: "my-tls-secret" # Name of the existing Kubernetes Secret containing the TLS certificate and private key
-```
-
-### Using Inline Certificate and Key
-
-You can also provide the certificate and key inline or via file references:
+To terminate TLS at the Catalyst Gateway, provide a certificate and key:
 
 ```yaml
 gateway:
   tls:
     enabled: true
-    cert: |
-      -----BEGIN CERTIFICATE-----
-      MIIDXTCCAkWgAwIBAgIJALN3fF8NqLxeMA0GCSqGSIb3DQEBCwUAMEUxCzAJBgNV
-      ...
-      -----END CERTIFICATE-----
-    key: |
-      -----BEGIN PRIVATE KEY-----
-      MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC5Ym8qkGZgGfWE
-      ...
-      -----END PRIVATE KEY-----
+    existingSecret: "my-tls-secret"
+    # Or provide cert/key inline
 ```
 
-## OpenTelemetry Collector (Optional)
+### OpenTelemetry Collector (Optional)
 
-Catalyst includes optional OpenTelemetry Collector addons that provide a flexible, vendor-neutral way to collect and export telemetry data (logs, metrics, and traces) from your Kubernetes cluster.
+Catalyst includes optional OpenTelemetry Collector addons for collecting and exporting telemetry. See the [official documentation](https://opentelemetry.io/docs/collector/configuration/) for configuration details.
 
-### Why Use the OpenTelemetry Collector?
+### Secrets
 
-- **Vendor Neutrality**: Send telemetry to any backend that supports OTLP or other standard protocols
-- **Flexibility**: Configure different exporters for traces, metrics, and logs independently
-- **Efficiency**: Process and filter telemetry before export to reduce costs and noise
-- **Standardization**: Use industry-standard OpenTelemetry instrumentation across all applications
+Catalyst supports **Kubernetes Secrets** (default) and **AWS Secrets Manager**.
 
-For more information on how to configure the OpenTelemetry Collector, visit the [official documentation](https://opentelemetry.io/docs/collector/configuration/).
-
-## Secrets
-
-When using Dapr components in Catalyst, you can use [Dapr's built-in secret references](https://docs.dapr.io/operations/components/component-secrets) to securely access secrets from supported secret stores. This allows you to keep sensitive information out of your application code and configuration files. In Catalyst, if you do not explicitly use Dapr's secret references, it will implicitly use one to ensure your secrets are only ever persisted in your own Catalyst Private installation and never in Diagrid Cloud.
-
-Catalyst currently supports 2 secrets providers:
-- **Kubernetes Secrets** (default)
-- **AWS Secrets Manager**
-
-To use AWS Secrets Manager, set the following configuration in your `values.yaml` file:
+To use AWS Secrets Manager:
 
 ```yaml
 global:
   secrets:
     provider: "aws_secretmanager"
     aws:
-      region: "us-east-1"  # AWS region where your secrets are stored
-      access_key: ""
-      secret_access_key: ""
+      region: "us-east-1"
+```
+
+### App Tunnels
+
+App tunnels (via Piko) connect Catalyst to applications on private networks without needing to expose them. Tunnels are always secured with mTLS. To enable TLS for the proxy connection itself:
+
+```yaml
+piko:
+  enabled: true
+  certificates:
+    proxy:
+      enabled: true
+      secretName: "piko-proxy-tls"
 ```
 
 ## Networking
 
-In order for your Catalyst Private installation to function correctly, it needs to connect to some Diagrid Cloud endpoints. Please ensure that your network allows outbound connectivity to the following domains:
+Catalyst Private requires outbound connectivity to Diagrid Cloud. Ensure your network allows access to:
 
 | Domain | Description | Required |
 |--------|-------------|----------|
-| `api.diagrid.io` | Used once by the Catalyst Agent on installation to join your region to Diagrid Cloud. | Yes |
-| `cra-cloudgrid.prd.p.diagrid.io` | Allows the Catalyst Agent to receive resource configurations such as new Projects, App IDs, and Components. | Yes |
-| `sentry.prd.p.diagrid.io` | Used by all Catalyst components to fetch a workload identity for establishing mTLS to Diagrid Cloud endpoints. | Yes |
-| `pem.trust.diagrid.io` | Used to distribute Diagrid Cloud trust anchors for establishing mTLS to Diagrid Cloud endpoints. | Yes |
-| `client.events.prd.p.diagrid.io` | Allows Catalyst components to publish events such as Dapr Component validation statuses to Diagrid Cloud. | Yes |
-| `cra-metrics.prd.p.diagrid.io` | Used to send [Dapr runtime](https://github.com/dapr/dapr/blob/master/docs/development/dapr-metrics.md#dapr-runtime-metrics) API metrics to Diagrid Cloud. | No |
-| `cra-logs.prd.p.diagrid.io` | Used to send Dapr sidecar API logs to Diagrid Cloud. | No |
+| `api.diagrid.io` | Region join (installation only). | Yes |
+| `cra-cloudgrid.prd.p.diagrid.io` | Resource configuration updates. | Yes |
+| `sentry.prd.p.diagrid.io` | Workload identity (mTLS). | Yes |
+| `pem.trust.diagrid.io` | Trust anchors (mTLS). | Yes |
+| `tunnels.trust.diagrid.io` | OIDC provider for Piko tunnels. | No |
+| `client.events.prd.p.diagrid.io` | Event publishing. | Yes |
+| `cra-metrics.prd.p.diagrid.io` | Dapr runtime metrics. | No |
+| `cra-logs.prd.p.diagrid.io` | Dapr sidecar logs. | No |
 
-We use mutual TLS (mTLS) for secure communication between your Catalyst Private installation and Diagrid Cloud. Therefore, it is important to ensure your proxy or firewall does not inspect/intercept the TLS traffic.
+**Note:** mTLS is used for secure communication. Ensure your proxy/firewall does not inspect this traffic.
 
 ## Development
 
-If you're developing or testing this chart locally from source:
-
 ### Build Dependencies
 
-Before testing or deploying the chart from source, build the chart dependencies:
-
 ```bash
-# Install Helm dependencies (run from repository root)
 make helm-prereqs
 ```
 
 ### Testing
 
 ```bash
-# From repository root
-make helm-test          # Run unit tests
-make helm-lint          # Run linting
+make helm-test          # Unit tests
+make helm-lint          # Linting
 make helm-template      # Render templates
-make helm-validate      # Run all validation
+make helm-validate      # Validation
 ```
 
 ### Dependency Management
 
-The `Chart.lock` file tracks exact dependency versions for reproducible builds. When modifying dependencies:
+Update `Chart.yaml`, then run:
 
-1. Update `Chart.yaml` with changes
-2. Run `helm dependency update` to regenerate `Chart.lock`
-3. Commit both files to version control
+```bash
+helm dependency update
+```
 
 ## Documentation
-
-For more information about Diagrid Catalyst, including detailed usage instructions and examples, please visit:
 
 - [Catalyst Documentation](https://docs.diagrid.io/catalyst)
 - [Catalyst Support](https://docs.diagrid.io/catalyst/support)
 - [Diagrid Website](https://www.diagrid.io/)
 - [Diagrid Support](https://diagrid.io/support)
-- [OpenTelemetry Collector Documentation](https://opentelemetry.io/docs/collector/)
-- [OpenTelemetry Collector Helm Chart](https://github.com/open-telemetry/opentelemetry-helm-charts/tree/main/charts/opentelemetry-collector)
-- [Collector Configuration Reference](https://opentelemetry.io/docs/collector/configuration/)

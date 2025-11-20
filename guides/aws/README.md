@@ -306,12 +306,6 @@ gateway:
         service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "instance"
 EOF
 
-# Authenticate Helm with the public AWS ECR registry
-aws ecr-public get-login-password \
-     --region us-east-1 | helm registry login \
-     --username AWS \
-     --password-stdin public.ecr.aws
-
 # Install Catalyst using the Helm chart
 helm install catalyst oci://public.ecr.aws/diagrid/catalyst \
      -n cra-agent \
