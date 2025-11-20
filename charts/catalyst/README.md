@@ -276,14 +276,14 @@ Catalyst Private requires outbound connectivity to Diagrid Cloud. Ensure your ne
 
 | Domain | Description | Required |
 |--------|-------------|----------|
-| `api.diagrid.io` | Region join (installation only). | Yes |
-| `cra-cloudgrid.prd.p.diagrid.io` | Resource configuration updates. | Yes |
-| `sentry.prd.p.diagrid.io` | Workload identity (mTLS). | Yes |
-| `pem.trust.diagrid.io` | Trust anchors (mTLS). | Yes |
+| `api.r1.diagrid.io` | Region join (installation only). | Yes |
+| `catalyst-cloud.r1.diagrid.io` | Resource configuration updates. | Yes |
+| `sentry.r1.diagrid.io` | Workload identity (mTLS). | Yes |
+| `trust.r1.diagrid.io` | Trust anchors (mTLS). | Yes |
 | `tunnels.trust.diagrid.io` | OIDC provider for Piko tunnels. | No |
-| `client.events.prd.p.diagrid.io` | Event publishing. | Yes |
-| `cra-metrics.prd.p.diagrid.io` | Dapr runtime metrics. | No |
-| `cra-logs.prd.p.diagrid.io` | Dapr sidecar logs. | No |
+| `client-events.r1.diagrid.io` | Event publishing. | Yes |
+| `catalyst-metrics.r1.diagrid.io` | Dapr runtime metrics. | No |
+| `catalyst-logs.r1.diagrid.io` | Dapr sidecar logs. | No |
 
 **Note:** mTLS is used for secure communication. Ensure your proxy/firewall does not inspect this traffic.
 
