@@ -13,7 +13,6 @@ This guide shows how to deploy [Diagrid Catalyst](https://docs.diagrid.io/cataly
 - [Diagrid CLI](https://docs.diagrid.io/catalyst/references/cli-reference/intro)
 - [Helm](https://helm.sh/)
 - [jq](https://stedolan.github.io/jq/download/)
-- [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) (for OCI registry login)
 
 ## Step 1: Create a Kind Cluster 📦
 
@@ -186,12 +185,6 @@ EOF
 Install the Catalyst Helm chart:
 
 ```bash
-# Authenticate with the public AWS registry
-aws ecr-public get-login-password \
-     --region us-east-1 | helm registry login \
-     --username AWS \
-     --password-stdin public.ecr.aws
-
 # Install Catalyst using the Helm chart
 helm install catalyst oci://public.ecr.aws/diagrid/catalyst \
      -n cra-agent \
