@@ -2,9 +2,9 @@
 
 ## Overview
 
-Diagrid Catalyst is a collection of API-based programming patterns for messaging, data, and workflow, fully compliant with the Dapr open source project. It provides managed components and a runtime to streamline cloud-native application development.
+Catalyst is an enterprise platform for workflow orchestration, service discovery and pub/sub, powered by Dapr. Build apps and AI agents that are compliant, secure and failure-proof. Find out more at [diagrid.io/catalyst](https://www.diagrid.io/catalyst).
 
-Catalyst Private enables you to self-host a Catalyst region within your own environment while using it as a service via Diagrid Cloud. This architecture separates the control plane (hosted by Diagrid Cloud) from the data plane (hosted in your Kubernetes cluster). The control plane manages configuration, while the data plane handles application connectivity and data.
+**Catalyst Private** enables you to self-host a Catalyst region within your own environment while using it as a service via Diagrid Cloud. This architecture separates the control plane (hosted by Diagrid Cloud) from the data plane (hosted in your Kubernetes cluster). The control plane manages configuration, while the data plane handles application connectivity and data.
 
 You interact with your Catalyst Private installation via the [Diagrid Cloud web console](https://catalyst.diagrid.io) and CLI. The console fetches app data directly from your installation, so your machine must be able to reach your Catalyst Private ingress.
 
