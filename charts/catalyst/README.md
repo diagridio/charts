@@ -111,20 +111,23 @@ The chart deploys multiple images. Below is a reference for users who need to mi
 
 #### Installation Images
 
+Most images are hosted in the Diagrid public repository:
+`REPO=us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public`
+
 By default, a consolidated image is used:
 
 | Component | Default Image | Description |
 |-----------|--------------|-------------|
-| **Catalyst** | `us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-all:<tag>` | Catalyst services |
+| **Catalyst** | `$REPO/catalyst-all:<tag>` | Catalyst services |
 
 Alternatively, separate images can be used:
 
 | Component | Default Image | Description |
 |-----------|--------------|-------------|
-| **Catalyst Agent** | `.../cra-agent:<tag>` | Catalyst agent service |
-| **Catalyst Management** | `.../catalyst-management:<tag>` | Catalyst management service |
-| **Gateway Control Plane** | `.../catalyst-gateway:<tag>` | Gateway control plane service |
-| **Gateway Identity Injector** | `.../identity-injector:<tag>` | Identity injection service |
+| **Catalyst Agent** | `$REPO/cra-agent:<tag>` | Catalyst agent service |
+| **Catalyst Management** | `$REPO/catalyst-management:<tag>` | Catalyst management service |
+| **Gateway Control Plane** | `$REPO/catalyst-gateway:<tag>` | Gateway control plane service |
+| **Gateway Identity Injector** | `$REPO/identity-injector:<tag>` | Identity injection service |
 
 Dependencies:
 
@@ -139,9 +142,9 @@ The Agent provisions these at runtime:
 
 | Component | Default Image | Description |
 |-----------|--------------|-------------|
-| **Dapr Server** | `.../sidecar:<tag>` | Catalyst dapr server |
-| **OpenTelemetry Collector** | `.../diagrid-otel-collector:<tag>` | OTel collector for telemetry |
-| **Dapr Control Plane (Catalyst)** | `.../dapr:<tag>` | Catalyst Dapr control plane services |
+| **Dapr Server** | `$REPO/sidecar:<tag>` | Catalyst dapr server |
+| **OpenTelemetry Collector** | `$REPO/diagrid-otel-collector:<tag>` | OTel collector for telemetry |
+| **Dapr Control Plane (Catalyst)** | `$REPO/dapr:<tag>` | Catalyst Dapr control plane services |
 | **Dapr Control Plane (OSS)** | `daprio/dapr:<tag>` | Dapr control plane services |
 
 #### Optional Images
@@ -150,7 +153,7 @@ Used when OpenTelemetry addons are enabled:
 
 | Component | Default Image | Description |
 |-----------|--------------|-------------|
-| **OpenTelemetry Collector** | `ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s:<tag>` | Collector for traces, metrics, and logs |
+| **OpenTelemetry Collector (OSS)** | `ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s:<tag>` | Collector for traces, metrics, and logs |
 
 ### Private Image Registry
 
