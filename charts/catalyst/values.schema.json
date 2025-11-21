@@ -262,7 +262,7 @@
             },
             "tag": {
               "type": "string",
-              "default": "0.504.0"
+              "default": "0.533.0"
             },
             "pullPolicy": {
               "type": "string",
