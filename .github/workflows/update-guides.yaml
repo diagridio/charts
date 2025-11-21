@@ -19,7 +19,7 @@ jobs:
 
     - name: Update guides version
       run: |
-        VERSION="${{ inputs.release_version }}"
+        export VERSION="${{ inputs.release_version }}"
         chmod +x .github/scripts/update-guides.sh
         ./.github/scripts/update-guides.sh
 
