@@ -10,7 +10,7 @@ on:
         type: string
         required: true
       release_branch:
-        description: "Release branch to create the release on."
+        description: "Release branch to create the release on. If release branch starts with release-, it will create a GitHub release. If release branch starts with candidate-release-, it will create a git tag."
         type: string
         required: true
       release_version:

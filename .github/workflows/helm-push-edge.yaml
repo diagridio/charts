@@ -1,4 +1,4 @@
-name: Publish Catalyst Helm Chart
+name: Publish Edge Helm Chart
 
 on:
   push:
@@ -17,8 +17,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # Full history for git tag checking
 
       - name: Install Helm
         uses: azure/setup-helm@v4
@@ -48,7 +46,6 @@ jobs:
           helm repo update
 
       - name: Update tags to edge
-        if: ${{ startsWith(github.ref, 'refs/heads/main') }}
         run: |
           make update-catalyst-tags IMAGES_TAG=edge
           make update-catalyst-chart-version VERSION=0.0.0-edge

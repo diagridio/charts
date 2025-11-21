@@ -178,6 +178,9 @@ agent:
   config:
     project:
       default_managed_state_store_type: postgresql-shared-disabled
+gateway:
+  tls:
+    enabled: true
 EOF
 
 ```
