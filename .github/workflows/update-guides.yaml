@@ -1,0 +1,37 @@
+name: Update Guides
+
+concurrency: "update-guides"
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: "Release version to update the guides to. e.g. 0.3.0"
+        type: string
+        required: true
+
+jobs:
+  update-guides:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Update guides version
+      run: |
+        VERSION="${{ inputs.release_version }}"
+        chmod +x .github/scripts/update-guides.sh
+        ./.github/scripts/update-guides.sh
+
+    - name: Create Pull Request to main
+      id: cpr
+      uses: peter-evans/create-pull-request@v7
+      with:
+        commit-message: "Update guides to ${{ inputs.release_version }}"
+        title: "[Auto] Update guides to ${{ inputs.release_version }}"
+        body: "Update guides to $${{ inputs.release_version }} 🎬"
+        base: main
+        branch: update-guides-${{ inputs.release_version }}
+        delete-branch: true
+        token: ${{ secrets.GITHUB_TOKEN }}
+        labels: automerge
