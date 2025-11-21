@@ -166,12 +166,12 @@
         },
         "control_plane_url": {
           "type": "string",
-          "default": "cra-cloudgrid.prd.p.diagrid.io:443",
+          "default": "catalyst-cloud.r1.diagrid.io:443",
           "description": "Global control plane URL"
         },
         "control_plane_http_url": {
           "type": "string",
-          "default": "https://api.diagrid.io",
+          "default": "https://api.r1.diagrid.io",
           "description": "Global control plane HTTP URL"
         },
         "control_plane_http_insecure": {
@@ -192,11 +192,11 @@
             },
             "remote_endpoint": {
               "type": "string",
-              "default": "sentry.prd.p.diagrid.io:443"
+              "default": "sentry.r1.diagrid.io"
             },
             "diagrid_trust_anchors_endpoint": {
               "type": "string",
-              "default": "https://pem.trust.diagrid.io"
+              "default": "https://trust.r1.diagrid.io"
             },
             "diagrid_trust_anchors_endpoint_insecure": {
               "type": "boolean",
@@ -222,7 +222,7 @@
           "properties": {
             "endpoint": {
               "type": "string",
-              "default": "tls://client.events.prd.p.diagrid.io:443"
+              "default": "tls://client-events.r1.diagrid.io:443"
             },
             "trust_domain": {
               "type": "string",
