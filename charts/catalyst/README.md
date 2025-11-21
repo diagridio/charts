@@ -239,6 +239,35 @@ gateway:
     # Or provide cert/key inline
 ```
 
+### Workflows
+
+Catalyst uses an external PostgreSQL database to store workflow state and provide rich visualizations. To enable this feature, configure the connection details as follows:
+
+```yaml
+agent:
+  config:
+    project:
+      default_managed_state_store_type: postgresql-shared-external
+      external_postgresql:
+        enabled: true
+        auth_type: connectionString
+        namespace: postgres
+        connection_string_host: postgres-postgresql.postgres.svc.cluster.local
+        connection_string_port: 5432
+        connection_string_username: postgres
+        connection_string_password: postgres
+        connection_string_database: catalyst
+```
+
+If you wish to disable this feature, you must set:
+
+```yaml
+agent:
+  config:
+    project:
+      default_managed_state_store_type: postgresql-shared-disabled
+```
+
 ### OpenTelemetry Collector (Optional)
 
 Catalyst includes optional OpenTelemetry Collector addons for collecting and exporting telemetry. See the [official documentation](https://opentelemetry.io/docs/collector/configuration/) for configuration details.
