@@ -269,7 +269,7 @@ helm install catalyst oci://public.ecr.aws/diagrid/catalyst \
    --create-namespace \
    -f catalyst-values.yaml \
    --set join_token="${JOIN_TOKEN}" \
-   --version 0.44.0-rc.1
+   --version 0.44.0
 ```
 
 Verify the installation by waiting for all pods to be ready:
