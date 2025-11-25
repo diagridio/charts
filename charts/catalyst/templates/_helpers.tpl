@@ -184,7 +184,7 @@ This helper:
   {{- $registry = .consolidated.registry -}}
   {{- $tag = .image.tag -}}
 {{- end -}}
-{{- if .global.registry -}}
+{{- if and .global .global.registry -}}
   {{- $registry = .global.registry -}}
 {{- end -}}
 {{- if kindIs "string" $repository -}}

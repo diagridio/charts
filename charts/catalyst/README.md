@@ -175,6 +175,10 @@ Configure your values file:
 global:
   image:
     registry: my-registry.example.com
+gateway:
+  envoy:
+    image:
+      registry: my-registry.example.com
 ```
 
 If using OpenTelemetry addons:
