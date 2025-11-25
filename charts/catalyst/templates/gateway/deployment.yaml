@@ -74,7 +74,7 @@ spec:
         - name: envoy
           securityContext:
             {{- toYaml .Values.gateway.envoy.securityContext | nindent 12 }}
-          image: {{ include "catalyst.image" (dict "image" .Values.gateway.envoy.image "consolidated" nil "global" .Values.global.image "context" .) }}
+          image: {{ include "catalyst.image" (dict "image" .Values.gateway.envoy.image "consolidated" nil "global" nil "context" .) }}
           imagePullPolicy: {{ include "catalyst.imagePullPolicy" (dict "image" .Values.gateway.envoy.image "consolidated" nil "global" .Values.global.image) }}
           args:
             - "-c"
