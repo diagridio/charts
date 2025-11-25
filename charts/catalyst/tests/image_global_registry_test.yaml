@@ -45,17 +45,16 @@ tests:
         template: gateway/deployment.yaml
         documentIndex: 1
 
-  - it: should not override envoy proxy image registry
+  - it: should override envoy proxy image registry
     set:
       join_token: "test-token"
       global.image.registry: "my-registry.io"
       gateway.controlplane.xds.mtls.enabled: false
       global.consolidated_image.enabled: false
-      gateway.envoy.image.registry: "reg-proxy.test"
     asserts:
       - matchRegex:
           path: spec.template.spec.containers[0].image
-          pattern: ^reg-proxy\.test/envoyproxy/envoy:distroless-v[0-9]+\.[0-9]+\.[0-9]+$
+          pattern: ^my-registry\.io/envoyproxy/envoy:distroless-v[0-9]+\.[0-9]+\.[0-9]+$
         template: gateway/deployment.yaml
         documentIndex: 0
 

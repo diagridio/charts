@@ -60,16 +60,15 @@ tests:
           pattern: "image_name: 'catalyst-all'"
         template: agent/configmap.yaml
 
-  - it: should not override envoy registry even in consolidated mode
+  - it: should still override envoy registry even in consolidated mode
     set:
       join_token: "test-token"
       global.consolidated_image.enabled: true
       global.image.registry: "my-registry.io"
       gateway.controlplane.xds.mtls.enabled: false
-      gateway.envoy.image.registry: "reg-proxy.test"
     asserts:
       - matchRegex:
           path: spec.template.spec.containers[0].image
-          pattern: ^reg-proxy\.test/envoyproxy/envoy:distroless-v[0-9]+\.[0-9]+\.[0-9]+$
+          pattern: ^my-registry\.io/envoyproxy/envoy:distroless-v[0-9]+\.[0-9]+\.[0-9]+$
         template: gateway/deployment.yaml
         documentIndex: 0
