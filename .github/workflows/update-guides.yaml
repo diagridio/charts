@@ -29,9 +29,9 @@ jobs:
       with:
         commit-message: "Update guides to ${{ inputs.release_version }}"
         title: "[Auto] Update guides to ${{ inputs.release_version }}"
-        body: "Update guides to $${{ inputs.release_version }} 🎬"
+        body: "Update guides to ${{ inputs.release_version }} 🎬"
         base: main
-        branch: update-guides-${{ inputs.release_version }}
+        branch: update-guides
         delete-branch: true
         token: ${{ secrets.GITHUB_TOKEN }}
         labels: automerge
