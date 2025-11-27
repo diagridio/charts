@@ -25,6 +25,7 @@ on:
 env:
   REGISTRY: ${{ vars.AWS_PUBLIC_ECR_HOST }}
   REPO: ${{ vars.AWS_PUBLIC_ECR_ALIAS }}
+  PROD_IMAGES_REGISTRY: "us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public"
 
 jobs:
   release:
@@ -81,6 +82,11 @@ jobs:
         export VERSION="${{ inputs.release_version }}"
         chmod +x .github/scripts/update-guides.sh
         ./.github/scripts/update-guides.sh
+
+    - name: Update registry
+      if: ${{ startsWith(inputs.release_branch, 'release-') }}
+      run: |
+        make update-catalyst-registry REGISTRY=${{ env.PROD_IMAGES_REGISTRY }}
 
     - name: Push to release branch
       run: |
