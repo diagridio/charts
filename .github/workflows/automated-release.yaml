@@ -25,6 +25,7 @@ on:
 env:
   REGISTRY: ${{ vars.AWS_PUBLIC_ECR_HOST }}
   REPO: ${{ vars.AWS_PUBLIC_ECR_ALIAS }}
+  PROD_IMAGES_REGISTRY: "us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public"
 
 jobs:
   release:
@@ -82,10 +83,15 @@ jobs:
         chmod +x .github/scripts/update-guides.sh
         ./.github/scripts/update-guides.sh
 
+    - name: Update registry
+      if: ${{ startsWith(inputs.release_branch, 'release-') }}
+      run: |
+        make update-catalyst-registry REGISTRY=${{ env.PROD_IMAGES_REGISTRY }}
+
     - name: Push to release branch
       run: |
         git add .
-        git commit -m "Update release branch to ${{ inputs.release_version }} and images to ${{ inputs.images_tag }}"
+        git commit -m "Update Helm chart version to ${{ inputs.release_version }} and images to ${{ inputs.images_tag }}"
         git push origin ${{ inputs.release_branch }}
     
     - name: Package and Push Helm Chart
@@ -103,7 +109,7 @@ jobs:
         echo "Creating GitHub release for $VERSION"
         gh release create "$VERSION" \
           --title "Release $VERSION" \
-          --notes "Helm chart version $VERSION from ${{ inputs.release_version }}" \
+          --notes "Helm chart version to ${{ inputs.release_version }} and images to ${{ inputs.images_tag }}" \
           --target "$(git rev-parse HEAD)"
     - name: Upload Chart to GitHub Release
       if: ${{ startsWith(inputs.release_branch, 'release-') }}

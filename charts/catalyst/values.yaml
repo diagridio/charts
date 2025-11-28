@@ -332,7 +332,7 @@ gateway:
       # registry is the container registry for the Envoy proxy image.
       # If global.image.registry is set, it will override this value.
       # This uses a DockerHub proxy to avoid rate limits
-      registry: us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy
+      registry: us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy
       # repository is the image name/path within the registry.
       repository: envoyproxy/envoy
       # tag is the image tag/version to use
