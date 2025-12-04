@@ -104,7 +104,7 @@ global:
     enabled: true
     # registry is the default registry for the consolidated image.
     # If global.image.registry is set, it will override this value.
-    registry: us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public
+    registry: us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public
     # repository is the image repository path (without registry or tag).
     # Example: "catalyst-all" or "diagrid/catalyst-all"
     repository: catalyst-all
@@ -144,12 +144,12 @@ agent:
       skip_api_validation: true
       # image_registry is the registry for the sidecar image.
       # If global.image.registry is set, it will be used instead.
-      image_registry: us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public
+      image_registry: us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public
       # image_name is the image name within the registry.
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       image_name: "{{ ternary .Values.global.consolidated_image.repository \"sidecar\" .Values.global.consolidated_image.enabled }}"
       # image_tag is the sidecar image version
-      image_tag: "0.557.0-rc.1"
+      image_tag: "0.559.0"
       resources:
         limits:
           cpu: 300m
@@ -164,12 +164,12 @@ agent:
       enabled: true
       # image_registry is the registry for the otel collector image.
       # If global.image.registry is set, it will be used instead.
-      image_registry: us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public
+      image_registry: us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public
       # image_name is the image name within the registry.
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       image_name: "{{ ternary .Values.global.consolidated_image.repository \"diagrid-otel-collector\" .Values.global.consolidated_image.enabled }}"
       # image_tag is the otel collector image version
-      image_tag: "0.557.0-rc.1"
+      image_tag: "0.559.0"
       metrics_endpoint: https://catalyst-metrics.r1.diagrid.io/api/v1/push
       loki_endpoint: https://catalyst-logs.r1.diagrid.io/loki/api/v1/push
       metrics_tls_insecure: false
@@ -226,12 +226,12 @@ agent:
     # registry is the container registry for the agent image.
     # If global.image.registry is set, it will override this value.
     # Example: "us-central1-docker.pkg.dev/my-project/my-repo"
-    registry: us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public
+    registry: us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public
     # repository is the image name/path within the registry (without registry prefix or tag).
     # Example: "diagrid/cra-agent" or "cra-agent"
     repository: cra-agent
     # tag is the image tag/version to use
-    tag: "0.557.0-rc.1"
+    tag: "0.559.0"
     # pullPolicy is the image pull policy for this specific image.
     # If empty, uses global.image.pullPolicy.
     # Valid values: Always, IfNotPresent, Never
@@ -309,12 +309,12 @@ gateway:
     image:
       # registry is the container registry for the identity injector image.
       # If global.image.registry is set, it will override this value.
-      registry: us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public
+      registry: us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public
       # repository is the image name/path within the registry.
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       repository: identity-injector
       # tag is the image tag/version to use
-      tag: "0.557.0-rc.1"
+      tag: "0.559.0"
       # pullPolicy is the image pull policy for this specific image.
       # If empty, uses global.image.pullPolicy.
       pullPolicy: ""
@@ -408,12 +408,12 @@ gateway:
     image:
       # registry is the container registry for the gateway control plane image.
       # If global.image.registry is set, it will override this value.
-      registry: us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public
+      registry: us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public
       # repository is the image name/path within the registry.
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       repository: catalyst-gateway
       # tag is the image tag/version to use
-      tag: "0.557.0-rc.1"
+      tag: "0.559.0"
       # pullPolicy is the image pull policy for this specific image.
       # If empty, uses global.image.pullPolicy.
       pullPolicy: ""
@@ -489,13 +489,13 @@ management:
   image:
     # registry is the container registry for the management image.
     # If global.image.registry is set, it will override this value.
-    registry: us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public
+    registry: us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public
     # repository is the image name/path within the registry (without registry prefix or tag).
     # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
     # Deprecated: This field supports template evaluation for backwards compatibility.
     repository: "{{ ternary .Values.global.consolidated_image.repository \"catalyst-management\" .Values.global.consolidated_image.enabled }}"
     # tag is the image tag/version to use
-    tag: "0.557.0-rc.1"
+    tag: "0.559.0"
     # pullPolicy is the image pull policy for this specific image.
     # If empty, uses global.image.pullPolicy.
     pullPolicy: ""
