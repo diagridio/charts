@@ -40,7 +40,6 @@ spec:
           command: ["./agent"]
           args:
           - "--log-level={{ .Values.agent.logLevel }}"
-          - "--tls.enabled=false"
           {{- if eq .Values.global.secrets.provider "redis" }}
           - "--secretsprovider=redis"
           - "--secrets_redis.host={{ required ".Values.global.secrets.redis.host entry required when .Values.global.secrets.provider is set to redis" .Values.global.secrets.redis.host }}"
