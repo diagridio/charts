@@ -316,6 +316,23 @@ Catalyst Private requires outbound connectivity to Diagrid Cloud. Ensure your ne
 
 **Note:** mTLS is used for secure communication. Ensure your proxy/firewall does not inspect this traffic.
 
+### Network Policies
+
+By default Catalyst sidecars have their traffic restricted using Kubernetes Network Policies. External access is blocked
+to the following CIDRs through the `agent.config.project.blocked_cidrs` Helm value:
+
+```yaml
+agent:
+  config:
+    project:
+      blocked_cidrs:
+        - "10.0.0.0/8",
+        - "172.16.0.0/12",
+        - "192.168.0.0/16"
+```
+
+This can be customized as needed to fit your environment.
+
 ## Development
 
 ### Build Dependencies
