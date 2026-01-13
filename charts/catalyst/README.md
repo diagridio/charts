@@ -272,6 +272,41 @@ agent:
 
 Catalyst includes optional OpenTelemetry Collector addons for collecting and exporting telemetry. See the [official documentation](https://opentelemetry.io/docs/collector/configuration/) for configuration details.
 
+### Tracing Support
+
+Catalyst supports sending tracing data to various backends through [Dapr configuration](https://docs.dapr.io/operations/observability/tracing/setup-tracing/).
+To configure tracing for your application you'll first need to create a dapr configuration with the apropriate entries,
+in the example below we are configuring it to use Jaeger as the backend running within the same kubernetes cluster:
+
+```bash
+cat <<EOF > tracing-config.yaml
+apiVersion: dapr.io/v1alpha1
+kind: Configuration
+metadata:
+  name: tracing-config
+spec:
+  tracing:
+    samplingRate: "1"
+    stdout: true
+    otel:
+      endpointAddress: "jaeger.jaeger.svc.cluster.local:4317"
+      isSecure: false
+      protocol: grpc 
+EOF
+```
+
+This configuration can now be applied using the Diagrid CLI:
+
+```bash
+diagrid apply -f tracing-config.yaml
+```
+
+Finally, to enable tracing for your application, it must be configured to use it:
+
+```yaml
+diagrid appid update <app-id> --dapr-config tracing-config
+``` 
+
 ### Secrets
 
 Catalyst supports **Kubernetes Secrets** (default) and **AWS Secrets Manager**.
