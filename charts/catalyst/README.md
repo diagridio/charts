@@ -304,7 +304,7 @@ diagrid apply -f tracing-config.yaml
 Finally, to enable tracing for your application, it must be configured to use it:
 
 ```yaml
-diagrid appid update <app-id> --dapr-config tracing-config
+diagrid appid update <app-id> --app-config tracing-config
 ``` 
 
 ### Secrets
