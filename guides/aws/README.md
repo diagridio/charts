@@ -24,7 +24,7 @@ diagrid login
 export JOIN_TOKEN=$(diagrid region create my-aws-region --ingress placeholder.example.com | jq -r .joinToken)
 
 # Create an api key to use the Diagrid CLI in AWS later
-export API_KEY=$(diagrid apikey create --name aws-key --role cra.diagrid:editor --duration 8640 | jq -r .token)
+export API_KEY=$(diagrid apikey create --name aws-key --role cra.diagrid:admin --duration 8640 | jq -r .token)
 ```
 
 ## Step 2: Deploy your AWS Resources 📦
