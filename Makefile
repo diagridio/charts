@@ -2,7 +2,7 @@
 # Target: Help                                                                 #
 ################################################################################
 help: ## Show this help message.
-	@echo "\nDiagrd Helm Chart Makefile"
+	@echo "\nDiagrid Helm Chart Makefile"
 	@echo "--------------------------"
 	@echo "The following parameters are available:"
 	@echo ""
@@ -11,6 +11,7 @@ help: ## Show this help message.
 	@echo "VERSION:    The version of the helm chart (default: 0.0.0-<git sha>)"
 	@echo "REGISTRY:   The OCI registry to push the helm chart to"
 	@echo "REPO:       The repository to push the helm chart to"
+	@echo "PR:		   Pull request number"
 	@echo ""
 	@echo "The following targets are available:"
 	@awk 'BEGIN {FS = ":.*##"; printf "\n  make \033[36m\033[0m\n"} \
@@ -111,6 +112,42 @@ helm-upgrade: helm-prereqs ## Upgrade the Helm chart
 		--set join_token="fake_token" \
 		--set agent.config.host.control_plane_url="fake_url" \
 		--set agent.config.host.control_plane_http_url="fake_http_url"
+
+.PHONY: helm-package-pr
+helm-package-pr:
+	@if [ -z "$(PR)" ]; then echo "PR is required. Usage: make helm-package-pr PR=<number> (e.g. make helm-package-pr PR=123)"; exit 1; fi
+	@command -v gh >/dev/null 2>&1 || { echo "gh cli is not installed. Please install gh cli first."; exit 1; }
+	@PR_SHA=$$(gh pr view $(PR) --repo diagridio/cloudgrid --json headRefOid -q '.headRefOid[:7]') && \
+		make update-catalyst-tags IMAGES_TAG=0.0.0-pr-$(PR)-$${PR_SHA} && \
+		REGISTRY="us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker" VERSION=0.0.0-pr-$(PR)-$${PR_SHA} make update-catalyst-registry helm-package helm-push && \
+	gcloud auth print-access-token | helm registry login -u oauth2accesstoken --password-stdin us-central1-docker.pkg.dev && \
+	echo "==========================================" && \
+	echo "Helm chart for PR #$(PR) has been packaged and pushed." && \
+	echo "" && \
+	echo "Please follow these steps in order to install the chart in your cluster:" && \
+	echo "	* onebox dev image-pull-secret | pbcopy" && \
+	echo "	*	Paste the output into a image-pull-secrets.yaml file in the bastion" && \
+	echo "	*	kubectl create namespace cra-agent && kubectl apply -f image-pull-secrets.yaml -n cra-agent" && \
+	echo "	* Next we need to patch existing catalyst helm values so this image pull secret is used, paste the following on the bastion:" && \
+	echo "		cat <<EOF > image-pull-secret-overrides.yaml \n\
+				# image-pull-secret-overrides.yaml \n\
+				global: \n\
+				  image: \n\
+					imagePullSecrets: \n\
+					  - name: image-pull-secret \n\
+				agent: \n\
+				  config: \n\
+					internal_dapr: \n\
+					  image_pull_secret: \"image-pull-secret\" \n\
+					  image_pull_secret_namespace: \"cra-agent\" \n\
+					otel: \n\
+					  image_pull_secret: \"image-pull-secret\" \n\
+					project: \n\
+					  image_pull_secret: \"image-pull-secret\" \n\
+					  image_pull_secret_namespace: \"cra-agent\" \n\
+EOF \n" && \
+	echo "	* helm upgrade --install catalyst oci://us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker/catalyst -n cra-agent --create-namespace --version 0.0.0-pr-$(PR)-$${PR_SHA} --values catalyst-values.yaml --values image-pull-secret-overrides.yaml" && \
+	echo "=========================================="
 
 # NOTICE: we need to update this function every time we use a new diagrid image
 update-catalyst-tags:

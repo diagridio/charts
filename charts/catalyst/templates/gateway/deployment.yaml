@@ -74,8 +74,8 @@ spec:
         - name: envoy
           securityContext:
             {{- toYaml .Values.gateway.envoy.securityContext | nindent 12 }}
-          image: {{ include "catalyst.image" (dict "image" .Values.gateway.envoy.image "consolidated" nil "global" .Values.global.image "context" .) }}
-          imagePullPolicy: {{ include "catalyst.imagePullPolicy" (dict "image" .Values.gateway.envoy.image "consolidated" nil "global" .Values.global.image) }}
+          image: {{ .Values.gateway.envoy.image.registry }}/{{ .Values.gateway.envoy.image.repository }}:{{ .Values.gateway.envoy.image.tag }}
+          imagePullPolicy: {{ .Values.gateway.envoy.image.pullPolicy }}
           args:
             - "-c"
             - "/etc/envoy/bootstrap-envoy.yaml"
