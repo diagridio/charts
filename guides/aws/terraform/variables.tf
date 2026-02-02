@@ -3,6 +3,12 @@ variable "aws_region" {
   default     = "us-west-2"
 }
 
+variable "tags" {
+  description = "Tags to apply to all AWS resources"
+  type        = map(string)
+  default     = {}
+}
+
 variable "cluster_name" {
   description = "Name of the EKS cluster"
   default     = "catalyst"
