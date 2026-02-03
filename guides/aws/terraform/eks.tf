@@ -112,6 +112,8 @@ module "eks" {
       desired_size = var.node_desired_capacity
 
       instance_types = [var.node_instance_type]
+
+      tags = var.tags
     }
   }
 
@@ -135,6 +137,8 @@ module "eks" {
 
   # Enable OIDC provider for service accounts
   enable_irsa = true
+
+  tags = var.tags
 }
 
 # TLS needed for the thumbprint
