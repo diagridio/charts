@@ -213,6 +213,11 @@ agent:
       scheduler:
         # storage_class: ""
         storage_size: 8Gi
+      sentry:
+        image:
+          registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public"
+          name: "private-sentry"
+          tag: "edge"
     kubernetes:
       qps: 25
       burst: 10
