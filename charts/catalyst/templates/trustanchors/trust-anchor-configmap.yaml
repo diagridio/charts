@@ -1,0 +1,37 @@
+{{- if .Values.trustAnchors.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "trustanchors.name" . }}-nginx-config
+  labels:
+    {{- include "trustanchors.labels" . | nindent 4 }}
+data:
+  nginx.conf: |
+    events {
+      worker_connections 1024;
+    }
+
+    http {
+      server {
+        listen 8080;
+        server_name _;
+
+        # Health check endpoint
+        location /healthz {
+          access_log off;
+          return 200 "healthy\n";
+          add_header Content-Type text/plain;
+        }
+
+        # Trust bundle endpoint
+        location = / {
+          root /;
+          try_files /trust-bundle/{{ .Values.trustAnchors.configMapKey }} =404;
+
+          add_header Content-Type application/x-pem-file;
+          add_header Cache-Control "public, max-age={{ .Values.trustAnchors.cacheMaxAge }}";
+          add_header X-Content-Type-Options nosniff;
+        }
+      }
+    }
+{{- end }}

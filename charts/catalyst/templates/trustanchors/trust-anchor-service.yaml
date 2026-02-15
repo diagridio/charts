@@ -1,0 +1,21 @@
+{{- if .Values.trustAnchors.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "trustanchors.name" . }}
+  labels:
+    {{- include "trustanchors.labels" . | nindent 4 }}
+  {{- with .Values.trustAnchors.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.trustAnchors.service.type }}
+  ports:
+  - port: {{ .Values.trustAnchors.service.port }}
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    {{- include "trustanchors.selectorLabels" . | nindent 4 }}
+{{- end }}

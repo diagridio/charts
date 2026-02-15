@@ -1,0 +1,102 @@
+{{- if .Values.trustAnchors.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "trustanchors.name" . }}
+  labels:
+    {{- include "trustanchors.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.trustAnchors.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "trustanchors.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/nginx-config: {{ include (print $.Template.BasePath "/trustanchors/trust-anchor-configmap.yaml") . | sha256sum }}
+        {{- with .Values.trustAnchors.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "trustanchors.selectorLabels" . | nindent 8 }}
+    spec:
+      restartPolicy: Always
+      serviceAccountName: {{ include "trustanchors.serviceAccountName" . }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101  # nginx user
+        fsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
+      {{- with .Values.global.image.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: nginx
+        image: {{ include "catalyst.image" (dict "image" .Values.trustAnchors.image "consolidated" nil "global" .Values.global.image "context" .) }}
+        imagePullPolicy: {{ include "catalyst.imagePullPolicy" (dict "image" .Values.trustAnchors.image "consolidated" nil "global" .Values.global.image) }}
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+          readOnly: true
+        - name: trust-bundle
+          mountPath: /trust-bundle
+          readOnly: true
+        - name: cache
+          mountPath: /var/cache/nginx
+        - name: run
+          mountPath: /var/run
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: http
+          initialDelaySeconds: 3
+          periodSeconds: 5
+          timeoutSeconds: 2
+          failureThreshold: 2
+        resources:
+          {{- toYaml .Values.trustAnchors.resources | nindent 10 }}
+      volumes:
+      - name: nginx-config
+        configMap:
+          name: {{ include "trustanchors.name" . }}-nginx-config
+      - name: trust-bundle
+        configMap:
+          name: {{ .Values.trustAnchors.configMapName }}
+      - name: cache
+        emptyDir: {}
+      - name: run
+        emptyDir: {}
+      {{- with .Values.trustAnchors.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.trustAnchors.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.trustAnchors.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
