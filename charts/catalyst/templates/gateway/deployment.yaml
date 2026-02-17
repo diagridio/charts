@@ -164,6 +164,7 @@ spec:
       annotations:
         dapr.io/app-id: gateway-controlplane
         dapr.io/config: catalyst
+        kubectl.kubernetes.io/default-container: catalyst-gateway-controlplane
       labels:
         {{- include "merge.maps" (dict "base" (include "gateway.controlplane.selectorLabels" . | fromYaml) "overrides" .Values.gateway.controlplane.merge.selectorLabels) | nindent 8 }}
     spec:
