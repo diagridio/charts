@@ -26,7 +26,7 @@ spec:
       restartPolicy: Always
       serviceAccountName: {{ include "agent.serviceAccountName" . }}
       securityContext:
-        {{ include "merge.maps" (dict "base" .Values.agent.securityContext "overrides" .Values.agent.merge.securityContext) | nindent 6 }}
+        {{ include "merge.maps" (dict "base" .Values.agent.podSecurityContext "overrides" .Values.agent.merge.podSecurityContext) | nindent 8 }}
       {{ with .Values.global.image.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -34,7 +34,7 @@ spec:
       containers:
         - name: {{ .Chart.Name }}
           securityContext:
-            {{- toYaml .Values.agent.securityContext | nindent 12 }}
+            {{ include "merge.maps" (dict "base" .Values.agent.securityContext "overrides" .Values.agent.merge.securityContext) | nindent 12 }}
           image: {{ include "catalyst.image" (dict "image" .Values.agent.image "consolidated" .Values.global.consolidated_image "global" .Values.global.image "context" .) }}
           imagePullPolicy: {{ include "catalyst.imagePullPolicy" (dict "image" .Values.agent.image "consolidated" .Values.global.consolidated_image "global" .Values.global.image) }}
           command: ["./agent"]
@@ -139,4 +139,3 @@ spec:
         {{- else }}
         []
         {{- end }}
-

@@ -35,9 +35,13 @@ spec:
     spec:
       serviceAccountName: {{ .Values.piko.serviceAccount.name }}
       terminationGracePeriodSeconds: {{ .Values.piko.terminationGracePeriodSeconds }}
+      securityContext:
+        {{- toYaml .Values.piko.podSecurityContext | nindent 8 }}
 
       containers:
         - name: piko
+          securityContext:
+            {{- toYaml .Values.piko.securityContext | nindent 12 }}
           image: {{ include "catalyst.image" (dict "image" .Values.piko.image "consolidated" nil "global" .Values.global.image "context" .) }}
           imagePullPolicy: {{ include "catalyst.imagePullPolicy" (dict "image" .Values.piko.image "consolidated" nil "global" .Values.global.image) }}
           ports:
