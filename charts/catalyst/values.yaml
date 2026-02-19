@@ -211,6 +211,7 @@ agent:
         requests:
           memory: 130Mi
       scheduler:
+        backend_type: managed-postgresql
         # storage_class: ""
         storage_size: 8Gi
       sentry:
