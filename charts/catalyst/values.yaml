@@ -593,7 +593,7 @@ piko:
   podAnnotations: {}
   podLabels: {}
   podSecurityContext:
-    runAsNonRoot: true
+    runAsNonRoot: false # not yet supported
     seccompProfile:
       type: RuntimeDefault
   securityContext:
