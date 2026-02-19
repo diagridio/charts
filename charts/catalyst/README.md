@@ -227,6 +227,20 @@ agent:
         namespace: "cra-agent"
 ```
 
+### Pod Security and Seccomp Profiles
+
+Catalyst components expose `podSecurityContext` and `securityContext` values so you can enforce enterprise pod security standards, including custom seccomp profiles.
+
+Example using a node-local seccomp profile:
+
+```yaml
+agent:
+  podSecurityContext:
+    seccompProfile:
+      type: Localhost
+      localhostProfile: profiles/catalyst-agent.json
+```
+
 ### Gateway TLS
 
 To terminate TLS at the Catalyst Gateway, provide a certificate and key:

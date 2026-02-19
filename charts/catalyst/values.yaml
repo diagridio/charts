@@ -256,15 +256,18 @@ agent:
   podAnnotations:
     prometheus.io/port: "9090"
     prometheus.io/scrape: "true"
-  podSecurityContext: {}
+  podSecurityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
   # fsGroup: 2000
 
-  securityContext: {}
-  # capabilities:
-  #   drop:
-  #   - ALL
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
   # readOnlyRootFilesystem: true
-  # runAsNonRoot: true
   # runAsUser: 1000
 
   resources:
@@ -389,6 +392,8 @@ gateway:
     podSecurityContext:
       runAsNonRoot: true
       fsGroup: 2000
+      seccompProfile:
+        type: RuntimeDefault
     securityContext:
       capabilities:
         drop:
@@ -453,6 +458,8 @@ gateway:
     podSecurityContext:
       runAsNonRoot: true
       fsGroup: 2000
+      seccompProfile:
+        type: RuntimeDefault
     securityContext:
       capabilities:
         drop:
@@ -525,15 +532,18 @@ management:
   podAnnotations:
     prometheus.io/port: "9091"
     prometheus.io/scrape: "true"
-  podSecurityContext: {}
+  podSecurityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
   # fsGroup: 2000
 
-  securityContext: {}
-  # capabilities:
-  #   drop:
-  #   - ALL
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
   # readOnlyRootFilesystem: true
-  # runAsNonRoot: true
   # runAsUser: 1000
 
   resources:
@@ -583,6 +593,15 @@ piko:
     name: "diagrid-piko"
   podAnnotations: {}
   podLabels: {}
+  podSecurityContext:
+    runAsNonRoot: false # not yet supported
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
   server:
     # -- Specifies the proxy port to listen on. The proxy port listens for
     # requests that are forwarded to upstream services.

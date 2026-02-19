@@ -698,6 +698,12 @@
         "serviceAccount": {
           "$ref": "#/definitions/serviceAccountSpec"
         },
+        "podSecurityContext": {
+          "type": "object"
+        },
+        "securityContext": {
+          "type": "object"
+        },
         "server": {
           "type": "object",
           "properties": {
