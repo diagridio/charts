@@ -311,7 +311,7 @@ diagrid appid update <app-id> --app-config tracing-config
 
 Catalyst supports a number of backend options for the Dapr scheduler, including:
 - `managed-postgresql` (default): Use the default PostgreSQL database deployed in the cluster. Requires `default_managed_state_store_type` to be set to `postgresql-shared-selfhosted`.
-- `external-postgresql`: Use an external PostgreSQL database (e.g., Amazon RDS, Azure Database for PostgreSQL). Requires `default_managed_state_store_type` to be set to `postgresql-shared-external` and the connection details to be provided.
+- `external-postgresql`: Use an external PostgreSQL database (e.g., Amazon RDS, Azure Database for PostgreSQL).
 - `etcd`: Use the Dapr default in-cluster etcd deployment.
 
 To configure the scheduler backend, set the `agent.config.project.scheduler.backend_type` value in your `values.yaml` file:
