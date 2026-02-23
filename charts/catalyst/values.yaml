@@ -136,7 +136,20 @@ agent:
       max_project_count: 50
     project:
       default_managed_pubsub_type: kafka-shared-disabled
-      default_managed_state_store_type: postgresql-shared-disabled
+      default_managed_state_store_type: postgresql-shared-selfhosted
+      selfhosted_postgresql:
+        persistence_storage_size: 1Gi
+      # Uncomment the following to bring your own PostgreSQL database
+      # default_managed_state_store_type: postgresql-shared-external
+      # external_postgresql:
+      #   enabled: true
+      #   auth_type: connectionString
+      #   namespace: postgres
+      #   connection_string_host: postgres-postgresql.postgres.svc.cluster.local
+      #   connection_string_port: 5432
+      #   connection_string_username: postgres
+      #   connection_string_password: postgres
+      #   connection_string_database: catalyst
       ingress_tls_secret_name: ""
       default_workflow: namespace
     sidecar:
@@ -211,6 +224,7 @@ agent:
         requests:
           memory: 130Mi
       scheduler:
+        backend_type: managed-postgresql
         # storage_class: ""
         storage_size: 8Gi
       sentry:

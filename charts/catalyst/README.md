@@ -321,6 +321,34 @@ Finally, to enable tracing for your application, it must be configured to use it
 diagrid appid update <app-id> --app-config tracing-config
 ``` 
 
+### Scheduler Backend
+
+Catalyst supports a number of backend options for the Dapr scheduler, including:
+- `managed-postgresql` (default): Use the default PostgreSQL database deployed in the cluster. Requires `default_managed_state_store_type` to be set to `postgresql-shared-selfhosted`.
+- `external-postgresql`: Use an external PostgreSQL database (e.g., Amazon RDS, Azure Database for PostgreSQL).
+- `etcd`: Use the Dapr default in-cluster etcd deployment.
+
+To configure the scheduler backend, set the `agent.config.internal_dapr.scheduler.backend_type` value in your `values.yaml` file:
+
+```yaml
+agent:
+  config:
+    internal_dapr:
+      ...
+      scheduler:
+        backend_type: external-postgresql
+        external_postgresql:
+          connections:
+          - database: scheduler
+            host: ""
+            password: ""
+            port: 5432
+            username: postgres
+          max_conns_per_instance: 10
+        storage_size: 200Gi
+        workers: 2048
+```
+
 ### Secrets
 
 Catalyst supports **Kubernetes Secrets** (default) and **AWS Secrets Manager**.
