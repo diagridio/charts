@@ -314,7 +314,7 @@ Catalyst supports a number of backend options for the Dapr scheduler, including:
 - `external-postgresql`: Use an external PostgreSQL database (e.g., Amazon RDS, Azure Database for PostgreSQL).
 - `etcd`: Use the Dapr default in-cluster etcd deployment.
 
-To configure the scheduler backend, set the `agent.config.project.scheduler.backend_type` value in your `values.yaml` file:
+To configure the scheduler backend, set the `agent.config.internal_dapr.scheduler.backend_type` value in your `values.yaml` file:
 
 ```yaml
 agent:
