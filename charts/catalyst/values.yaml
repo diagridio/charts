@@ -170,6 +170,7 @@ agent:
       image_name: "{{ ternary .Values.global.consolidated_image.repository \"diagrid-otel-collector\" .Values.global.consolidated_image.enabled }}"
       # image_tag is the otel collector image version
       image_tag: "edge"
+      image_pull_policy: "Always"
       metrics_endpoint: https://catalyst-metrics.r1.diagrid.io/api/v1/push
       loki_endpoint: https://catalyst-logs.r1.diagrid.io/loki/api/v1/push
       metrics_tls_insecure: false
