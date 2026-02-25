@@ -220,6 +220,13 @@ agent:
           # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
           name: "{{ ternary .Values.global.consolidated_image.repository \"private-sentry\" .Values.global.consolidated_image.enabled }}"
           tag: "edge"
+        jwt:
+          # managed means agent automatically does key rotation and JWKS updates.
+          # If false, users need to manage the JWT keys and provide an apropriately configured secret,
+          # ie a `jwks.json` field containing the supported public keys and an `issue.key` field
+          # containing the signing key.
+          managed: true
+          secret_name: "jwt-signing-keys"
     kubernetes:
       qps: 25
       burst: 10
