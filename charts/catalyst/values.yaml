@@ -492,8 +492,6 @@ management:
       port: 8181
     http_server_auth:
       enabled: true
-      domain: "api.r1.diagrid.io"
-      audience: "admingrid-api"
     grpc_server:
       enabled: false
     profiling:
