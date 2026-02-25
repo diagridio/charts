@@ -247,7 +247,7 @@ agent:
   fullnameOverride: ""
   service:
     type: ClusterIP
-    port: 50005
+    port: 9090
   serviceAccount:
     # Annotations to add to the service account
     annotations: {}
@@ -515,7 +515,7 @@ management:
   fullnameOverride: ""
   service:
     type: ClusterIP
-    port: 9090
+    port: 50005
   http_service:
     type: ClusterIP
     port: 8181
