@@ -227,6 +227,8 @@ agent:
           # containing the signing key.
           managed: true
           secret_name: "jwt-signing-keys"
+          key_filename: "issuer.key"
+          jwks_filename: "jwks.json"
     kubernetes:
       qps: 25
       burst: 10
