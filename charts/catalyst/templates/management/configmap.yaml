@@ -6,8 +6,7 @@
 {{- $_ := set $configMap "sentry" .Values.global.sentry -}}
 {{- $_ := set $configMap "nats" .Values.global.nats -}}
 {{- $_ := set $configMap "secrets" .Values.global.secrets -}}
-{{- $_ := set $configMap.featureflags "nats_enabled" .Values.global.featureflags.nats_enabled -}}
-{{- $_ := set $configMap.featureflags "agent_component_validation" .Values.global.featureflags.agent_component_validation -}}
+{{- $_ := set $configMap "featureflags" .Values.global.featureflags -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
