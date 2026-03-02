@@ -1,0 +1,345 @@
+suite: Test Configmap Global Field Propagation
+templates:
+  - agent/configmap.yaml
+  - management/configmap.yaml
+
+tests:
+  # -------------------------------------------------------------------------
+  # Feature Flags
+  # -------------------------------------------------------------------------
+  - it: should propagate nats_enabled feature flag to agent configmap
+    set:
+      join_token: "test-token"
+      global.featureflags.nats_enabled: true
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "nats_enabled: true"
+        template: agent/configmap.yaml
+
+  - it: should propagate nats_enabled feature flag disabled to agent configmap
+    set:
+      join_token: "test-token"
+      global.featureflags.nats_enabled: false
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "nats_enabled: false"
+        template: agent/configmap.yaml
+
+  - it: should propagate agent_component_validation feature flag to agent configmap
+    set:
+      join_token: "test-token"
+      global.featureflags.agent_component_validation: true
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "agent_component_validation: true"
+        template: agent/configmap.yaml
+
+  - it: should propagate both feature flags to agent configmap
+    set:
+      join_token: "test-token"
+      global.featureflags.nats_enabled: true
+      global.featureflags.agent_component_validation: true
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "nats_enabled: true"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "agent_component_validation: true"
+        template: agent/configmap.yaml
+
+  - it: should propagate nats_enabled feature flag to management configmap
+    set:
+      join_token: "test-token"
+      global.featureflags.nats_enabled: true
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "nats_enabled: true"
+        template: management/configmap.yaml
+
+  - it: should propagate nats_enabled feature flag disabled to management configmap
+    set:
+      join_token: "test-token"
+      global.featureflags.nats_enabled: false
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "nats_enabled: false"
+        template: management/configmap.yaml
+
+  - it: should propagate agent_component_validation feature flag to management configmap
+    set:
+      join_token: "test-token"
+      global.featureflags.agent_component_validation: true
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "agent_component_validation: true"
+        template: management/configmap.yaml
+
+  - it: should propagate foo feature flag to management configmap
+    set:
+      join_token: "test-token"
+      global.featureflags.foo: baz
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "foo: baz"
+        template: management/configmap.yaml
+
+  - it: should propagate both feature flags to management configmap
+    set:
+      join_token: "test-token"
+      global.featureflags.nats_enabled: false
+      global.featureflags.agent_component_validation: true
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "nats_enabled: false"
+        template: management/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "agent_component_validation: true"
+        template: management/configmap.yaml
+
+  # -------------------------------------------------------------------------
+  # Sentry
+  # -------------------------------------------------------------------------
+  - it: should propagate sentry fields to agent configmap
+    set:
+      join_token: "test-token"
+      global.sentry.enabled: true
+      global.sentry.endpoint: "dapr-sentry.my-namespace.svc.cluster.local:443"
+      global.sentry.remote_endpoint: "sentry.r1.diagrid.io:443"
+      global.sentry.remote_namespace: "controlplane"
+      global.sentry.trust_domain: "prj-root.trust.diagrid.io"
+      global.sentry.namespace: "root-dapr-system"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "enabled: true"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "endpoint: dapr-sentry.my-namespace.svc.cluster.local:443"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "remote_endpoint: sentry.r1.diagrid.io:443"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "remote_namespace: controlplane"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "trust_domain: prj-root.trust.diagrid.io"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "namespace: root-dapr-system"
+        template: agent/configmap.yaml
+
+  - it: should propagate sentry disabled to agent configmap
+    set:
+      join_token: "test-token"
+      global.sentry.enabled: false
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "enabled: false"
+        template: agent/configmap.yaml
+
+  - it: should propagate sentry diagrid_trust_anchors fields to agent configmap
+    set:
+      join_token: "test-token"
+      global.sentry.diagrid_trust_anchors_endpoint: "https://trust.custom.diagrid.io"
+      global.sentry.diagrid_trust_anchors_endpoint_insecure: true
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "diagrid_trust_anchors_endpoint: https://trust.custom.diagrid.io"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "diagrid_trust_anchors_endpoint_insecure: true"
+        template: agent/configmap.yaml
+
+  - it: should propagate sentry fields to management configmap
+    set:
+      join_token: "test-token"
+      global.sentry.enabled: true
+      global.sentry.endpoint: "dapr-sentry.mgmt-ns.svc.cluster.local:443"
+      global.sentry.remote_endpoint: "sentry.r1.diagrid.io:443"
+      global.sentry.trust_domain: "prj-root.trust.diagrid.io"
+      global.sentry.namespace: "root-dapr-system"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "enabled: true"
+        template: management/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "endpoint: dapr-sentry.mgmt-ns.svc.cluster.local:443"
+        template: management/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "remote_endpoint: sentry.r1.diagrid.io:443"
+        template: management/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "trust_domain: prj-root.trust.diagrid.io"
+        template: management/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "namespace: root-dapr-system"
+        template: management/configmap.yaml
+
+  - it: should include sentry section in agent configmap
+    set:
+      join_token: "test-token"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "sentry:"
+        template: agent/configmap.yaml
+
+  - it: should include sentry section in management configmap
+    set:
+      join_token: "test-token"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "sentry:"
+        template: management/configmap.yaml
+
+  # -------------------------------------------------------------------------
+  # NATS
+  # -------------------------------------------------------------------------
+  - it: should propagate nats fields to agent configmap
+    set:
+      join_token: "test-token"
+      global.nats.endpoint: "tls://nats.custom.example.com:4222"
+      global.nats.trust_domain: "trust.custom.io"
+      global.nats.namespace: "custom-namespace"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "endpoint: tls://nats.custom.example.com:4222"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "trust_domain: trust.custom.io"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "namespace: custom-namespace"
+        template: agent/configmap.yaml
+
+  - it: should propagate nats fields to management configmap
+    set:
+      join_token: "test-token"
+      global.nats.endpoint: "tls://nats.internal.example.com:4222"
+      global.nats.trust_domain: "trust.internal.io"
+      global.nats.namespace: "nats-namespace"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "endpoint: tls://nats.internal.example.com:4222"
+        template: management/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "trust_domain: trust.internal.io"
+        template: management/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "namespace: nats-namespace"
+        template: management/configmap.yaml
+
+  - it: should include nats section in agent configmap
+    set:
+      join_token: "test-token"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "nats:"
+        template: agent/configmap.yaml
+
+  - it: should include nats section in management configmap
+    set:
+      join_token: "test-token"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "nats:"
+        template: management/configmap.yaml
+
+  # -------------------------------------------------------------------------
+  # Control Plane
+  # -------------------------------------------------------------------------
+  - it: should propagate control plane fields to agent configmap
+    set:
+      join_token: "test-token"
+      global.control_plane_namespace: "my-controlplane"
+      global.control_plane_url: "catalyst-cloud.custom.example.com:443"
+      global.control_plane_http_url: "https://api.custom.example.com"
+      global.control_plane_http_insecure: true
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "control_plane_namespace: my-controlplane"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "control_plane_url: catalyst-cloud.custom.example.com:443"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "control_plane_http_url: https://api.custom.example.com"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "control_plane_http_insecure: true"
+        template: agent/configmap.yaml
+
+  - it: should propagate control plane fields to management configmap
+    set:
+      join_token: "test-token"
+      global.control_plane_namespace: "my-controlplane"
+      global.control_plane_url: "catalyst-cloud.custom.example.com:443"
+      global.control_plane_http_url: "https://api.custom.example.com"
+      global.control_plane_http_insecure: false
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "control_plane_namespace: my-controlplane"
+        template: management/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "control_plane_url: catalyst-cloud.custom.example.com:443"
+        template: management/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "control_plane_http_url: https://api.custom.example.com"
+        template: management/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "control_plane_http_insecure: false"
+        template: management/configmap.yaml
+
+  # -------------------------------------------------------------------------
+  # Agent-specific: join_token propagation
+  # -------------------------------------------------------------------------
+  - it: should propagate join_token to agent configmap host section
+    set:
+      join_token: "my-join-token-value"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "join_token: my-join-token-value"
+        template: agent/configmap.yaml
