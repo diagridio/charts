@@ -25,5 +25,9 @@ spec:
       {{- if .Values.management.http_service.nodePort }}
       nodePort: {{ .Values.management.http_service.nodePort }}
       {{- end }}
+    - name: metrics
+      port: {{ .Values.management.metrics_service.port | default 9091 }}
+      protocol: TCP
+      targetPort: {{ .Values.management.metrics_service.port | default 9091 }}
   selector:
     {{- include "management.selectorLabels" . | nindent 6 }}

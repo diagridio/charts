@@ -528,6 +528,8 @@ management:
   http_service:
     type: ClusterIP
     port: 8181
+  metrics_service:
+    port: 9091
   ingress:
     enabled: false
     dns_top_level_domain: ""
