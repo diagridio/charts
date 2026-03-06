@@ -606,7 +606,7 @@ piko:
     # repository is the image name/path within the registry.
     repository: piko
     # tag is the image tag/version to use
-    tag: "v0.8.2"
+    tag: "v0.8.3"
     # pullPolicy is the image pull policy for this specific image.
     # If empty, uses global.image.pullPolicy.
     pullPolicy: IfNotPresent
