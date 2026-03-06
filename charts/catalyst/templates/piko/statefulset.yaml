@@ -72,6 +72,7 @@ spec:
             - {{ .Values.piko.publicToken.url }}
             - --upstream.auth.jwks.cache-ttl
             - {{ .Values.piko.publicToken.cacheTTL }}
+            - --upstream.auth.require_endpoints
           env:
             - name: POD_NAME
               valueFrom:
