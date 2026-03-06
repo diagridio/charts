@@ -133,12 +133,24 @@ agent:
       ingress_ip_addr: ""
       egress_addresses: []
     placement:
+      # max_project_count configures the maximum number of projects that can be handled by the agent.
+      # this is a limit internal to this catalyst installation that helps prevent resource exhaustion.
       max_project_count: 50
+      # max_appid_count configures the maximum number of appids that can be handled by the agent.
+      # this is a limit internal to this catalyst installation that helps prevent resource exhaustion.
+      max_appid_count: 300
     project:
       default_managed_pubsub_type: kafka-shared-disabled
       default_managed_state_store_type: postgresql-shared-disabled
       ingress_tls_secret_name: ""
       default_workflow: namespace
+      # sidecar_operations_worker_pool_max_appids_percentage configures a worker pool for operations that deploy appids
+      # sidecar operations worker pool capacity will be equal to placement.max_appid_count
+      # sidecar operations worker pool max workers will be determined by a percentage of placement.max_appid_count
+      # sidecar_operations_worker_pool_max_appids_percentage controls how many appis are deployed at a time.
+      # setting it to 1.0 means that all appids could be deployed at the same time, which might cause resource exhaustion.
+      # setting it to 0.10 means that at most 300 * 0.10 = 30 appids will be deployed at the same time, which provides a balance between deployment speed and resource usage spikes.
+      sidecar_operations_worker_pool_max_appids_percentage: "0.10"
     sidecar:
       # default to disable API validation because ingress could be not configured by users
       skip_api_validation: true
