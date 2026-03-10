@@ -81,8 +81,8 @@ global:
     endpoint: dapr-sentry.root-dapr-system.svc.cluster.local:443
     remote_endpoint: sentry.r1.diagrid.io:443
     remote_namespace: "controlplane"
-    diagrid_trust_anchors_endpoint: https://trust.r1.diagrid.io
-    diagrid_trust_anchors_endpoint_insecure: false
+    trust_anchors_endpoint: https://trust.r1.diagrid.io
+    trust_anchors_endpoint_insecure: false
     trust_domain: prj-root.trust.diagrid.io
     namespace: root-dapr-system
     trust_anchors_file: "/var/run/secrets/diagrid.io/trust/ca.crt"
