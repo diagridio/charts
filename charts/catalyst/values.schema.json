@@ -194,11 +194,11 @@
               "type": "string",
               "default": "sentry.r1.diagrid.io"
             },
-            "diagrid_trust_anchors_endpoint": {
+            "trust_anchors_endpoint": {
               "type": "string",
               "default": "https://trust.r1.diagrid.io"
             },
-            "diagrid_trust_anchors_endpoint_insecure": {
+            "trust_anchors_endpoint_insecure": {
               "type": "boolean",
               "default": false
             },
