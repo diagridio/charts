@@ -3,7 +3,7 @@ kind: Service
 metadata:
   name: {{ include "management.name" . }}
   annotations:
-{{- with .Values.agent.podAnnotations }}
+{{- with .Values.management.podAnnotations }}
 {{ toYaml . | nindent 4 }}
 {{- end }}
   labels:

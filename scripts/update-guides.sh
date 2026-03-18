@@ -2,6 +2,12 @@
 
 set -e
 
+usage() {
+  echo "Usage: $(basename "$0") [OPTIONS]" 1>&2
+  echo "Error: invalid arguments or required variables (e.g., VERSION) are missing." 1>&2
+  exit 1
+}
+
 export NEW_VERSION=$VERSION
 
 if [[ -z "$NEW_VERSION" ]]; then
@@ -15,7 +21,7 @@ if [[ ! "$NEW_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$ ]]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 GUIDES_DIR="$PROJECT_ROOT/guides"
 
 echo "Updating version to: $NEW_VERSION"

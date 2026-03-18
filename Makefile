@@ -2,7 +2,7 @@
 # Target: Help                                                                 #
 ################################################################################
 help: ## Show this help message.
-	@echo "\nDiagrd Helm Chart Makefile"
+	@echo "\nDiagrid Helm Chart Makefile"
 	@echo "--------------------------"
 	@echo "The following parameters are available:"
 	@echo ""
@@ -82,7 +82,7 @@ helm-test-integration: ## Run integration tests (requires Docker)
 	cd tests/integration && \
 	go test -v -timeout 10m .
 
-.PHONE: helm-clean
+.PHONY: helm-clean
 helm-clean: ## Clean up generated files
 	rm -rf $(CHART_DIR)/dist
 
