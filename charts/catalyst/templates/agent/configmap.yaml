@@ -15,6 +15,7 @@
   {{- $_ := set $agentConfig.otel "image_registry" .Values.global.image.registry -}}
   {{- $_ := set $agentConfig.upstream_dapr "container_registry" .Values.global.image.registry -}}
   {{- $_ := set $agentConfig.internal_dapr "container_registry" .Values.global.image.registry -}}
+  {{- $_ := set $agentConfig.internal_dapr.sentry.image "registry" .Values.global.image.registry -}}
 {{- end -}}
 {{- /* Apply global charts configuration */ -}}
 {{- if or .Values.global.charts.registry .Values.global.charts.username .Values.global.charts.password .Values.global.charts.clientCert .Values.global.charts.clientKey .Values.global.charts.customCA .Values.global.charts.existingSecret -}}
