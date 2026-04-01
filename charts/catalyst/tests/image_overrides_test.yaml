@@ -51,11 +51,11 @@ tests:
     asserts:
       - equal:
           path: spec.template.spec.containers[0].image
-          value: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/cra-agent:1.0.0"
+          value: "us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/cra-agent:1.0.0"
         template: agent/deployment.yaml
       - equal:
           path: spec.template.spec.containers[0].image
-          value: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-management:2.0.0"
+          value: "us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-management:2.0.0"
         template: management/deployment.yaml
 
   - it: should allow component-specific pull policy

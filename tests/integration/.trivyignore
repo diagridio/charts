@@ -1,0 +1,6 @@
+# Moby AuthZ plugin bypass with oversized request bodies https://avd.aquasec.com/nvd/cve-2026-34040
+# Fix is only in moby v29.3.1 which restructured Go modules. Migration is blocked by ecosystem
+# dependencies (testcontainers-go, dapr/components-contrib) which still use github.com/docker/docker
+# and github.com/moby/moby v28.x. v28.5.2 is the last v28.x release and there is no backport. 
+# Only affects deployments with Docker AuthZ plugins configured; used only in test utilities.
+CVE-2026-34040

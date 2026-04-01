@@ -17,7 +17,7 @@ tests:
     asserts:
       - matchRegex:
           path: spec.template.spec.containers[0].image
-          pattern: ^us-central1-docker\.pkg\.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
+          pattern: ^us-central1-docker\.pkg\.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
         template: agent/deployment.yaml
 
   - it: should use consolidated image for management
@@ -27,7 +27,7 @@ tests:
     asserts:
       - matchRegex:
           path: spec.template.spec.containers[0].image
-          pattern: ^us-central1-docker\.pkg\.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
+          pattern: ^us-central1-docker\.pkg\.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
         template: management/deployment.yaml
 
   - it: should use consolidated image for gateway controlplane
@@ -38,7 +38,7 @@ tests:
     asserts:
       - matchRegex:
           path: spec.template.spec.containers[0].image
-          pattern: ^us-central1-docker\.pkg\.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
+          pattern: ^us-central1-docker\.pkg\.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
         template: gateway/deployment.yaml
         documentIndex: 1
 
@@ -49,7 +49,7 @@ tests:
     asserts:
       - matchRegex:
           path: spec.template.spec.containers[0].image
-          pattern: ^us-central1-docker\.pkg\.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
+          pattern: ^us-central1-docker\.pkg\.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
         template: agent/deployment.yaml
 
   - it: should use consolidated image for management
@@ -59,7 +59,7 @@ tests:
     asserts:
       - matchRegex:
           path: spec.template.spec.containers[0].image
-          pattern: ^us-central1-docker\.pkg\.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
+          pattern: ^us-central1-docker\.pkg\.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
         template: management/deployment.yaml
 
   - it: should use consolidated image for gateway controlplane
@@ -70,7 +70,7 @@ tests:
     asserts:
       - matchRegex:
           path: spec.template.spec.containers[0].image
-          pattern: ^us-central1-docker\.pkg\.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
+          pattern: ^us-central1-docker\.pkg\.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
         template: gateway/deployment.yaml
         documentIndex: 1
 
@@ -82,7 +82,7 @@ tests:
     asserts:
       - matchRegex:
           path: spec.template.spec.containers[0].image
-          pattern: ^us-central1-docker\.pkg\.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
+          pattern: ^us-central1-docker\.pkg\.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
         template: gateway/deployment.yaml
         documentIndex: 0
       - equal:
