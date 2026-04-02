@@ -1,0 +1,8 @@
+join_token: "test-token"
+global:
+  control_plane_url: ""
+  control_plane_http_url: ""
+  sentry:
+    endpoint: ""
+    trust_domain: ""
+    namespace: ""

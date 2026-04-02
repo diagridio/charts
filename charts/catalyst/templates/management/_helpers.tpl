@@ -55,6 +55,18 @@ Create the name of the service account to use for management
 {{- end }}
 
 {{/*
+Validate management values
+*/}}
+{{- define "management.validateValues" -}}
+    {{- if and (hasKey .Values.management.config "http_server") .Values.management.config.http_server.enabled -}}
+        {{- if not .Values.global.control_plane_url -}}
+            {{- fail "global.control_plane_url is required when management.config.http_server.enabled is true!" -}}
+        {{- end -}}
+    {{- end -}}
+    {{- include "catalyst.validateGlobalValues" . -}}
+{{- end -}}
+
+{{/*
 Calculate GoLang GOMEMLIMIT From .Values.Resources.Limit.Memory
 */}}
 {{- define "cra.GetGoLangGOMEMLIMITFromResourceLimits" -}}

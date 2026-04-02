@@ -143,7 +143,7 @@ The Agent provisions these at runtime:
 | Component | Default Image | Description |
 |-----------|--------------|-------------|
 | **Dapr Server** | `$REPO/sidecar:<tag>` | Catalyst dapr server |
-| **OpenTelemetry Collector** | `$REPO/diagrid-otel-collector:<tag>` | OTel collector for telemetry |
+| **OpenTelemetry Collector** | `$REPO/catalyst-otel-collector:<tag>` | OTel collector for telemetry |
 | **Dapr Control Plane (Catalyst)** | `$REPO/dapr:<tag>` | Catalyst Dapr control plane services |
 | **Dapr Control Plane (OSS)** | `daprio/dapr:<tag>` | Dapr control plane services |
 

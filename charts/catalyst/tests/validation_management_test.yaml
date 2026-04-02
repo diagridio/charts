@@ -1,0 +1,32 @@
+suite: Test Management Required Values Validation
+templates:
+  - management/configmap.yaml
+
+tests:
+  - it: should fail management configmap when global values are empty
+    values:
+      - values/empty-globals.yaml
+    asserts:
+      - failedTemplate:
+          errorMessage: "global.control_plane_url is required when management.config.http_server.enabled is true!"
+
+  - it: should fail management configmap when secrets provider is redis but host is missing
+    values:
+      - values/redis-provider-no-host.yaml
+    asserts:
+      - failedTemplate:
+          errorMessage: "global.secrets.redis.host is required when global.secrets.provider is redis!"
+
+  - it: should fail management configmap when secrets provider is aws but region is missing
+    values:
+      - values/aws-provider-no-region.yaml
+    asserts:
+      - failedTemplate:
+          errorMessage: "global.secrets.aws.region is required when global.secrets.provider is aws!"
+
+  - it: should render management configmap with valid default values
+    set:
+      join_token: "test-token"
+    asserts:
+      - isKind:
+          of: ConfigMap

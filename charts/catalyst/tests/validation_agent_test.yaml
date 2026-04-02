@@ -1,0 +1,72 @@
+suite: Test Agent Required Values Validation
+templates:
+  - agent/configmap.yaml
+
+tests:
+  - it: should fail agent configmap when global values are empty
+    values:
+      - values/empty-globals.yaml
+    asserts:
+      - failedTemplate:
+          errorMessage: "global.control_plane_url is required!"
+
+  - it: should fail agent configmap when secrets provider is redis but host is missing
+    values:
+      - values/redis-provider-no-host.yaml
+    asserts:
+      - failedTemplate:
+          errorMessage: "global.secrets.redis.host is required when global.secrets.provider is redis!"
+
+  - it: should fail agent configmap when secrets provider is aws but region is missing
+    values:
+      - values/aws-provider-no-region.yaml
+    asserts:
+      - failedTemplate:
+          errorMessage: "global.secrets.aws.region is required when global.secrets.provider is aws!"
+
+  - it: should fail agent configmap when default_managed_state_store_type is empty
+    set:
+      join_token: "test-token"
+      agent.config.project.default_managed_state_store_type: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: "agent.config.project.default_managed_state_store_type is required!"
+
+  - it: should fail agent configmap when default_managed_pubsub_type is empty
+    set:
+      join_token: "test-token"
+      agent.config.project.default_managed_pubsub_type: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: "agent.config.project.default_managed_pubsub_type is required!"
+
+  - it: should fail agent configmap when placement.max_project_count is zero
+    set:
+      join_token: "test-token"
+      agent.config.placement.max_project_count: 0
+    asserts:
+      - failedTemplate:
+          errorMessage: "agent.config.placement.max_project_count must be greater than 0!"
+
+  - it: should fail agent configmap when placement.max_appid_count is zero
+    set:
+      join_token: "test-token"
+      agent.config.placement.max_appid_count: 0
+    asserts:
+      - failedTemplate:
+          errorMessage: "agent.config.placement.max_appid_count must be greater than 0!"
+
+  - it: should fail agent configmap when internal_dapr.ca is set without trust_anchors_config_map_name
+    set:
+      join_token: "test-token"
+      agent.config.internal_dapr.ca.trust_anchors_config_map_name: ""
+    asserts:
+      - failedTemplate:
+          errorMessage: "agent.config.internal_dapr.ca.trust_anchors_config_map_name is required when internal_dapr.ca is configured!"
+
+  - it: should render agent configmap with valid default values
+    set:
+      join_token: "test-token"
+    asserts:
+      - isKind:
+          of: ConfigMap

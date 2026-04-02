@@ -230,4 +230,34 @@ This helper extracts the repository:tag portion and prepends the new registry.
 {{- end -}}
 {{- end -}}
 
-
+{{/*
+Validate global values shared by agent and management.
+Both services require sentry and correct secrets provider configuration.
+*/}}
+{{- define "catalyst.validateGlobalValues" -}}
+    {{- if not .Values.global.sentry.endpoint -}}
+        {{- fail "global.sentry.endpoint is required!" -}}
+    {{- end -}}
+    {{- if not .Values.global.sentry.trust_domain -}}
+        {{- fail "global.sentry.trust_domain is required!" -}}
+    {{- end -}}
+    {{- if not .Values.global.sentry.namespace -}}
+        {{- fail "global.sentry.namespace is required!" -}}
+    {{- end -}}
+    {{- if eq .Values.global.secrets.provider "redis" -}}
+        {{- if not .Values.global.secrets.redis -}}
+            {{- fail "global.secrets.redis must be configured when global.secrets.provider is redis!" -}}
+        {{- end -}}
+        {{- if not .Values.global.secrets.redis.host -}}
+            {{- fail "global.secrets.redis.host is required when global.secrets.provider is redis!" -}}
+        {{- end -}}
+    {{- end -}}
+    {{- if eq .Values.global.secrets.provider "aws" -}}
+        {{- if not .Values.global.secrets.aws -}}
+            {{- fail "global.secrets.aws must be configured when global.secrets.provider is aws!" -}}
+        {{- end -}}
+        {{- if not .Values.global.secrets.aws.region -}}
+            {{- fail "global.secrets.aws.region is required when global.secrets.provider is aws!" -}}
+        {{- end -}}
+    {{- end -}}
+{{- end -}}

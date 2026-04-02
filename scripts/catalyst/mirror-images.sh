@@ -156,7 +156,7 @@ declare -a IMAGES=(
   
   # Agent Nested Images
   "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/sidecar:${CATALYST_VERSION}"
-  "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/diagrid-otel-collector:${CATALYST_VERSION}"
+  "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-otel-collector:${CATALYST_VERSION}"
   
   # Upstream Dapr Images
   "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/daprio/dapr:${DAPR_VERSION}"
