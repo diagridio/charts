@@ -120,6 +120,7 @@ update-catalyst-tags:
 	fi
 	yq -i '.agent.config.sidecar.image_tag="$(IMAGES_TAG)"' $(CHART_DIR)/values.yaml
 	yq -i '.agent.config.otel.image_tag="$(IMAGES_TAG)"' $(CHART_DIR)/values.yaml
+	yq -i '.agent.config.internal_dapr.sentry.image.tag="$(IMAGES_TAG)"' $(CHART_DIR)/values.yaml
 	yq -i '.agent.image.tag="$(IMAGES_TAG)"' $(CHART_DIR)/values.yaml
 	yq -i '.gateway.identityInjector.image.tag="$(IMAGES_TAG)"' $(CHART_DIR)/values.yaml
 	yq -i '.gateway.controlplane.image.tag="$(IMAGES_TAG)"' $(CHART_DIR)/values.yaml
