@@ -112,6 +112,20 @@ helm-upgrade: helm-prereqs ## Upgrade the Helm chart
 		--set agent.config.host.control_plane_url="fake_url" \
 		--set agent.config.host.control_plane_http_url="fake_http_url"
 
+.PHONY: validate-no-edge-images
+validate-no-edge-images: ## Validate no edge image tags remain in the chart values
+	@echo "Checking for edge image tags in $(CHART_DIR)/values.yaml..."
+	@EDGE_TAGS=$$(grep -n -E '(image_tag|[[:space:]]tag):[[:space:]]*"?edge"?' $(CHART_DIR)/values.yaml); \
+	if [ -n "$$EDGE_TAGS" ]; then \
+		echo "ERROR: Found edge image tags in $(CHART_DIR)/values.yaml:"; \
+		echo "$$EDGE_TAGS"; \
+		echo ""; \
+		echo "All image tags must be updated to the release version."; \
+		echo "Ensure the 'update-catalyst-tags' target covers all image tags."; \
+		exit 1; \
+	fi
+	@echo "Validation passed: no edge image tags found."
+
 # NOTICE: we need to update this function every time we use a new diagrid image
 update-catalyst-tags:
 	@if [ -z "$(IMAGES_TAG)" ]; then \
