@@ -134,7 +134,7 @@ Dependencies:
 | Component | Default Image | Description |
 |-----------|--------------|-------------|
 | **Envoy Proxy** | `envoyproxy/envoy:<tag>` | Envoy proxy for gateway |
-| **Piko** | `dotjson/piko:<tag>` | Piko reverse tunneling service |
+| **Piko** | `$REPO/diagrid-piko:<tag>` | Piko reverse tunneling service |
 
 #### Runtime Images
 

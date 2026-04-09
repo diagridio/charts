@@ -103,14 +103,14 @@ tests:
         template: gateway/deployment.yaml
         documentIndex: 0
 
-  - it: should NOT use consolidated image for piko (external component)
+  - it: should NOT use consolidated image for piko (separate binary)
     set:
       join_token: "test-token"
       global.consolidated_image.enabled: true
     asserts:
       - matchRegex:
           path: spec.template.spec.containers[0].image
-          pattern: ^us-central1-docker\.pkg\.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy/dotjson/piko:v[0-9]+\.[0-9]+\.[0-9]+$
+          pattern: ^us-central1-docker\.pkg\.dev/prj-common-p-shared-79896/reg-p-common-docker-public/diagrid-piko:v[0-9]+\.[0-9]+\.[0-9]+$
         template: piko/statefulset.yaml
 
   - it: should NOT use consolidated image for envoy (external component)
@@ -125,14 +125,14 @@ tests:
         template: gateway/deployment.yaml
         documentIndex: 0
 
-  - it: should NOT use consolidated image for piko (external component)
+  - it: should NOT use consolidated image for piko (separate binary)
     set:
       join_token: "test-token"
       global.consolidated_image.enabled: true
     asserts:
       - equal:
           path: spec.template.spec.containers[0].image
-          value: "us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy/dotjson/piko:v0.8.3"
+          value: "us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/diagrid-piko:v1.0.0"
         template: piko/statefulset.yaml
 
   - it: should use consolidated image name in agent config

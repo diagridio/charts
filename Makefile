@@ -140,6 +140,6 @@ update-catalyst-registry:
 	yq -i '.gateway.identityInjector.image.registry="$(REGISTRY)"' $(CHART_DIR)/values.yaml
 	yq -i '.gateway.controlplane.image.registry="$(REGISTRY)"' $(CHART_DIR)/values.yaml
 	yq -i '.management.image.registry="$(REGISTRY)"' $(CHART_DIR)/values.yaml
-# TODO update piko image once we have a solution for it
+	yq -i '.piko.image.registry="$(REGISTRY)"' $(CHART_DIR)/values.yaml
 # TODO not updating dapr images registry, we still not publishing these images to the prod registry
 # yq -i '.agent.config.internal_dapr.container_registry="$(REGISTRY)"' $(CHART_DIR)/values.yaml
