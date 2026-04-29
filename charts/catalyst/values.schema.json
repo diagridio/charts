@@ -3,14 +3,10 @@
     "title": "Catalyst Helm Chart Values",
     "description": "Schema for validating Diagrid Catalyst Helm chart values",
     "type": "object",
-    "required": [
-        "join_token"
-    ],
     "properties": {
         "join_token": {
             "type": "string",
-            "description": "A join token obtained by creating a Region in Diagrid Cloud. Required for enrollment.",
-            "minLength": 1
+            "description": "A join token obtained by creating a Region in Diagrid Cloud. Required unless agent.existingJoinTokenSecret is set."
         },
         "global": {
             "type": "object",
@@ -135,7 +131,8 @@
                             "enum": [
                                 "kubernetes",
                                 "aws",
-                                "redis"
+                                "redis",
+                                "postgresql"
                             ],
                             "default": "kubernetes",
                             "description": "Secret provider type"
@@ -171,6 +168,75 @@
                                 "password": {
                                     "type": "string",
                                     "description": "Redis password"
+                                }
+                            }
+                        },
+                        "postgresql": {
+                            "type": "object",
+                            "properties": {
+                                "kek_provider": {
+                                    "type": "string",
+                                    "description": "KEK provider type: 'local' (AES-256) or 'awskms' (AWS KMS)"
+                                },
+                                "primary_encryption_key": {
+                                    "type": "string",
+                                    "description": "Primary encryption key (64 hex chars for AES-256) — used when kek_provider is 'local'"
+                                },
+                                "primary_key_version": {
+                                    "type": "integer",
+                                    "description": "Primary key version"
+                                },
+                                "secondary_encryption_key": {
+                                    "type": "string",
+                                    "description": "Secondary encryption key for key rotation"
+                                },
+                                "secondary_key_version": {
+                                    "type": "integer",
+                                    "description": "Secondary key version"
+                                },
+                                "connection_string": {
+                                    "type": "string",
+                                    "description": "PostgreSQL connection string: postgres://user:pass@host:5432/db"
+                                },
+                                "max_conns": {
+                                    "type": "integer",
+                                    "description": "Maximum number of PostgreSQL connections"
+                                },
+                                "timeout": {
+                                    "type": "string",
+                                    "description": "PostgreSQL connection timeout"
+                                },
+                                "aws_kms_key_id": {
+                                    "type": "string",
+                                    "description": "AWS KMS key ID — required when kek_provider is 'awskms'"
+                                },
+                                "aws_region": {
+                                    "type": "string",
+                                    "description": "AWS region for KMS"
+                                },
+                                "aws_access_key": {
+                                    "type": "string",
+                                    "description": "AWS access key for KMS"
+                                },
+                                "aws_secret_access_key": {
+                                    "type": "string",
+                                    "description": "AWS secret access key for KMS"
+                                },
+                                "use_aws_iam": {
+                                    "type": "boolean",
+                                    "description": "Use AWS IAM role for KMS authentication"
+                                },
+                                "aws_assume_role_arn": {
+                                    "type": "string",
+                                    "description": "AWS IAM role ARN to assume for KMS"
+                                },
+                                "existingSecret": {
+                                    "type": "string",
+                                    "description": "Reference to an existing Kubernetes secret containing PostgreSQL secrets provider configuration"
+                                },
+                                "existingSecretKeys": {
+                                    "type": "object",
+                                    "description": "Key names within the existing secret"
                                 }
                             }
                         }
@@ -225,20 +291,6 @@
                         "trust_anchors_file": {
                             "type": "string",
                             "default": "/var/run/secrets/diagrid.io/trust/ca.crt"
-                        }
-                    }
-                },
-                "nats": {
-                    "type": "object",
-                    "description": "NATS configuration",
-                    "properties": {
-                        "endpoint": {
-                            "type": "string",
-                            "default": "tls://client-events.r1.diagrid.io:443"
-                        },
-                        "trust_domain": {
-                            "type": "string",
-                            "default": "trust.diagrid.io"
                         }
                     }
                 },
@@ -307,6 +359,21 @@
             "type": "object",
             "description": "Agent component configuration",
             "properties": {
+                "existingJoinTokenSecret": {
+                    "type": "object",
+                    "description": "Reference to a pre-created Kubernetes Secret containing the join token. When name is set, join_token value is not required.",
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "description": "Name of the existing Kubernetes Secret"
+                        },
+                        "key": {
+                            "type": "string",
+                            "default": "join_token",
+                            "description": "Key within the Secret that contains the join token"
+                        }
+                    }
+                },
                 "logLevel": {
                     "type": "string",
                     "enum": [
@@ -484,6 +551,9 @@
                             "minimum": 1,
                             "default": 1
                         },
+                        "autoscaling": {
+                            "$ref": "#/definitions/autoscalingSpec"
+                        },
                         "image": {
                             "$ref": "#/definitions/imageSpec"
                         },
@@ -614,6 +684,9 @@
                     "type": "integer",
                     "minimum": 1,
                     "default": 2
+                },
+                "autoscaling": {
+                    "$ref": "#/definitions/autoscalingSpec"
                 },
                 "image": {
                     "$ref": "#/definitions/imageSpec"
@@ -982,6 +1055,39 @@
                             "description": "Memory request (e.g., '128Mi', '1Gi')"
                         }
                     }
+                }
+            }
+        },
+        "autoscalingSpec": {
+            "type": "object",
+            "description": "HorizontalPodAutoscaler configuration. When enabled, the Deployment's replicas field is omitted so the HPA owns it.",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "default": false
+                },
+                "minReplicas": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "maxReplicas": {
+                    "type": "integer",
+                    "minimum": 1
+                },
+                "targetCPUUtilizationPercentage": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100
+                },
+                "targetMemoryUtilizationPercentage": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 100
+                },
+                "behavior": {
+                    "type": "object",
+                    "description": "HPA scaling behavior — passed through to the HPA v2 behavior spec",
+                    "default": {}
                 }
             }
         }

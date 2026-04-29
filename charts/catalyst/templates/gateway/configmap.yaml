@@ -40,10 +40,6 @@ data:
               filename: /etc/ssl/certs/{{ .Values.gateway.tls.certificates.certFile }}
             private_key:
               filename: /etc/ssl/certs/{{ .Values.gateway.tls.certificates.keyFile }}
-            {{- if .Values.gateway.tls.certificates.caFile }}
-            ocsp_staple:
-              filename: /etc/ssl/certs/{{ .Values.gateway.tls.certificates.caFile }}
-            {{- end }}
       {{- end }}
       clusters:
         - name: controlplane

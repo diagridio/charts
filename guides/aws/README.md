@@ -1,6 +1,6 @@
 # Deploying Catalyst to AWS
 
-This guide demonstrates how to deploy Catalyst Private in a private AWS Virtual Private Cloud (VPC). This setup is for demonstration purposes only and this should not be used in production.
+This guide demonstrates how to deploy Catalyst Enterprise Self-Hosted in a private AWS Virtual Private Cloud (VPC). This setup is for demonstration purposes only and this should not be used in production.
 
 > [!NOTE]
 > This guide assumes a Linux or MacOS environment for running the scripts. Adaptations might be needed for Windows.
@@ -170,7 +170,7 @@ helm upgrade -install \
   cert-manager jetstack/cert-manager \
   --namespace cert-manager \
   --create-namespace \
-  --version 1.42.0-rc.2 \
+  --version 1.48.0 \
   --set crds.enabled=true \
   --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=<value-from-cert_manager_role_arn-output>
 ```
@@ -312,7 +312,7 @@ helm install catalyst oci://public.ecr.aws/diagrid/catalyst \
      --create-namespace \
      -f catalyst-values.yaml \
      --set join_token="${JOIN_TOKEN}" \
-     --version 1.42.0-rc.2
+     --version 1.48.0
 ```
 
 ## Step 11: Setup ingress and wildcard TLS certificate

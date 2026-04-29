@@ -25,6 +25,14 @@ rules:
   - apiGroups: [""]
     resources: ["configmaps"]
     verbs: ["get", "list", "watch"]
+  {{- if .Values.global.waitForDaprConfig.enabled }}
+  # Read-only access used by the wait-for-dapr-config init container to
+  # block startup until the cra-agent has created the Configuration CR
+  # referenced by this pod's `dapr.io/config` annotation.
+  - apiGroups: ["dapr.io"]
+    resources: ["configurations"]
+    verbs: ["get"]
+  {{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -51,3 +59,29 @@ roleRef:
   kind: ClusterRole
   name: {{ include "gateway.controlplane.serviceAccountName" . }}
   apiGroup: rbac.authorization.k8s.io
+{{- if .Values.global.waitForDaprConfig.enabled }}
+---
+# Allow the gateway envoy ServiceAccount to read its Dapr Configuration CR
+# so the wait-for-dapr-config init container can poll for it.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "gateway.envoy.serviceAccountName" . }}-wait-for-dapr-config
+rules:
+  - apiGroups: ["dapr.io"]
+    resources: ["configurations"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "gateway.envoy.serviceAccountName" . }}-wait-for-dapr-config
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "gateway.envoy.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "gateway.envoy.serviceAccountName" . }}-wait-for-dapr-config
+{{- end }}

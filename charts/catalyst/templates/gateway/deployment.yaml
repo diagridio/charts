@@ -10,7 +10,9 @@ metadata:
   labels:
     {{- include "merge.maps" (dict "base" (fromYaml (include "gateway.envoy.labels" .)) "overrides" .Values.gateway.envoy.merge.labels) | nindent 4 }}
 spec:
+  {{- if not .Values.gateway.envoy.autoscaling.enabled }}
   replicas: {{ if .Values.gateway.ha.enabled }}{{ .Values.gateway.ha.minReplicas }}{{ else }}{{ .Values.gateway.envoy.replicaCount }}{{ end }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "gateway.envoy.selectorLabels" . | nindent 6 }}
@@ -32,6 +34,10 @@ spec:
       {{- with .Values.global.image.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.global.waitForDaprConfig.enabled }}
+      initContainers:
+        {{- include "catalyst.waitForDaprConfigInitContainer" (dict "configName" "catalyst" "context" .) | nindent 8 }}
       {{- end }}
       containers:
       {{- if .Values.gateway.controlplane.xds.mtls.enabled }}
@@ -175,6 +181,10 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- if .Values.global.waitForDaprConfig.enabled }}
+      initContainers:
+        {{- include "catalyst.waitForDaprConfigInitContainer" (dict "configName" "catalyst" "context" .) | nindent 8 }}
+      {{- end }}
       containers:
       {{- if .Values.gateway.controlplane.xds.mtls.enabled }}
         - name: identity-injector
@@ -236,6 +246,94 @@ spec:
               value: "/var/run/secrets/diagrid.io/tls/tls.key"
             - name: XDS_SERVER_CA_CERT
               value: "/var/run/secrets/diagrid.io/trust/ca.crt"
+          {{- end }}
+          {{- if and (eq .Values.global.secrets.provider "postgresql") .Values.global.secrets.postgresql.existingSecret }}
+          {{- $pgSecret := .Values.global.secrets.postgresql.existingSecret }}
+          {{- $pgKeys := .Values.global.secrets.postgresql.existingSecretKeys }}
+            - name: SECRETS_POSTGRESQL_CONNECTION_STRING
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $pgSecret }}
+                  key: {{ $pgKeys.connection_string | default "connection_string" }}
+                  optional: true
+            - name: SECRETS_POSTGRESQL_KEK_PROVIDER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $pgSecret }}
+                  key: {{ $pgKeys.kek_provider | default "kek_provider" }}
+                  optional: true
+            - name: SECRETS_POSTGRESQL_PRIMARY_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $pgSecret }}
+                  key: {{ $pgKeys.primary_encryption_key | default "primary_encryption_key" }}
+                  optional: true
+            - name: SECRETS_POSTGRESQL_PRIMARY_KEY_VERSION
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $pgSecret }}
+                  key: {{ $pgKeys.primary_key_version | default "primary_key_version" }}
+                  optional: true
+            - name: SECRETS_POSTGRESQL_SECONDARY_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $pgSecret }}
+                  key: {{ $pgKeys.secondary_encryption_key | default "secondary_encryption_key" }}
+                  optional: true
+            - name: SECRETS_POSTGRESQL_SECONDARY_KEY_VERSION
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $pgSecret }}
+                  key: {{ $pgKeys.secondary_key_version | default "secondary_key_version" }}
+                  optional: true
+            - name: SECRETS_POSTGRESQL_AWS_KMS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $pgSecret }}
+                  key: {{ $pgKeys.aws_kms_key_id | default "aws_kms_key_id" }}
+                  optional: true
+            - name: SECRETS_POSTGRESQL_AWS_REGION
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $pgSecret }}
+                  key: {{ $pgKeys.aws_region | default "aws_region" }}
+                  optional: true
+            - name: SECRETS_POSTGRESQL_AWS_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $pgSecret }}
+                  key: {{ $pgKeys.aws_access_key | default "aws_access_key" }}
+                  optional: true
+            - name: SECRETS_POSTGRESQL_AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $pgSecret }}
+                  key: {{ $pgKeys.aws_secret_access_key | default "aws_secret_access_key" }}
+                  optional: true
+            - name: SECRETS_POSTGRESQL_USE_AWS_IAM
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $pgSecret }}
+                  key: {{ $pgKeys.use_aws_iam | default "use_aws_iam" }}
+                  optional: true
+            - name: SECRETS_POSTGRESQL_AWS_ASSUME_ROLE_ARN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $pgSecret }}
+                  key: {{ $pgKeys.aws_assume_role_arn | default "aws_assume_role_arn" }}
+                  optional: true
+            - name: SECRETS_POSTGRESQL_MAX_CONNS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $pgSecret }}
+                  key: {{ $pgKeys.max_conns | default "max_conns" }}
+                  optional: true
+            - name: SECRETS_POSTGRESQL_TIMEOUT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $pgSecret }}
+                  key: {{ $pgKeys.timeout | default "timeout" }}
+                  optional: true
           {{- end }}
           securityContext:
             {{- toYaml .Values.gateway.controlplane.securityContext | nindent 12 }}

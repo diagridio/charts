@@ -6,7 +6,12 @@
 {{- $_ := set $configMap "control_plane_http_insecure" .Values.global.control_plane_http_insecure -}}
 {{- $_ := set $configMap "sentry" .Values.global.sentry -}}
 {{- $_ := set $configMap "nats" .Values.global.nats -}}
-{{- $_ := set $configMap "secrets" .Values.global.secrets -}}
+{{- $_ := set $configMap "secretsprovider" .Values.global.secrets.provider -}}
+{{- $_ := set $configMap "secrets_redis" .Values.global.secrets.redis -}}
+{{- $_ := set $configMap "secrets_aws_secretmanager" .Values.global.secrets.aws -}}
+{{- if and (eq .Values.global.secrets.provider "postgresql") (not .Values.global.secrets.postgresql.existingSecret) -}}
+  {{- $_ := set $configMap "secrets_postgresql" .Values.global.secrets.postgresql -}}
+{{- end -}}
 {{- $_ := set $configMap "featureflags" .Values.global.featureflags -}}
 apiVersion: v1
 kind: ConfigMap

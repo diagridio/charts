@@ -1,19 +1,25 @@
 {{- include "agent.validateValues" . -}}
 {{- $agentConfig := deepCopy .Values.agent.config -}}
-{{- $_ := set $agentConfig.host "join_token" .Values.join_token -}}
+{{- if .Values.join_token -}}
+  {{- $_ := set $agentConfig.host "join_token" .Values.join_token -}}
+{{- end -}}
 {{- $_ := set $agentConfig "control_plane_namespace" .Values.global.control_plane_namespace -}}
 {{- $_ := set $agentConfig "control_plane_url" .Values.global.control_plane_url -}}
 {{- $_ := set $agentConfig "control_plane_http_url" .Values.global.control_plane_http_url -}}
 {{- $_ := set $agentConfig "control_plane_http_insecure" .Values.global.control_plane_http_insecure -}}
 {{- $_ := set $agentConfig "sentry" .Values.global.sentry -}}
 {{- $_ := set $agentConfig "nats" .Values.global.nats -}}
-{{- $_ := set $agentConfig "secrets" .Values.global.secrets -}}
+{{- $_ := set $agentConfig "secretsprovider" .Values.global.secrets.provider -}}
+{{- $_ := set $agentConfig "secrets_redis" .Values.global.secrets.redis -}}
+{{- $_ := set $agentConfig "secrets_aws_secretmanager" .Values.global.secrets.aws -}}
+{{- if and (eq .Values.global.secrets.provider "postgresql") (not .Values.global.secrets.postgresql.existingSecret) -}}
+  {{- $_ := set $agentConfig "secrets_postgresql" .Values.global.secrets.postgresql -}}
+{{- end -}}
 {{- $_ := set $agentConfig "featureflags" .Values.global.featureflags -}}
 {{- /* Apply global registry override to nested image configurations */ -}}
 {{- if .Values.global.image.registry -}}
   {{- $_ := set $agentConfig.sidecar "image_registry" .Values.global.image.registry -}}
   {{- $_ := set $agentConfig.otel "image_registry" .Values.global.image.registry -}}
-  {{- $_ := set $agentConfig.upstream_dapr "container_registry" .Values.global.image.registry -}}
   {{- $_ := set $agentConfig.internal_dapr "container_registry" .Values.global.image.registry -}}
   {{- $_ := set $agentConfig.internal_dapr.sentry.image "registry" .Values.global.image.registry -}}
 {{- end -}}
@@ -39,6 +45,13 @@
   {{- end -}}
   {{- if or .Values.global.charts.customCA .Values.global.charts.existingSecret -}}
     {{- $_ := set $agentConfig.artifacts "internal_repo_ca_file" (printf "/var/run/secrets/charts/ca.crt") -}}
+  {{- end -}}
+{{- end -}}
+{{- /* Default ingress TLS secret from the gateway TLS settings when not explicitly set */ -}}
+{{- if and .Values.gateway.tls.enabled (not $agentConfig.host.ingress.tls.secret.name) -}}
+  {{- $_ := set $agentConfig.host.ingress.tls.secret "name" (include "gateway.tlsSecretName" . | trim) -}}
+  {{- if and .Values.gateway.tls.certificates.caFile (not $agentConfig.host.ingress.tls.secret.ca_file) -}}
+    {{- $_ := set $agentConfig.host.ingress.tls.secret "ca_file" .Values.gateway.tls.certificates.caFile -}}
   {{- end -}}
 {{- end -}}
 apiVersion: v1

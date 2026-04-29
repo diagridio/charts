@@ -3,9 +3,30 @@ kind: ClusterRole
 metadata:
   name: {{ include "management.serviceAccountName" . }}
 rules:
-- apiGroups: ["*"]
-  resources: ["*"]
-  verbs: ["*"]
+# ConfigMaps — informer (list, watch) + patch (xrs ACK annotations) + get (region details)
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list", "watch", "patch"]
+# Secrets — informer (list, watch) + CRUD on per-project/per-appid token secrets
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list", "watch", "create", "update", "delete"]
+# Namespaces — get + list (project namespace lookup)
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["get", "list"]
+# Leases — leader election (get-or-create, periodic update)
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get", "create", "update"]
+# Dapr components — read-only (component lookup, kafka topology)
+- apiGroups: ["dapr.io"]
+  resources: ["components"]
+  verbs: ["get", "list", "watch"]
+# Dapr configurations — read-only
+- apiGroups: ["dapr.io"]
+  resources: ["configurations"]
+  verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

@@ -1,5 +1,5 @@
 {{- $gomemlimit := include "catalyst.GetGoLangGOMEMLIMITFromResourceLimits" (dict "limits" .Values.agent.resources.limits "golimit" .Values.agent.goSoftLimit) }}
-{{- $joinToken := required "join_token is required" .Values.join_token }}
+{{- include "agent.validateValues" . -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -40,20 +40,6 @@ spec:
           command: ["./agent"]
           args:
           - "--log-level={{ .Values.agent.logLevel }}"
-          {{- if eq .Values.global.secrets.provider "redis" }}
-          - "--secretsprovider=redis"
-          - "--secrets_redis.host={{ required ".Values.global.secrets.redis.host entry required when .Values.global.secrets.provider is set to redis" .Values.global.secrets.redis.host }}"
-          - "--secrets_redis.password={{ .Values.global.secrets.redis.password }}"
-          {{- end }}
-          {{- if eq .Values.global.secrets.provider "aws" }}
-          - "--secretsprovider=aws.secretmanager"
-          - "--secrets_aws_secretmanager.region={{ required ".Values.global.secrets.aws.region entry required when .Values.global.secrets.provider is set to aws" .Values.global.secrets.aws.region }}"
-          - "--secrets_aws_secretmanager.access_key={{ .Values.global.secrets.aws.access_key }}"
-          - "--secrets_aws_secretmanager.secret_access_key={{ .Values.global.secrets.aws.secret_access_key }}"
-          {{- end }}
-          {{- if eq .Values.global.secrets.provider "kubernetes" }}
-          - "--secretsprovider=kubernetes"
-          {{- end }}
           env:
           - name: NAMESPACE
             valueFrom:
@@ -64,6 +50,107 @@ spec:
           {{- if (and $gomemlimit (ne $gomemlimit "0")) }}
           - name: GOMEMLIMIT
             value: {{ $gomemlimit }}
+          {{- end }}
+          {{- if and (eq .Values.global.secrets.provider "postgresql") .Values.global.secrets.postgresql.existingSecret }}
+          {{- $pgSecret := .Values.global.secrets.postgresql.existingSecret }}
+          {{- $pgKeys := .Values.global.secrets.postgresql.existingSecretKeys }}
+          - name: SECRETS_POSTGRESQL_CONNECTION_STRING
+            valueFrom:
+              secretKeyRef:
+                name: {{ $pgSecret }}
+                key: {{ $pgKeys.connection_string | default "connection_string" }}
+                optional: true
+          - name: SECRETS_POSTGRESQL_KEK_PROVIDER
+            valueFrom:
+              secretKeyRef:
+                name: {{ $pgSecret }}
+                key: {{ $pgKeys.kek_provider | default "kek_provider" }}
+                optional: true
+          - name: SECRETS_POSTGRESQL_PRIMARY_ENCRYPTION_KEY
+            valueFrom:
+              secretKeyRef:
+                name: {{ $pgSecret }}
+                key: {{ $pgKeys.primary_encryption_key | default "primary_encryption_key" }}
+                optional: true
+          - name: SECRETS_POSTGRESQL_PRIMARY_KEY_VERSION
+            valueFrom:
+              secretKeyRef:
+                name: {{ $pgSecret }}
+                key: {{ $pgKeys.primary_key_version | default "primary_key_version" }}
+                optional: true
+          - name: SECRETS_POSTGRESQL_SECONDARY_ENCRYPTION_KEY
+            valueFrom:
+              secretKeyRef:
+                name: {{ $pgSecret }}
+                key: {{ $pgKeys.secondary_encryption_key | default "secondary_encryption_key" }}
+                optional: true
+          - name: SECRETS_POSTGRESQL_SECONDARY_KEY_VERSION
+            valueFrom:
+              secretKeyRef:
+                name: {{ $pgSecret }}
+                key: {{ $pgKeys.secondary_key_version | default "secondary_key_version" }}
+                optional: true
+          - name: SECRETS_POSTGRESQL_AWS_KMS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                name: {{ $pgSecret }}
+                key: {{ $pgKeys.aws_kms_key_id | default "aws_kms_key_id" }}
+                optional: true
+          - name: SECRETS_POSTGRESQL_AWS_REGION
+            valueFrom:
+              secretKeyRef:
+                name: {{ $pgSecret }}
+                key: {{ $pgKeys.aws_region | default "aws_region" }}
+                optional: true
+          - name: SECRETS_POSTGRESQL_AWS_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                name: {{ $pgSecret }}
+                key: {{ $pgKeys.aws_access_key | default "aws_access_key" }}
+                optional: true
+          - name: SECRETS_POSTGRESQL_AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                name: {{ $pgSecret }}
+                key: {{ $pgKeys.aws_secret_access_key | default "aws_secret_access_key" }}
+                optional: true
+          - name: SECRETS_POSTGRESQL_USE_AWS_IAM
+            valueFrom:
+              secretKeyRef:
+                name: {{ $pgSecret }}
+                key: {{ $pgKeys.use_aws_iam | default "use_aws_iam" }}
+                optional: true
+          - name: SECRETS_POSTGRESQL_AWS_ASSUME_ROLE_ARN
+            valueFrom:
+              secretKeyRef:
+                name: {{ $pgSecret }}
+                key: {{ $pgKeys.aws_assume_role_arn | default "aws_assume_role_arn" }}
+                optional: true
+          - name: SECRETS_POSTGRESQL_MAX_CONNS
+            valueFrom:
+              secretKeyRef:
+                name: {{ $pgSecret }}
+                key: {{ $pgKeys.max_conns | default "max_conns" }}
+                optional: true
+          - name: SECRETS_POSTGRESQL_TIMEOUT
+            valueFrom:
+              secretKeyRef:
+                name: {{ $pgSecret }}
+                key: {{ $pgKeys.timeout | default "timeout" }}
+                optional: true
+          {{- end }}
+          {{- /* Unified join-token env: viper resolves host.join_token from CRA_HOST_JOIN_TOKEN. */}}
+          {{- /* When existingJoinTokenSecret.name is set, source from Secret. Otherwise, fall back */}}
+          {{- /* to inline .Values.join_token literal. Either path makes the agent flag work. */}}
+          {{- if .Values.agent.existingJoinTokenSecret.name }}
+          - name: CRA_HOST_JOIN_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.agent.existingJoinTokenSecret.name }}
+                key: {{ .Values.agent.existingJoinTokenSecret.key | default "join_token" }}
+          {{- else if .Values.join_token }}
+          - name: CRA_HOST_JOIN_TOKEN
+            value: {{ .Values.join_token | quote }}
           {{- end }}
           {{- if .Values.agent.extraEnvs }}
           {{- toYaml .Values.agent.extraEnvs | nindent 10 }}

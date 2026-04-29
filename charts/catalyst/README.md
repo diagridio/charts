@@ -1,43 +1,6 @@
-# Catalyst Helm Chart
+# Catalyst Helm Chart Reference
 
-## Overview
-
-Catalyst is an enterprise platform for workflow orchestration, service discovery and pub/sub, powered by Dapr. Build apps and AI agents that are compliant, secure and failure-proof. Find out more at [diagrid.io/catalyst](https://www.diagrid.io/catalyst).
-
-**Catalyst Private** enables you to self-host a Catalyst region within your own environment while using it as a service via Diagrid Cloud. This architecture separates the control plane (hosted by Diagrid Cloud) from the data plane (hosted in your Kubernetes cluster). The control plane manages configuration, while the data plane handles application connectivity and data.
-
-You interact with your Catalyst Private installation via the [Diagrid Cloud web console](https://catalyst.diagrid.io) and CLI. The console fetches app data directly from your installation, so your machine must be able to reach your Catalyst Private ingress.
-
-![Catalyst](../../assets/img/catalyst.svg)
-
-## Dapr API Compatibility
-
-Diagrid Catalyst supports the following Dapr APIs:
-- [Workflows](https://docs.dapr.io/reference/api/workflow_api/)
-- [Conversation](https://docs.dapr.io/reference/api/conversation_api/)
-- [Service Invocation](https://docs.dapr.io/reference/api/service_invocation_api/)
-- [State Management](https://docs.dapr.io/reference/api/state_api/)
-- [Pub/Sub](https://docs.dapr.io/reference/api/pubsub_api/)
-- [Bindings](https://docs.dapr.io/reference/api/bindings_api/)
-- [Actors](https://docs.dapr.io/reference/api/actors_api/)
-- [Secrets](https://docs.dapr.io/reference/api/secrets_api/)
-- [Jobs](https://docs.dapr.io/reference/api/jobs_api/)
-- [Distributed Lock](https://docs.dapr.io/reference/api/distributed_lock_api/)
-
-## Components
-
-- **Agent**: Manages Dapr project configuration.
-- **Management**: Accesses service providers (e.g., secrets stores).
-- **Gateway**: Routes to Dapr runtime instances.
-- **Telemetry**: Exports telemetry from Dapr.
-- **Piko**: Tunnels to applications on private networks.
-
-## Guides
-For step-by-step guides on deploying Catalyst to various Kubernetes environments, please refer to the following:
-
-- [Deploying Catalyst to a KinD Cluster](../../guides/kind/README.md)
-- [Deploying Catalyst to an Azure Kubernetes Service Cluster](../../guides/azure/README.md)
-- [Deploying Catalyst to an AWS Elastic Kubernetes Service Cluster](../../guides/aws/README.md)
+Configuration reference for the Catalyst Helm chart.
 
 ## Prerequisites
 
@@ -49,31 +12,11 @@ For step-by-step guides on deploying Catalyst to various Kubernetes environments
 
 This chart includes the following dependencies:
 
-- **OpenTelemetry Collector** - Optional telemetry collection and export
-
-For local development or when working from source, see the [Development](#development) section below.
+- **OpenTelemetry Collector** — Optional telemetry collection and export
 
 ## Install
 
-### Obtain a Join Token
-
-Before installing Catalyst, you need to obtain a join token from [Diagrid Cloud](https://catalyst.diagrid.io):
-
-1. Sign up or log in to [Diagrid Catalyst](https://catalyst.diagrid.io)
-2. Create a new `region` via the [Diagrid CLI](https://docs.diagrid.io/catalyst/references/cli-reference/intro):
-
 ```bash
-diagrid login
-
-export JOIN_TOKEN=$(diagrid region create <region-name> --ingress "https://<ingress-domain>" | jq -r .joinToken)
-```
-
-> **NOTE:** The join token can be regenerated before successfully completing the installation, but not after.
-
-### Installing the Chart
-
-```bash
-# Install Catalyst using the Helm chart
 helm install catalyst oci://public.ecr.aws/diagrid/catalyst \
      -n cra-agent \
      --create-namespace \
@@ -81,16 +24,17 @@ helm install catalyst oci://public.ecr.aws/diagrid/catalyst \
      --set join_token="${JOIN_TOKEN}"
 ```
 
+`JOIN_TOKEN` must be obtained from Diagrid Cloud before installing. See the [Getting Started guide](../../guides/getting-started/README.md) for signup and token retrieval.
+
 ## Uninstall
-To uninstall Catalyst and clean up all associated resources, run the following command:
 
 ```bash
 helm uninstall catalyst -n cra-agent
 ```
 
-> **WARNING:**  The `region` resource is intended for a single installation, once you uninstall Catalyst, the region is no longer valid. If you want to uninstall Catalyst but allow re-installation, remove the clean up hook by setting the values:
+> **WARNING:** The `region` resource is intended for a single installation, once you uninstall Catalyst, the region is no longer valid. If you want to uninstall Catalyst but allow re-installation, remove the clean up hook by setting the values:
 
-```bash
+```yaml
 cleanup:
   enabled: false
 ```
@@ -157,19 +101,7 @@ Used when OpenTelemetry addons are enabled:
 
 ### Private Image Registry
 
-For air-gapped environments, use the provided script to mirror images to your private registry.
-
-```bash
-./scripts/catalyst/mirror-images.sh my-registry.example.com \
-  --catalyst-version 0.469.0 \
-  --dapr-version 1.16.2 \
-  --internal-dapr-version 1.16.2-catalyst.1 \
-  --envoy-version distroless-v1.33.0 \
-  --piko-version v0.8.2 \
-  --otel-version 0.112.0
-```
-
-Configure your values file:
+Point the chart at a mirrored registry:
 
 ```yaml
 global:
@@ -193,16 +125,11 @@ opentelemetry-daemonset:
     tag: "0.112.0"
 ```
 
+For the full mirror procedure (including the `mirror-images.sh` script) see the [Air-gapped installs guide](../../guides/air-gapped/README.md).
+
 ### Private Helm Registry
 
-To mirror the chart to a private registry:
-
-```bash
-helm pull oci://public.ecr.aws/diagrid/catalyst --version <version>
-helm push catalyst-<version>.tgz oci://my-registry.example.com/diagrid/catalyst
-```
-
-Configure authentication in `values.yaml`:
+Configure chart registry authentication:
 
 ```yaml
 global:
@@ -213,6 +140,8 @@ global:
     # Or use existingSecret, clientCert, clientKey, customCA
 ```
 
+See the [Air-gapped installs guide](../../guides/air-gapped/README.md) for the steps to mirror the chart itself.
+
 ### Dapr PKI
 
 By default, Dapr Sentry generates a self-signed root CA. For production, integrate with your own PKI by providing an issuer CA and trust anchors:
@@ -221,11 +150,21 @@ By default, Dapr Sentry generates a self-signed root CA. For production, integra
 agent:
   config:
     internal_dapr:
-      ca:
-        issuer_secret_name: "issuer-secret"
-        trust_anchors_config_map_name: "trust-anchors"
-        namespace: "cra-agent"
+      pki:
+        issuer:
+          secret:
+            name: dapr-trust-bundle
+            namespace: cert-manager
+            cert: tls.crt
+            key: tls.key
+        trust:
+          config_map:
+            name: dapr-trust-bundle
+            namespace: cert-manager
+            chain: ca.crt
 ```
+
+For an end-to-end walkthrough using `cert-manager` and `trust-manager` to provision these certificates, see the [Dapr PKI guide](../../guides/dapr-pki/README.md).
 
 ### Pod Security and Seccomp Profiles
 
@@ -252,6 +191,8 @@ gateway:
     existingSecret: "my-tls-secret"
     # Or provide cert/key inline
 ```
+
+For step-by-step instructions covering self-signed (dev), bring-your-own certificates, cert-manager integration, private CA trust for sidecars, and rotation, see the [Gateway TLS guide](../../guides/gateway-tls/README.md).
 
 ### Workflows
 
@@ -286,53 +227,72 @@ agent:
 
 Catalyst includes optional OpenTelemetry Collector addons for collecting and exporting telemetry. See the [official documentation](https://opentelemetry.io/docs/collector/configuration/) for configuration details.
 
-### Tracing Support
-
-Catalyst supports sending tracing data to various backends through [Dapr configuration](https://docs.dapr.io/operations/observability/tracing/setup-tracing/).
-To configure tracing for your application you'll first need to create a dapr configuration with the apropriate entries,
-in the example below we are configuring it to use Jaeger as the backend running within the same kubernetes cluster:
-
-```bash
-cat <<EOF > tracing-config.yaml
-apiVersion: dapr.io/v1alpha1
-kind: Configuration
-metadata:
-  name: tracing-config
-spec:
-  tracing:
-    samplingRate: "1"
-    stdout: true
-    otel:
-      endpointAddress: "jaeger.jaeger.svc.cluster.local:4317"
-      isSecure: false
-      protocol: grpc 
-EOF
-```
-
-This configuration can now be applied using the Diagrid CLI:
-
-```bash
-diagrid apply -f tracing-config.yaml
-```
-
-Finally, to enable tracing for your application, it must be configured to use it:
-
-```yaml
-diagrid appid update <app-id> --app-config tracing-config
-``` 
+To emit traces from Dapr apps into the collector (or any other OTLP backend), see the [tracing guide](../../guides/tracing/README.md) — tracing is enabled per App ID via the Diagrid CLI, not through chart values.
 
 ### Secrets
 
-Catalyst supports **Kubernetes Secrets** (default) and **AWS Secrets Manager**.
+Catalyst supports four secret provider backends: **Kubernetes Secrets** (default), **AWS Secrets Manager** and **PostgreSQL**.
 
 To use AWS Secrets Manager:
 
 ```yaml
 global:
   secrets:
-    provider: "aws_secretmanager"
+    provider: "aws.secretmanager"
     aws:
       region: "us-east-1"
+```
+
+#### PostgreSQL Secrets Provider
+
+The PostgreSQL secrets provider stores Catalyst application secrets in a PostgreSQL database using envelope encryption (each secret is encrypted with a data encryption key, which is itself encrypted by a key encryption key).
+
+**Inline configuration** (connection string and keys provided directly in values):
+
+```yaml
+global:
+  secrets:
+    provider: postgresql
+    postgresql:
+      kek_provider: "local"           # "local" (AES-256) or "awskms" (AWS KMS)
+      connection_string: "postgres://user:password@host:5432/dbname"
+      primary_encryption_key: "<64 hex characters>"
+      primary_key_version: 1
+```
+
+**Using an existing Kubernetes secret** (recommended for production — keeps all sensitive config out of values files):
+
+First, create the Kubernetes secret in the same namespace as the Catalyst installation:
+
+```bash
+kubectl create secret generic catalyst-pg-secrets -n cra-agent \
+  --from-literal=connection_string="postgres://user:password@host:5432/dbname" \
+  --from-literal=kek_provider="local" \
+  --from-literal=primary_encryption_key="<64 hex characters>" \
+  --from-literal=primary_key_version="1"
+```
+
+Then reference it in values:
+
+```yaml
+global:
+  secrets:
+    provider: postgresql
+    postgresql:
+      existingSecret: "catalyst-pg-secrets"
+```
+
+>NOTE: When `existingSecret` is set, **all** PostgreSQL secrets provider config is read from the referenced Kubernetes secret via environment variables — nothing is written to the ConfigMap. All keys are read with `optional: true`, so keys that are absent from the secret are simply not set and the application uses its built-in defaults (useful for optional fields like secondary keys or AWS KMS config). By default the secret key names match the config field names. Override individual key names using `existingSecretKeys` if your secret uses different naming:
+
+```yaml
+global:
+  secrets:
+    postgresql:
+      existingSecret: "catalyst-pg-secrets"
+      existingSecretKeys:
+        connection_string: "pg_conn_str"
+        primary_encryption_key: "kek_primary"
+        primary_key_version: "kek_primary_version"
 ```
 
 ### App Tunnels
@@ -350,7 +310,7 @@ piko:
 
 ## Networking
 
-Catalyst Private requires outbound connectivity to Diagrid Cloud. Ensure your network allows access to:
+Catalyst Enterprise Self-Hosted requires outbound connectivity to Diagrid Cloud. Ensure your network allows access to:
 
 | Domain | Description | Required |
 |--------|-------------|----------|
@@ -359,7 +319,6 @@ Catalyst Private requires outbound connectivity to Diagrid Cloud. Ensure your ne
 | `sentry.r1.diagrid.io` | Workload identity (mTLS). | Yes |
 | `trust.r1.diagrid.io` | Trust anchors (mTLS). | Yes |
 | `tunnels.trust.diagrid.io` | OIDC provider for Piko tunnels. | No |
-| `client-events.r1.diagrid.io` | Event publishing. | Yes |
 | `catalyst-metrics.r1.diagrid.io` | Dapr runtime metrics. | No |
 | `catalyst-logs.r1.diagrid.io` | Dapr sidecar logs. | No |
 
@@ -367,45 +326,94 @@ Catalyst Private requires outbound connectivity to Diagrid Cloud. Ensure your ne
 
 ### Network Policies
 
-By default Catalyst sidecars have their traffic restricted using Kubernetes Network Policies. External access is blocked
-to the following CIDRs through the `agent.config.project.blocked_cidrs` Helm value:
+Catalyst configures Kubernetes `NetworkPolicy` resources per project namespace using three symmetric lists:
+
+| Key | What it does |
+|-----|--------------|
+| `agent.config.project.blocked_egress`  | Denies destinations in the sidecar `0.0.0.0/0` egress rule. CIDR-only (NetworkPolicy `except` limitation). |
+| `agent.config.project.allowed_egress`  | Additive egress allow rules. May target CIDRs and/or namespaces, with optional port scoping. |
+| `agent.config.project.allowed_ingress` | Additive ingress allow rules into project namespaces. May target CIDRs and/or namespaces, with optional port scoping. |
+
+**Precedence: allow beats block.** NetworkPolicy rules are additive — the API server OR's them together — so any
+destination matched by an `allowed_egress` entry is reachable even if its CIDR also appears in `blocked_egress`. Use
+this to punch narrow holes through the block list rather than weakening it.
+
+**Ingress floor (non-configurable):** the agent namespace (`cra-agent`) and the `monitoring` namespace are always
+permitted as ingress sources. Management and Prometheus scraping therefore never break regardless of `allowed_ingress`.
+
+#### Default block list
 
 ```yaml
 agent:
   config:
     project:
-      blocked_cidrs:
-        - "10.0.0.0/8",
-        - "172.16.0.0/12",
-        - "192.168.0.0/16"
+      blocked_egress:
+        - name: rfc1918
+          cidrs:
+            - "10.0.0.0/8"
+            - "172.16.0.0/12"
+            - "192.168.0.0/16"
+        - name: link-local           # covers cloud instance metadata endpoints
+          cidrs:
+            - "169.254.0.0/16"
 ```
 
-This can be customized as needed to fit your environment.
+Trim entries or replace the whole list to match your environment (e.g. on GKE/AKS the pod network lives inside
+`10.0.0.0/8`; prefer punching allow holes through `allowed_egress` rather than removing the block). Set
+`blocked_egress: []` to permit all egress (not recommended for production usage).
 
-## Development
+#### Allowing specific destinations
 
-### Build Dependencies
+Both `cidrs` and `namespaces` may be set on the same rule. Ports are optional and default to "all ports" when omitted:
 
-```bash
-make helm-prereqs
+```yaml
+agent:
+  config:
+    project:
+      allowed_egress:
+        - name: rds
+          cidrs: ["10.4.5.6/32"]
+          ports:
+            - port: 5432
+              protocol: TCP
+        - name: msk
+          cidrs: ["10.4.5.0/24"]
+          ports:
+            - port: 9094
+              protocol: TCP
+        - name: worker-namespace
+          namespaces: ["my-workers"]
 ```
 
-### Testing
+#### Allowing ingress
 
-```bash
-make helm-test          # Unit tests
-make helm-lint          # Linting
-make helm-template      # Render templates
-make helm-validate      # Validation
+```yaml
+agent:
+  config:
+    project:
+      allowed_ingress:
+        - name: extra-prom
+          namespaces: ["observability"]
+          ports:
+            - port: 9090
+              protocol: TCP
 ```
 
-### Dependency Management
+#### Disabling network policies entirely
 
-Update `Chart.yaml`, then run:
-
-```bash
-helm dependency update
+```yaml
+agent:
+  config:
+    project:
+      disable_network_policies: true
 ```
+
+When disabled, no `NetworkPolicy` resources are created for project namespaces, and any previously created policies are
+removed on the next reconcile.
+
+> **CNI requirement:** NetworkPolicy enforcement requires a CNI that supports it (Calico, Cilium, Azure NPM, AWS VPC
+> CNI with `ENABLE_NETWORK_POLICY=true`, or kube-router). If none is detected at startup the agent logs a warning and
+> policies are still created altough not enforced.
 
 ## Documentation
 

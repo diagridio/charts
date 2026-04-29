@@ -1,0 +1,340 @@
+suite: Test Gateway Envoy and Management Autoscaling
+templates:
+  - gateway/deployment.yaml
+  - gateway/configmap.yaml
+  - gateway/hpa.yaml
+  - management/deployment.yaml
+  - management/configmap.yaml
+  - management/hpa.yaml
+tests:
+  - it: should not render any HPAs by default
+    set:
+      join_token: "test-token"
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: gateway/hpa.yaml
+      - hasDocuments:
+          count: 0
+        template: management/hpa.yaml
+
+  - it: should set deployment replicas when autoscaling is disabled
+    set:
+      join_token: "test-token"
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 1
+        template: gateway/deployment.yaml
+        documentIndex: 0
+      - equal:
+          path: spec.replicas
+          value: 1
+        template: gateway/deployment.yaml
+        documentIndex: 1
+      - equal:
+          path: spec.replicas
+          value: 2
+        template: management/deployment.yaml
+
+  - it: should render gateway envoy HPA when autoscaling is enabled
+    set:
+      join_token: "test-token"
+      gateway.envoy.autoscaling.enabled: true
+      gateway.envoy.autoscaling.minReplicas: 2
+      gateway.envoy.autoscaling.maxReplicas: 8
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: gateway/hpa.yaml
+      - isKind:
+          of: HorizontalPodAutoscaler
+        template: gateway/hpa.yaml
+      - equal:
+          path: metadata.name
+          value: catalyst-gateway
+        template: gateway/hpa.yaml
+      - equal:
+          path: spec.scaleTargetRef.name
+          value: catalyst-gateway
+        template: gateway/hpa.yaml
+      - equal:
+          path: spec.minReplicas
+          value: 2
+        template: gateway/hpa.yaml
+      - equal:
+          path: spec.maxReplicas
+          value: 8
+        template: gateway/hpa.yaml
+      - notExists:
+          path: spec.replicas
+        template: gateway/deployment.yaml
+        documentIndex: 0
+
+  - it: should always set replicas on the gateway controlplane deployment
+    set:
+      join_token: "test-token"
+      gateway.envoy.autoscaling.enabled: true
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 1
+        template: gateway/deployment.yaml
+        documentIndex: 1
+
+  - it: should render management HPA when autoscaling is enabled
+    set:
+      join_token: "test-token"
+      management.autoscaling.enabled: true
+      management.autoscaling.minReplicas: 3
+      management.autoscaling.maxReplicas: 7
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: management/hpa.yaml
+      - isKind:
+          of: HorizontalPodAutoscaler
+        template: management/hpa.yaml
+      - equal:
+          path: spec.minReplicas
+          value: 3
+        template: management/hpa.yaml
+      - equal:
+          path: spec.maxReplicas
+          value: 7
+        template: management/hpa.yaml
+      - notExists:
+          path: spec.replicas
+        template: management/deployment.yaml
+
+  - it: should include both CPU and memory metrics when both are set
+    set:
+      join_token: "test-token"
+      management.autoscaling.enabled: true
+      management.autoscaling.targetCPUUtilizationPercentage: 70
+      management.autoscaling.targetMemoryUtilizationPercentage: 80
+    asserts:
+      - lengthEqual:
+          path: spec.metrics
+          count: 2
+        template: management/hpa.yaml
+      - contains:
+          path: spec.metrics
+          content:
+            type: Resource
+            resource:
+              name: cpu
+              target:
+                type: Utilization
+                averageUtilization: 70
+        template: management/hpa.yaml
+      - contains:
+          path: spec.metrics
+          content:
+            type: Resource
+            resource:
+              name: memory
+              target:
+                type: Utilization
+                averageUtilization: 80
+        template: management/hpa.yaml
+
+  - it: should pass through behavior spec when provided
+    set:
+      join_token: "test-token"
+      management.autoscaling.enabled: true
+      management.autoscaling.behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 300
+    asserts:
+      - equal:
+          path: spec.behavior.scaleDown.stabilizationWindowSeconds
+          value: 300
+        template: management/hpa.yaml
+
+  - it: should omit envoy deployment replicas when HA and autoscaling are both enabled
+    set:
+      join_token: "test-token"
+      gateway.ha.enabled: true
+      gateway.envoy.autoscaling.enabled: true
+    asserts:
+      - notExists:
+          path: spec.replicas
+        template: gateway/deployment.yaml
+        documentIndex: 0
+
+  - it: should use default targetCPUUtilizationPercentage of 80 when not overridden
+    set:
+      join_token: "test-token"
+      management.autoscaling.enabled: true
+    asserts:
+      - equal:
+          path: spec.metrics[0].resource.name
+          value: cpu
+        template: management/hpa.yaml
+      - equal:
+          path: spec.metrics[0].resource.target.averageUtilization
+          value: 80
+        template: management/hpa.yaml
+      - lengthEqual:
+          path: spec.metrics
+          count: 1
+        template: management/hpa.yaml
+
+  - it: should render memory-only HPA when CPU target is unset
+    set:
+      join_token: "test-token"
+      management.autoscaling.enabled: true
+      management.autoscaling.targetCPUUtilizationPercentage: null
+      management.autoscaling.targetMemoryUtilizationPercentage: 60
+    asserts:
+      - lengthEqual:
+          path: spec.metrics
+          count: 1
+        template: management/hpa.yaml
+      - equal:
+          path: spec.metrics[0].resource.name
+          value: memory
+        template: management/hpa.yaml
+      - equal:
+          path: spec.metrics[0].resource.target.averageUtilization
+          value: 60
+        template: management/hpa.yaml
+
+  - it: should omit behavior block when not provided
+    set:
+      join_token: "test-token"
+      management.autoscaling.enabled: true
+    asserts:
+      - notExists:
+          path: spec.behavior
+        template: management/hpa.yaml
+
+  - it: should emit v2 autoscaling API version and target the right Deployment kind
+    set:
+      join_token: "test-token"
+      gateway.envoy.autoscaling.enabled: true
+      management.autoscaling.enabled: true
+    asserts:
+      - equal:
+          path: apiVersion
+          value: autoscaling/v2
+        template: gateway/hpa.yaml
+      - equal:
+          path: apiVersion
+          value: autoscaling/v2
+        template: management/hpa.yaml
+      - equal:
+          path: spec.scaleTargetRef.apiVersion
+          value: apps/v1
+        template: management/hpa.yaml
+      - equal:
+          path: spec.scaleTargetRef.kind
+          value: Deployment
+        template: management/hpa.yaml
+
+  - it: should apply component labels to HPAs
+    set:
+      join_token: "test-token"
+      gateway.envoy.autoscaling.enabled: true
+      management.autoscaling.enabled: true
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/component"]
+          value: gateway-envoy
+        template: gateway/hpa.yaml
+      - equal:
+          path: metadata.labels["app.kubernetes.io/component"]
+          value: management
+        template: management/hpa.yaml
+
+  - it: should propagate merge.labels overrides into HPA metadata
+    set:
+      join_token: "test-token"
+      gateway.envoy.autoscaling.enabled: true
+      gateway.envoy.merge.labels:
+        team: platform
+        costCenter: "42"
+      management.autoscaling.enabled: true
+      management.merge.labels:
+        team: infra
+    asserts:
+      - equal:
+          path: metadata.labels.team
+          value: platform
+        template: gateway/hpa.yaml
+      - equal:
+          path: metadata.labels.costCenter
+          value: "42"
+        template: gateway/hpa.yaml
+      - equal:
+          path: metadata.labels.team
+          value: infra
+        template: management/hpa.yaml
+
+  - it: should render namespace on HPAs from release namespace
+    set:
+      join_token: "test-token"
+      gateway.envoy.autoscaling.enabled: true
+      management.autoscaling.enabled: true
+    release:
+      namespace: catalyst-system
+    asserts:
+      - equal:
+          path: metadata.namespace
+          value: catalyst-system
+        template: gateway/hpa.yaml
+      - equal:
+          path: metadata.namespace
+          value: catalyst-system
+        template: management/hpa.yaml
+
+  - it: should pass through full HPA behavior with scaleUp and scaleDown policies
+    set:
+      join_token: "test-token"
+      gateway.envoy.autoscaling.enabled: true
+      gateway.envoy.autoscaling.behavior:
+        scaleDown:
+          stabilizationWindowSeconds: 300
+          policies:
+            - type: Percent
+              value: 100
+              periodSeconds: 15
+        scaleUp:
+          stabilizationWindowSeconds: 0
+          policies:
+            - type: Pods
+              value: 4
+              periodSeconds: 15
+          selectPolicy: Max
+    asserts:
+      - equal:
+          path: spec.behavior.scaleDown.stabilizationWindowSeconds
+          value: 300
+        template: gateway/hpa.yaml
+      - equal:
+          path: spec.behavior.scaleUp.selectPolicy
+          value: Max
+        template: gateway/hpa.yaml
+      - contains:
+          path: spec.behavior.scaleUp.policies
+          content:
+            type: Pods
+            value: 4
+            periodSeconds: 15
+        template: gateway/hpa.yaml
+
+  - it: should honor custom management.nameOverride in HPA target ref
+    set:
+      join_token: "test-token"
+      management.nameOverride: "custom-mgmt"
+      management.autoscaling.enabled: true
+    asserts:
+      - equal:
+          path: metadata.name
+          value: custom-mgmt
+        template: management/hpa.yaml
+      - equal:
+          path: spec.scaleTargetRef.name
+          value: custom-mgmt
+        template: management/hpa.yaml

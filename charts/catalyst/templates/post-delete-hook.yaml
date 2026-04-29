@@ -102,8 +102,8 @@ spec:
       restartPolicy: OnFailure
       containers:
       - name: cleanup
-        image: {{ .Values.cleanup.image.registry }}/{{ .Values.cleanup.image.repository }}:{{ .Values.cleanup.image.tag }}
-        imagePullPolicy: {{ .Values.cleanup.image.pullPolicy }}
+        image: {{ include "catalyst.image" (dict "image" .Values.cleanup.image "consolidated" nil "global" .Values.global.image "context" .) }}
+        imagePullPolicy: {{ include "catalyst.imagePullPolicy" (dict "image" .Values.cleanup.image "consolidated" nil "global" .Values.global.image) }}
         command:
         - /bin/bash
         - -c

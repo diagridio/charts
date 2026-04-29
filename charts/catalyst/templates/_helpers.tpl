@@ -231,6 +231,54 @@ This helper extracts the repository:tag portion and prepends the new registry.
 {{- end -}}
 
 {{/*
+Init container that blocks until the named Dapr Configuration CR exists in
+the pod's namespace. Used by management/gateway/gateway-controlplane pods to
+avoid crash-looping during the window between pod start and the cra-agent
+creating their Configuration CR (the agent installs root-dapr-system and
+joins the region before it can compute the trust domain and create the CRs).
+
+Usage:
+  {{- include "catalyst.waitForDaprConfigInitContainer" (dict "configName" "management" "context" .) | nindent 6 }}
+*/}}
+{{- define "catalyst.waitForDaprConfigInitContainer" -}}
+{{- $w := .context.Values.global.waitForDaprConfig -}}
+{{- if $w.enabled -}}
+- name: wait-for-dapr-config
+  image: "{{ $w.image.registry }}/{{ $w.image.repository }}:{{ $w.image.tag }}"
+  imagePullPolicy: {{ $w.image.pullPolicy }}
+  command:
+    - sh
+    - -c
+    - |
+      set -eu
+      cfg="{{ .configName }}"
+      deadline=$(( $(date +%s) + ${TIMEOUT_SECONDS} ))
+      echo "waiting for Configuration.dapr.io/${cfg} in namespace ${NAMESPACE} (timeout ${TIMEOUT_SECONDS}s)"
+      while ! kubectl get configurations.dapr.io "${cfg}" -n "${NAMESPACE}" -o name >/dev/null 2>&1; do
+        if [ "$(date +%s)" -ge "${deadline}" ]; then
+          echo "timed out waiting for Configuration.dapr.io/${cfg} in namespace ${NAMESPACE}"
+          exit 1
+        fi
+        sleep "${POLL_INTERVAL_SECONDS}"
+      done
+      echo "Configuration.dapr.io/${cfg} present, continuing"
+  env:
+    - name: NAMESPACE
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.namespace
+    - name: TIMEOUT_SECONDS
+      value: {{ $w.timeoutSeconds | quote }}
+    - name: POLL_INTERVAL_SECONDS
+      value: {{ $w.pollIntervalSeconds | quote }}
+  resources:
+    {{- toYaml $w.resources | nindent 4 }}
+  securityContext:
+    {{- toYaml $w.securityContext | nindent 4 }}
+{{- end -}}
+{{- end -}}
+
+{{/*
 Validate global values shared by agent and management.
 Both services require sentry and correct secrets provider configuration.
 */}}

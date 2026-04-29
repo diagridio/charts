@@ -3,9 +3,124 @@ kind: ClusterRole
 metadata:
   name: {{ include "agent.serviceAccountName" . }}
 rules:
-- apiGroups: ["*"]
-  resources: ["*"]
-  verbs: ["*"]
+# ─────────────────────────────────────────────────────────────────────────────
+# Agent binary — direct kubernetes client calls (non-Helm)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Project namespaces — create/delete, plus get/list on boot.
+# `watch` is required for no-escalation when installing the Dapr chart
+# (dapr-scheduler ClusterRole grants namespaces:{get,list,watch}).
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["get", "list", "watch", "create", "delete"]
+
+# Leader-election lease for the agent itself (cra-agent namespace).
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Helm installer + dynamic client — cluster-wide because target namespaces
+# span cra-agent, root-dapr-system, shared-{kafka,postgresql}, prj-*, default
+# (the namespace chart is installed from the 'default' Helm namespace).
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Core resources installed by the Dapr, vcluster, OTel collector, Kafka,
+# PostgreSQL, Redis, CRA sidecar, component, and namespace charts. The
+# agent also reads pull secrets / infra passwords from arbitrary namespaces
+# and syncs pull secrets to project namespaces.
+- apiGroups: [""]
+  resources: ["configmaps", "secrets", "services", "serviceaccounts"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# Helm --wait polls pod readiness during install/upgrade. The agent never
+# creates pods directly (Deployments/StatefulSets do). `delete` is required
+# for no-escalation when installing the Dapr chart (dapr-operator-admin
+# ClusterRole grants pods:{get,list,watch,delete}).
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch", "delete"]
+
+# Helm emits events during chart operations.
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "patch"]
+
+# Workloads installed by Dapr control plane, OTel collectors, Kafka,
+# PostgreSQL, Redis, and CRA sidecar charts. `deployments` also needs patch
+# for the dynamic-client sidecar-restart on trust-bundle rotation.
+- apiGroups: ["apps"]
+  resources: ["deployments", "statefulsets", "daemonsets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# ReplicaSets are owned by Deployments; Helm --wait reads them.
+- apiGroups: ["apps"]
+  resources: ["replicasets"]
+  verbs: ["get", "list", "watch"]
+
+# Finalizer subresources — required for no-escalation when installing the
+# Dapr chart (dapr-operator-admin grants {deployments,statefulsets}/finalizers
+# and services/finalizers with the verbs below).
+- apiGroups: ["apps"]
+  resources: ["deployments/finalizers", "statefulsets/finalizers"]
+  verbs: ["get", "list", "watch", "update"]
+- apiGroups: [""]
+  resources: ["services/finalizers"]
+  verbs: ["get", "list", "watch", "create", "update"]
+
+# TokenReview — required for no-escalation when installing the Dapr chart
+# (dapr-sentry ClusterRole grants tokenreviews:create).
+- apiGroups: ["authentication.k8s.io"]
+  resources: ["tokenreviews"]
+  verbs: ["create"]
+
+# HPA for the CRA sidecar chart.
+- apiGroups: ["autoscaling"]
+  resources: ["horizontalpodautoscalers"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# PodDisruptionBudget for the Dapr chart.
+- apiGroups: ["policy"]
+  resources: ["poddisruptionbudgets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# CronJob/Job for the Dapr jwt-key-rotation chart.
+- apiGroups: ["batch"]
+  resources: ["cronjobs", "jobs"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# NetworkPolicies created by the per-project namespace chart.
+- apiGroups: ["networking.k8s.io"]
+  resources: ["networkpolicies"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# Per-sidecar Role/RoleBinding (CRA chart) plus ClusterRole/ClusterRoleBinding
+# installed by the Dapr chart and the OTel collectors.
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["roles", "rolebindings", "clusterroles", "clusterrolebindings"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# Dapr resources: per-project components/configurations/subscriptions/
+# resiliencies/httpendpoints (dapr-component, dapr-resource, and
+# dynamic-artifact-release charts), plus the agent's own
+# createDaprConfiguration in cra-agent. `mcpservers` is granted to
+# dapr-operator-admin in newer Dapr charts (required for no-escalation).
+- apiGroups: ["dapr.io"]
+  resources: ["components", "configurations", "subscriptions", "resiliencies", "httpendpoints", "mcpservers"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# CRDs applied by the Dapr chart (components/configurations/subscriptions/
+# resiliencies/httpendpoints) and potentially the vcluster-k0s chart. Helm
+# applies these ahead of templated resources on install/upgrade.
+- apiGroups: ["apiextensions.k8s.io"]
+  resources: ["customresourcedefinitions"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# Upstream Dapr chart includes MutatingWebhookConfiguration for the sidecar
+# injector; keep Validating too in case it appears in future chart versions.
+- apiGroups: ["admissionregistration.k8s.io"]
+  resources: ["mutatingwebhookconfigurations", "validatingwebhookconfigurations"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

@@ -58,8 +58,8 @@ Create the name of the service account to use for agent
 Validate values
 */}}
 {{- define "agent.validateValues" -}}
-    {{- if not .Values.join_token -}}
-        {{- fail "A valid join_token value is required to deploy this chart!" -}}
+    {{- if and (not .Values.join_token) (not .Values.agent.existingJoinTokenSecret.name) -}}
+        {{- fail "Either join_token or agent.existingJoinTokenSecret.name is required to deploy this chart!" -}}
     {{- end -}}
     {{- if not .Values.global.control_plane_url -}}
         {{- fail "global.control_plane_url is required!" -}}

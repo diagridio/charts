@@ -1,9 +1,10 @@
 ---
-#-----------------------------------------------------------------------------
-# JOIN_TOKEN [REQUIRED]: A join token can be obtained by creating a Region in
-# Diagrid Cloud. This token is used by the agent to enroll your installation with
-# the Cloud control plane. A join token can be regenerated before you successfully
-# complete the installation but not after.
+#------------------------------------------------------------------------------
+# JOIN_TOKEN [REQUIRED unless agent.existingJoinTokenSecret is set]:
+# A join token can be obtained by creating a Region in Diagrid Cloud.
+# This token is used by the agent to enroll your installation with
+# the Cloud control plane. A join token can be regenerated before you
+# successfully complete the installation but not after.
 #------------------------------------------------------------------------------
 join_token: ""
 #------------------------------------------------------------------------------
@@ -63,14 +64,55 @@ global:
     annotations: {}
   # Secrets config for integrating with a secret provider
   secrets:
-    # Supported values: kubernetes, aws
+    # Supported values: kubernetes, aws.secretmanager, postgresql
     provider: kubernetes
     aws:
       # Required aws region to access AWS Secrets Manager
       region: ""
-      # Optional, access key and secret key par to access AWS Secrets Manager
+      # Optional, access key and secret key pair to access AWS Secrets Manager
       access_key: ""
       secret_access_key: ""
+    postgresql:
+      # KEK provider type: "local" (AES-256) or "awskms" (AWS KMS)
+      kek_provider: "local"
+      # Primary encryption key (64 hex characters for AES-256) — used when kek_provider is "local"
+      primary_encryption_key: ""
+      primary_key_version: 1
+      # Secondary encryption key for key rotation — leave empty if not rotating
+      secondary_encryption_key: ""
+      secondary_key_version: 0
+      # PostgreSQL connection string: postgres://user:pass@host:5432/db
+      connection_string: ""
+      max_conns: 10
+      timeout: "10s"
+      # AWS KMS fields — required when kek_provider is "awskms"
+      aws_kms_key_id: ""
+      aws_region: ""
+      aws_access_key: ""
+      aws_secret_access_key: ""
+      use_aws_iam: false
+      aws_assume_role_arn: ""
+      # Reference to an existing Kubernetes secret containing PostgreSQL secrets provider configuration.
+      # If provided, inline configuration above will be ignored
+      existingSecret: ""
+      # Key names within the existing secret. All keys are read with optional: true,
+      # so missing keys result in the application using its built-in defaults
+      # Override any key name if your secret uses different naming.
+      existingSecretKeys:
+        connection_string: "connection_string"
+        kek_provider: "kek_provider"
+        primary_encryption_key: "primary_encryption_key"
+        primary_key_version: "primary_key_version"
+        secondary_encryption_key: "secondary_encryption_key"
+        secondary_key_version: "secondary_key_version"
+        aws_kms_key_id: "aws_kms_key_id"
+        aws_region: "aws_region"
+        aws_access_key: "aws_access_key"
+        aws_secret_access_key: "aws_secret_access_key"
+        use_aws_iam: "use_aws_iam"
+        aws_assume_role_arn: "aws_assume_role_arn"
+        max_conns: "max_conns"
+        timeout: "timeout"
   # Global control plane URL
   control_plane_namespace: controlplane
   control_plane_url: catalyst-cloud.r1.diagrid.io:443
@@ -86,14 +128,8 @@ global:
     trust_domain: prj-root.trust.diagrid.io
     namespace: root-dapr-system
     trust_anchors_file: "/var/run/secrets/diagrid.io/trust/ca.crt"
-  # Global NATS configuration
-  nats:
-    endpoint: tls://client-events.r1.diagrid.io:443
-    trust_domain: trust.diagrid.io
-    namespace: "controlplane"
   # Global feature flags
-  featureflags:
-    nats_enabled: true
+  featureflags: {}
   # Consolidated image allows you to use a single image for
   # all Catalyst components instead of individual images.
   # This can be used when you need to reduce the number of
@@ -110,6 +146,50 @@ global:
     # pullPolicy is the image pull policy for the consolidated image
     # If not set, uses global.image.pullPolicy
     pullPolicy: ""
+  # waitForDaprConfig controls a per-pod init container that blocks until the
+  # Dapr Configuration CR referenced by the pod's `dapr.io/config` annotation
+  # exists in the pod's namespace. This avoids dapr-sentry returning
+  # PermissionDenied for SVID requests during the bootstrap window when the
+  # cra-agent has not yet created the Configuration CR.
+  waitForDaprConfig:
+    # enabled determines whether the init container is injected
+    enabled: true
+    # timeoutSeconds caps how long the init container will wait before exiting
+    # with an error. The pod is then restarted by kubelet.
+    timeoutSeconds: 600
+    # pollIntervalSeconds is the polling interval between API server lookups
+    pollIntervalSeconds: 2
+    image:
+      # registry/repository/tag/pullPolicy for the wait init container.
+      # Needs an image with `kubectl`. Defaults to the same image used by the
+      # cleanup hook, pulled through the DockerHub proxy to avoid rate limits.
+      registry: us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy
+      repository: alpine/k8s
+      tag: "1.28.3"
+      pullPolicy: IfNotPresent
+    # resources for the init container — small footprint, polls only.
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 64Mi
+    # securityContext for the init container. The host pods set
+    # runAsNonRoot: true at the pod level, and the alpine/k8s image runs as
+    # root by default — overriding runAsUser here keeps the init container
+    # compliant with the restricted Pod Security Standard.
+    securityContext:
+      runAsUser: 65532
+      runAsGroup: 65532
+      runAsNonRoot: true
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop:
+          - ALL
+      seccompProfile:
+        type: RuntimeDefault
 #------------------------------------------------------------------------------
 # Shared Configurations
 # TODO not implemented yet
@@ -122,6 +202,12 @@ shared:
 # Agent Configurations
 #------------------------------------------------------------------------------
 agent:
+  # existingJoinTokenSecret references a pre-created Kubernetes Secret
+  # containing the join token. When set, join_token value is not required.
+  # The Secret must exist in the same namespace as the Helm release.
+  existingJoinTokenSecret:
+    name: ""
+    key: "join_token"
   logLevel: info
   # This agent config is read directly into the ConfigMap. However,
   # we do apply templating which allows us to provide inline
@@ -129,8 +215,24 @@ agent:
   config:
     host:
       private_region: true
-      ingress_ip_addr: ""
       egress_addresses: []
+      ingress:
+        ip_addr: ""
+        port: 443
+        service:
+          namespace: ""
+          name: ""
+        tls:
+          secret:
+            # Name of the Kubernetes secret containing the ingress gateway TLS certificate.
+            # Automatically derived from gateway.tls settings when not set explicitly.
+            name: ""
+            # Key within the secret that holds the CA certificate PEM.
+            # Only needed when the gateway TLS certificate is signed by a
+            # private/internal CA. When using a well-known CA (e.g. Let's Encrypt)
+            # this can be left empty and no CA will be distributed to sidecars.
+            # Defaults to "ca.crt" when set.
+            ca_file: ""
     placement:
       # max_project_count configures the maximum number of projects that can be handled by the agent.
       # this is a limit internal to this catalyst installation that helps prevent resource exhaustion.
@@ -139,9 +241,81 @@ agent:
       # this is a limit internal to this catalyst installation that helps prevent resource exhaustion.
       max_appid_count: 300
     project:
+      # disable_network_policies disables all Kubernetes NetworkPolicy resources for project namespaces.
+      # When true, no network policies are created and any previously created policies are removed on the next reconcile.
+      disable_network_policies: false
+      # blocked_egress denies network destinations from the sidecar 0.0.0.0/0
+      # egress rule. Each rule's CIDRs are flattened into the NetworkPolicy
+      # IPBlock.except list — NetworkPolicy's "except" only supports CIDRs, so
+      # rules here may only contain cidrs (no namespaces, no ports). Defaults
+      # cover RFC1918 private ranges and the link-local range (169.254.0.0/16),
+      # which includes cloud instance metadata endpoints. Trim or override to
+      # match your environment (e.g. GKE/AKS pod CIDRs live in 10.0.0.0/8).
+      #
+      # PRECEDENCE: allowed_egress always beats blocked_egress. NetworkPolicy
+      # rules are additive, so any destination matched by an allowed_egress
+      # entry is reachable even if its CIDR also appears here.
+      blocked_egress:
+        # RFC1918 private address space. Blocking these by default prevents
+        # sidecars from reaching internal corporate networks, other tenants'
+        # workloads, and in-cluster services that have not been explicitly
+        # allow-listed via allowed_egress. Note that many managed Kubernetes
+        # offerings (GKE, AKS, EKS) place pod and node CIDRs inside 10.0.0.0/8,
+        # so operators typically need to either trim this entry or add an
+        # allowed_egress rule for the cluster's pod/service CIDRs.
+        - name: rfc1918
+          cidrs:
+            - "10.0.0.0/8" # RFC1918 — large private network (most cloud VPC/pod CIDRs)
+            - "172.16.0.0/12" # RFC1918 — medium private network (Docker default bridge)
+            - "192.168.0.0/16" # RFC1918 — small private network (home/office LANs)
+        # Link-local range (RFC3927). The critical reason to block this is
+        # 169.254.169.254, the cloud instance metadata service (IMDS) used by
+        # AWS, GCP, and Azure. An unblocked sidecar could exfiltrate IAM
+        # credentials, instance identity documents, or user-data secrets via
+        # SSRF-style attacks against the node's metadata endpoint.
+        - name: link-local
+          cidrs:
+            - "169.254.0.0/16"
+      # allowed_egress is an additive list of egress destinations permitted
+      # from sidecars. Each rule may combine cidrs and namespaces, and may be
+      # scoped to specific ports. Use this to reach internal services such as
+      # RDS, MSK, or workloads in other namespaces — allow rules win over
+      # blocked_egress so you can punch narrow holes through the block list.
+      #
+      # Example:
+      #   allowed_egress:
+      #     - name: rds
+      #       cidrs: ["10.4.5.6/32"]
+      #       ports:
+      #         - port: 5432
+      #           protocol: TCP
+      #     - name: msk
+      #       cidrs: ["10.4.5.0/24"]
+      #       ports:
+      #         - port: 9094
+      #           protocol: TCP
+      #     - name: worker-namespace
+      #       namespaces: ["my-workers"]
+      #       ports:
+      #         - port: 8080
+      #           protocol: TCP
+      allowed_egress: []
+      # allowed_ingress is an additive list of ingress sources permitted into
+      # project namespaces. Each rule may combine cidrs and namespaces, and may
+      # be scoped to specific ports. The agent namespace (cra-agent) and the
+      # monitoring namespace are always permitted implicitly — you do not need
+      # to list them here.
+      #
+      # Example:
+      #   allowed_ingress:
+      #     - name: extra-prom
+      #       namespaces: ["observability"]
+      #       ports:
+      #         - port: 9090
+      #           protocol: TCP
+      allowed_ingress: []
       default_managed_pubsub_type: kafka-shared-disabled
       default_managed_state_store_type: postgresql-shared-disabled
-      ingress_tls_secret_name: ""
       default_workflow: namespace
       # sidecar_operations_worker_pool_max_appids_percentage configures a worker pool for operations that deploy appids
       # sidecar operations worker pool capacity will be equal to placement.max_appid_count
@@ -160,7 +334,7 @@ agent:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       image_name: "{{ ternary .Values.global.consolidated_image.repository \"sidecar\" .Values.global.consolidated_image.enabled }}"
       # image_tag is the sidecar image version
-      image_tag: "1.42.0-rc.2"
+      image_tag: "1.48.0"
       resources:
         limits:
           cpu: 300m
@@ -169,8 +343,6 @@ agent:
           cpu: 10m
           memory: 25Mi
       service_account_annotations: []
-    api_token_error:
-      enabled: false
     otel:
       enabled: true
       # image_registry is the registry for the otel collector image.
@@ -180,7 +352,7 @@ agent:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       image_name: "{{ ternary .Values.global.consolidated_image.repository \"catalyst-otel-collector\" .Values.global.consolidated_image.enabled }}"
       # image_tag is the otel collector image version
-      image_tag: "1.42.0-rc.2"
+      image_tag: "1.48.0"
       image_pull_policy: "Always"
       metrics_endpoint: https://catalyst-metrics.r1.diagrid.io/api/v1/push
       loki_endpoint: https://catalyst-logs.r1.diagrid.io/loki/api/v1/push
@@ -202,18 +374,10 @@ agent:
         requests:
           cpu: 75m
           memory: 500Mi
-    upstream_dapr:
-      # container_registry is the registry for upstream Dapr images.
-      # Images will be pulled from a dockerhub proxy to avoid rate limits.
-      # If global.image.registry is set, it will be used instead.
-      # This registry hosts proxy images from daprio on DockerHub
-      container_registry: us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/daprio
     internal_dapr:
       # container_registry is the registry for internal Diagrid Dapr images.
       # If global.image.registry is set, it will be used instead.
       container_registry: us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public
-      ca:
-        trust_anchors_config_map_name: ca-certificates-bundle
       sentry_resources:
         limits:
           memory: 100Mi
@@ -227,10 +391,10 @@ agent:
         storage_size: 8Gi
       sentry:
         image:
-          registry: "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public"
+          registry: us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public
           # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
           name: "{{ ternary .Values.global.consolidated_image.repository \"private-sentry\" .Values.global.consolidated_image.enabled }}"
-          tag: "1.42.0-rc.2"
+          tag: "1.48.0"
         jwt:
           enabled: true
           # managed means agent automatically does key rotation and JWKS updates.
@@ -261,7 +425,7 @@ agent:
     # Example: "diagrid/cra-agent" or "cra-agent"
     repository: cra-agent
     # tag is the image tag/version to use
-    tag: "1.42.0-rc.2"
+    tag: "1.48.0"
     # pullPolicy is the image pull policy for this specific image.
     # If empty, uses global.image.pullPolicy.
     # Valid values: Always, IfNotPresent, Never
@@ -347,20 +511,32 @@ gateway:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       repository: identity-injector
       # tag is the image tag/version to use
-      tag: "1.42.0-rc.2"
+      tag: "1.48.0"
       # pullPolicy is the image pull policy for this specific image.
       # If empty, uses global.image.pullPolicy.
       pullPolicy: ""
     resources:
       limits:
-        cpu: 50m
-        memory: 50Mi
+        cpu: 200m
+        memory: 128Mi
       requests:
-        cpu: 10m
-        memory: 15Mi
+        cpu: 50m
+        memory: 64Mi
   envoy:
-    # If HA is enabled, this will be overridden by gateway.ha.minReplicas
+    # If HA is enabled, this will be overridden by gateway.ha.minReplicas.
+    # When autoscaling.enabled is true, this field is ignored and the HPA manages replicas.
     replicaCount: 1
+    # Optional HorizontalPodAutoscaler for the gateway Envoy data plane.
+    # When enabled, the Deployment's replicas field is omitted so the HPA owns it.
+    autoscaling:
+      enabled: false
+      minReplicas: 1
+      maxReplicas: 5
+      # At least one of targetCPUUtilizationPercentage or targetMemoryUtilizationPercentage must be set.
+      targetCPUUtilizationPercentage: 80
+      # targetMemoryUtilizationPercentage: 80
+      # Optional HPA scaling behavior — see k8s HPA v2 behavior spec.
+      behavior: {}
     image:
       # registry is the container registry for the Envoy proxy image.
       # If global.image.registry is set, it will override this value.
@@ -448,7 +624,7 @@ gateway:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       repository: catalyst-gateway
       # tag is the image tag/version to use
-      tag: "1.42.0-rc.2"
+      tag: "1.48.0"
       # pullPolicy is the image pull policy for this specific image.
       # If empty, uses global.image.pullPolicy.
       pullPolicy: ""
@@ -520,7 +696,19 @@ management:
     profiling:
       enabled: false
     featureflags: {}
+  # When autoscaling.enabled is true, this field is ignored and the HPA manages replicas.
   replicaCount: 2
+  # Optional HorizontalPodAutoscaler for the management service.
+  # When enabled, the Deployment's replicas field is omitted so the HPA owns it.
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 5
+    # At least one of targetCPUUtilizationPercentage or targetMemoryUtilizationPercentage must be set.
+    targetCPUUtilizationPercentage: 80
+    # targetMemoryUtilizationPercentage: 80
+    # Optional HPA scaling behavior — see k8s HPA v2 behavior spec.
+    behavior: {}
   image:
     # registry is the container registry for the management image.
     # If global.image.registry is set, it will override this value.
@@ -530,7 +718,7 @@ management:
     # Deprecated: This field supports template evaluation for backwards compatibility.
     repository: "{{ ternary .Values.global.consolidated_image.repository \"catalyst-management\" .Values.global.consolidated_image.enabled }}"
     # tag is the image tag/version to use
-    tag: "1.42.0-rc.2"
+    tag: "1.48.0"
     # pullPolicy is the image pull policy for this specific image.
     # If empty, uses global.image.pullPolicy.
     pullPolicy: ""
@@ -933,8 +1121,9 @@ cleanup:
     dapr: "root-dapr-system"
   image:
     # registry is the container registry for the cleanup job image
-    # The cleanup job needs both kubectl and helm CLI tools
-    registry: docker.io
+    # The cleanup job needs both kubectl and helm CLI tools.
+    # Pulled through the DockerHub proxy to avoid rate limits.
+    registry: us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy
     # repository is the image repository path
     repository: alpine/k8s
     # tag is the image tag/version

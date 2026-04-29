@@ -1,0 +1,53 @@
+# AWS Marketplace values overlay for Catalyst.
+# Usage: helm install catalyst ./catalyst -f values-aws-marketplace.yaml \
+#                  --set agent.existingJoinTokenSecret.name=<join-token-secret>
+#
+# ECR Registry: 709825985650.dkr.ecr.us-east-1.amazonaws.com/diagrid
+# global.image.registry cascades to all components via the catalyst.image helper
+# and to nested agent config registries via the configmap template.
+
+global:
+  image:
+    registry: "709825985650.dkr.ecr.us-east-1.amazonaws.com/diagrid"
+    pullPolicy: IfNotPresent
+  charts:
+    registry: "oci://709825985650.dkr.ecr.us-east-1.amazonaws.com/diagrid"
+  secrets:
+    provider: aws
+
+agent:
+  config:
+    host:
+      # Agent reaches the data-plane gateway via the LoadBalancer-exposed
+      # gateway-envoy service in the release namespace.
+      ingress:
+        service:
+          name: gateway-envoy
+          # Empty namespace resolves to the Helm release namespace at render time.
+          namespace: ""
+
+gateway:
+  envoy:
+    service:
+      type: LoadBalancer
+      annotations:
+        service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+        service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+        service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+
+# CFN owns cluster lifecycle on the AWS Marketplace deploy path; the
+# post-delete cleanup hook is unnecessary (and would race with the
+# CFN-managed teardown of namespaces and CRDs).
+cleanup:
+  enabled: false
+
+# Sub-charts use their own image config, not the catalyst.image helper.
+opentelemetry-deployment:
+  enabled: false
+  image:
+    repository: "709825985650.dkr.ecr.us-east-1.amazonaws.com/diagrid/opentelemetry-collector-k8s"
+
+opentelemetry-daemonset:
+  enabled: false
+  image:
+    repository: "709825985650.dkr.ecr.us-east-1.amazonaws.com/diagrid/opentelemetry-collector-k8s"

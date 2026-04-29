@@ -1,4 +1,4 @@
-# Diagrid Catalyst Private: Azure Deployment Guide
+# Diagrid Catalyst Enterprise Self-Hosted: Azure Deployment Guide
 
 > **Note:** This guide is for demonstration purposes and should not be used in production.
 
@@ -7,9 +7,9 @@
 ## Table of Contents
 
 1. [Prerequisites](#prerequisites)
-2. [What is Catalyst Private?](#what-is-catalyst-private)
+2. [What is Catalyst Enterprise Self-Hosted?](#what-is-catalyst-enterprise-self-hosted)
 3. [Azure Architecture Overview](#azure-architecture-overview)
-4. [Catalyst Private Workflow Support](#catalyst-private-workflow-support)
+4. [Catalyst Enterprise Self-Hosted Workflow Support](#catalyst-enterprise-self-hosted-workflow-support)
 5. [Installation Steps](#installation-steps)
    - [1. Create a Catalyst Region](#1-create-a-catalyst-region)
    - [2. Login to Azure](#2-login-to-azure)
@@ -48,19 +48,19 @@
 
 ---
 
-## What is Catalyst Private?
+## What is Catalyst Enterprise Self-Hosted?
 
-Catalyst Private is a self-hosted deployment of Diagrid Catalyst, running in your own environment. It provides a centralized Dapr control plane and application identity system that can be used to build enterprise-grade Dapr systems across polyglot compute platforms. Specifically, Catalyst is purpose-built to support Dapr Workflow development and operations.
+Catalyst Enterprise Self-Hosted is a self-hosted deployment of Diagrid Catalyst, running in your own environment. It provides a centralized Dapr control plane and application identity system that can be used to build enterprise-grade Dapr systems across polyglot compute platforms. Specifically, Catalyst is purpose-built to support Dapr Workflow development and operations.
 
-This document covers how to deploy Catalyst Private within your Azure Virtual Network, with all traffic routed through a centralized firewall. It also details how to configure your Catalyst deployment with support for Workflow visualization, which requires a PostgreSQL instance.
+This document covers how to deploy Catalyst Enterprise Self-Hosted within your Azure Virtual Network, with all traffic routed through a centralized firewall. It also details how to configure your Catalyst deployment with support for Workflow visualization, which requires a PostgreSQL instance.
 
 ---
 
 ## Azure Architecture Overview
 
-The Azure setup in this guide provisions a secure, production-ready environment for Catalyst Private. While customization options are available, this baseline configuration provides a complete, working deployment. The installation guide will create and configure the following:
+The Azure setup in this guide provisions a secure, production-ready environment for Catalyst Enterprise Self-Hosted. While customization options are available, this baseline configuration provides a complete, working deployment. The installation guide will create and configure the following:
 
-- **Resource Group**: Logical container for all resources related to Catalyst Private
+- **Resource Group**: Logical container for all resources related to Catalyst Enterprise Self-Hosted
 - **Virtual Network (VNet)**: Isolated network space with a custom IP range (default: `10.42.0.0/16`)
 - **Subnets**:
   - **Primary Subnet**: For AKS and the management VM (default: `10.42.1.0/24`)
@@ -103,18 +103,18 @@ This architecture closely aligns with the [AKS Baseline Architecture](https://le
 
 ---
 
-## Catalyst Private Workflow Support
+## Catalyst Enterprise Self-Hosted Workflow Support
 
-At its core, Catalyst Private hosts the **Dapr Workflow API**, providing a robust foundation for building long-running, stateful workflows with built-in fault tolerance, scalability, and visualization.
+At its core, Catalyst Enterprise Self-Hosted hosts the **Dapr Workflow API**, providing a robust foundation for building long-running, stateful workflows with built-in fault tolerance, scalability, and visualization.
 
-In Catalyst Private, PostgreSQL is required to store the data that powers workflow visualization. You can choose to use the same instance to store the workflow engine state or bring your own workflow state store. In this guide, we will use a PostgreSQL instance hosted within AKS to power both the workflow state storage and the visualization.
+In Catalyst Enterprise Self-Hosted, PostgreSQL is required to store the data that powers workflow visualization. You can choose to use the same instance to store the workflow engine state or bring your own workflow state store. In this guide, we will use a PostgreSQL instance hosted within AKS to power both the workflow state storage and the visualization.
 
 - **Workflow Visualization**: Enables the Catalyst console to display workflow diagrams, execution paths, and real-time workflow status
 - **Workflow State Management**: Stores workflow execution state, including task status, variables, and execution history
 
 ### Configuration Details
 
-If you choose to enable support for Workflows in Catalyst Private, the following will be configured as part of the setup below:
+If you choose to enable support for Workflows in Catalyst Enterprise Self-Hosted, the following will be configured as part of the setup below:
 
 - **PostgreSQL Configuration**:
 
@@ -122,13 +122,13 @@ If you choose to enable support for Workflows in Catalyst Private, the following
   - Sets up default credentials (`postgres/postgres`) for initial setup
   - Configures internal Kubernetes service discovery via `postgres-postgresql.postgres.svc.cluster.local`
 
-- **Catalyst Integration**: The Catalyst Private Helm values are configured to use PostgreSQL as the external state store:
+- **Catalyst Integration**: The Catalyst Enterprise Self-Hosted Helm values are configured to use PostgreSQL as the external state store:
   - `default_managed_state_store_type: postgresql-shared-external` enables PostgreSQL integration
   - Connection string parameters specify the Kubernetes service endpoint and database credentials
 
-> **Note:** To visualize the workflows run on Catalyst Private through the Catalyst console, you will need to ensure the appropriate networking rules are configured to allow access to the Catalyst UI from your installation.
+> **Note:** To visualize the workflows run on Catalyst Enterprise Self-Hosted through the Catalyst console, you will need to ensure the appropriate networking rules are configured to allow access to the Catalyst UI from your installation.
 
-If you choose to forgo the workflow setup, you can still use Catalyst Private with the other supported Dapr APIs like service invocation, pubsub, state management, etc.
+If you choose to forgo the workflow setup, you can still use Catalyst Enterprise Self-Hosted with the other supported Dapr APIs like service invocation, pubsub, state management, etc.
 
 ---
 
@@ -204,7 +204,7 @@ diagrid login --api-key="$API_KEY"
 
 ### 6. Install PostgreSQL for Dapr Workflow
 
-To use Dapr Workflow with Catalyst Private, deploy a PostgreSQL instance to the AKS cluster. This step is optional.
+To use Dapr Workflow with Catalyst Enterprise Self-Hosted, deploy a PostgreSQL instance to the AKS cluster. This step is optional.
 
 ```bash
 helm repo add bitnami https://charts.bitnami.com/bitnami
@@ -269,7 +269,7 @@ helm install catalyst oci://public.ecr.aws/diagrid/catalyst \
    --create-namespace \
    -f catalyst-values.yaml \
    --set join_token="${JOIN_TOKEN}" \
-   --version 1.42.0-rc.2
+   --version 1.48.0
 ```
 
 Verify the installation by waiting for all pods to be ready:
@@ -366,7 +366,7 @@ To continue testing, refer to [local development docs](https://docs.diagrid.io/c
 
 ## Limitations
 
-- **Secrets Support**: Catalyst Private supports storing secrets in AWS Secrets Manager or Kubernetes Secrets. Azure Key Vault support is on the roadmap.
+- **Secrets Support**: Catalyst Enterprise Self-Hosted supports storing secrets in AWS Secrets Manager or Kubernetes Secrets. Azure Key Vault support is on the roadmap.
 
 ---
 

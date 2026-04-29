@@ -1,0 +1,5 @@
+join_token: "test-token"
+global:
+  image:
+    registry: "709825985650.dkr.ecr.us-east-1.amazonaws.com/diagrid"
+    pullPolicy: IfNotPresent
