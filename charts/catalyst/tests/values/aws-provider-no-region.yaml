@@ -1,6 +1,6 @@
 join_token: "test-token"
 global:
   secrets:
-    provider: "aws"
+    provider: "aws.secretmanager"
     aws:
       region: ""

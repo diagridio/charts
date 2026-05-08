@@ -3,6 +3,44 @@
 {{- if .Values.join_token -}}
   {{- $_ := set $agentConfig.host "join_token" .Values.join_token -}}
 {{- end -}}
+{{- /* Propagate top-level shared.scheduling so the agent applies it to every
+       workload it provisions (sidecars, per-project Dapr, per-project OTel).
+       Two conversions happen here to dodge viper gotchas in the agent:
+         - nodeSelector map -> list-of-pairs (preserves label keys with ".")
+         - affinity map    -> YAML string literal (preserves camelCase keys) */ -}}
+{{- if and .Values.shared .Values.shared.scheduling -}}
+  {{- $sched := dict -}}
+  {{- if .Values.shared.scheduling.nodeSelector -}}
+    {{- $list := list -}}
+    {{- range $k, $v := .Values.shared.scheduling.nodeSelector -}}{{- $list = append $list (dict "key" $k "value" $v) -}}{{- end -}}
+    {{- $_ := set $sched "node_selector" $list -}}
+  {{- end -}}
+  {{- if .Values.shared.scheduling.tolerations -}}{{- $_ := set $sched "tolerations" .Values.shared.scheduling.tolerations -}}{{- end -}}
+  {{- if and .Values.shared.scheduling.affinity (gt (len .Values.shared.scheduling.affinity) 0) -}}{{- $_ := set $sched "affinity" (toYaml .Values.shared.scheduling.affinity) -}}{{- end -}}
+  {{- if $sched -}}
+    {{- $_ := set $agentConfig "shared" (dict "scheduling" $sched) -}}
+  {{- end -}}
+{{- end -}}
+{{- /* Convert per-workload node_selector map -> list-of-pairs and affinity map -> YAML string. */ -}}
+{{- range $section := list "sidecar" "internal_dapr" "otel" -}}
+  {{- $cfg := index $agentConfig $section -}}
+  {{- if $cfg -}}
+    {{- if hasKey $cfg "node_selector" -}}
+      {{- if kindIs "map" $cfg.node_selector -}}
+        {{- $list := list -}}
+        {{- range $k, $v := $cfg.node_selector -}}{{- $list = append $list (dict "key" $k "value" $v) -}}{{- end -}}
+        {{- $_ := set $cfg "node_selector" $list -}}
+      {{- end -}}
+    {{- end -}}
+    {{- if hasKey $cfg "affinity" -}}
+      {{- if and (kindIs "map" $cfg.affinity) (gt (len $cfg.affinity) 0) -}}
+        {{- $_ := set $cfg "affinity" (toYaml $cfg.affinity) -}}
+      {{- else -}}
+        {{- $_ := unset $cfg "affinity" -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
 {{- $_ := set $agentConfig "control_plane_namespace" .Values.global.control_plane_namespace -}}
 {{- $_ := set $agentConfig "control_plane_url" .Values.global.control_plane_url -}}
 {{- $_ := set $agentConfig "control_plane_http_url" .Values.global.control_plane_http_url -}}

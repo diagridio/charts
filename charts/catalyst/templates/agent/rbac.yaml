@@ -41,6 +41,19 @@ rules:
   resources: ["pods"]
   verbs: ["get", "list", "watch", "delete"]
 
+# pods/log is a subresource and must be granted separately. The agent reads
+# pod logs in the on-error handler to surface failure details.
+- apiGroups: [""]
+  resources: ["pods/log"]
+  verbs: ["get"]
+
+# PersistentVolumeClaims left behind by dapr-scheduler-server and
+# dapr-placement-server StatefulSets are cleaned up on teardown. Both single
+# delete (vcluster handler) and deletecollection (by label selector) are used.
+- apiGroups: [""]
+  resources: ["persistentvolumeclaims"]
+  verbs: ["delete", "deletecollection"]
+
 # Helm emits events during chart operations.
 - apiGroups: [""]
   resources: ["events"]
@@ -121,6 +134,12 @@ rules:
 - apiGroups: ["admissionregistration.k8s.io"]
   resources: ["mutatingwebhookconfigurations", "validatingwebhookconfigurations"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# EndpointSlice for the "kubernetes" service in the default namespace is read
+# when building NetworkPolicy rules to allow access to the K8s API server.
+- apiGroups: ["discovery.k8s.io"]
+  resources: ["endpointslices"]
+  verbs: ["get"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

@@ -35,31 +35,19 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if .Values.global.waitForDaprConfig.enabled }}
+      {{- if or .Values.global.waitForDaprConfig.enabled .Values.gateway.controlplane.xds.mtls.enabled }}
       initContainers:
+      {{- if .Values.global.waitForDaprConfig.enabled }}
         {{- include "catalyst.waitForDaprConfigInitContainer" (dict "configName" "catalyst" "context" .) | nindent 8 }}
       {{- end }}
-      containers:
       {{- if .Values.gateway.controlplane.xds.mtls.enabled }}
-        - name: identity-injector
+        - name: identity-injector-init
           command:
             - ./identity-injector
+          args:
+            - --exit-on-success
           env:
-            - name: IDENTITY_TRUST_DOMAIN
-              value: prj-root.trust.diagrid.io
-            - name: IDENTITY_APPID
-              value: gateway
-            - name: IDENTITY_ROOT_DIR
-              value: /var/run/secrets/diagrid.io
-            - name: IDENTITY_CA_CERT
-              value: /var/run/secrets/diagrid.io/trust/ca.crt
-            - name: IDENTITY_TLS_DIR
-              value: /var/run/secrets/diagrid.io/tls
-            - name: NAMESPACE
-              valueFrom:
-                fieldRef:
-                  apiVersion: v1
-                  fieldPath: metadata.namespace
+            {{- include "gateway.identityInjector.env" (dict "appID" "gateway") | nindent 12 }}
           image: {{ include "catalyst.image" (dict "image" .Values.gateway.identityInjector.image "consolidated" .Values.global.consolidated_image "global" .Values.global.image "context" .) }}
           imagePullPolicy: {{ include "catalyst.imagePullPolicy" (dict "image" .Values.gateway.identityInjector.image "consolidated" .Values.global.consolidated_image "global" .Values.global.image) }}
           resources:
@@ -67,15 +55,24 @@ spec:
           terminationMessagePath: /dev/termination-log
           terminationMessagePolicy: File
           volumeMounts:
-            - mountPath: /var/run/secrets/diagrid.io
-              name: tls-certs
-            - mountPath: /var/run/secrets/diagrid.io/trust/ca.crt
-              name: trust-bundle
-              readOnly: true
-              subPath: ca.crt
-            - mountPath: /var/run/secrets/dapr.io/sentrytoken
-              name: dapr-identity-token
-              readOnly: true
+            {{- include "gateway.identityInjector.volumeMounts" . | nindent 12 }}
+      {{- end }}
+      {{- end }}
+      containers:
+      {{- if .Values.gateway.controlplane.xds.mtls.enabled }}
+        - name: identity-injector
+          command:
+            - ./identity-injector
+          env:
+            {{- include "gateway.identityInjector.env" (dict "appID" "gateway") | nindent 12 }}
+          image: {{ include "catalyst.image" (dict "image" .Values.gateway.identityInjector.image "consolidated" .Values.global.consolidated_image "global" .Values.global.image "context" .) }}
+          imagePullPolicy: {{ include "catalyst.imagePullPolicy" (dict "image" .Values.gateway.identityInjector.image "consolidated" .Values.global.consolidated_image "global" .Values.global.image) }}
+          resources:
+            {{- toYaml .Values.gateway.identityInjector.resources | nindent 12 }}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            {{- include "gateway.identityInjector.volumeMounts" . | nindent 12 }}
       {{- end }}
         - name: envoy
           securityContext:
@@ -144,11 +141,11 @@ spec:
                   path: token
         {{- end }}
       nodeSelector:
-        {{- toYaml .Values.gateway.envoy.nodeSelector | nindent 8 }}
+        {{- include "catalyst.nodeSelector" (dict "shared" .Values.shared.scheduling "component" .Values.gateway.envoy) | nindent 8 }}
       affinity:
-        {{- toYaml .Values.gateway.envoy.affinity | nindent 8 }}
+        {{- include "catalyst.affinity" (dict "shared" .Values.shared.scheduling "component" .Values.gateway.envoy) | nindent 8 }}
       tolerations:
-        {{- toYaml .Values.gateway.envoy.tolerations | nindent 8 }}
+        {{- include "catalyst.tolerations" (dict "shared" .Values.shared.scheduling "component" .Values.gateway.envoy) | nindent 8 }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -181,31 +178,19 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- if .Values.global.waitForDaprConfig.enabled }}
+      {{- if or .Values.global.waitForDaprConfig.enabled .Values.gateway.controlplane.xds.mtls.enabled }}
       initContainers:
+      {{- if .Values.global.waitForDaprConfig.enabled }}
         {{- include "catalyst.waitForDaprConfigInitContainer" (dict "configName" "catalyst" "context" .) | nindent 8 }}
       {{- end }}
-      containers:
       {{- if .Values.gateway.controlplane.xds.mtls.enabled }}
-        - name: identity-injector
+        - name: identity-injector-init
           command:
             - ./identity-injector
+          args:
+            - --exit-on-success
           env:
-            - name: IDENTITY_TRUST_DOMAIN
-              value: prj-root.trust.diagrid.io
-            - name: IDENTITY_APPID
-              value: gateway-controlplane
-            - name: IDENTITY_ROOT_DIR
-              value: /var/run/secrets/diagrid.io
-            - name: IDENTITY_CA_CERT
-              value: /var/run/secrets/diagrid.io/trust/ca.crt
-            - name: IDENTITY_TLS_DIR
-              value: /var/run/secrets/diagrid.io/tls
-            - name: NAMESPACE
-              valueFrom:
-                fieldRef:
-                  apiVersion: v1
-                  fieldPath: metadata.namespace
+            {{- include "gateway.identityInjector.env" (dict "appID" "gateway-controlplane") | nindent 12 }}
           image: {{ include "catalyst.image" (dict "image" .Values.gateway.identityInjector.image "consolidated" .Values.global.consolidated_image "global" .Values.global.image "context" .) }}
           imagePullPolicy: {{ include "catalyst.imagePullPolicy" (dict "image" .Values.gateway.identityInjector.image "consolidated" .Values.global.consolidated_image "global" .Values.global.image) }}
           resources:
@@ -213,15 +198,24 @@ spec:
           terminationMessagePath: /dev/termination-log
           terminationMessagePolicy: File
           volumeMounts:
-            - mountPath: /var/run/secrets/diagrid.io
-              name: tls-certs
-            - mountPath: /var/run/secrets/diagrid.io/trust/ca.crt
-              name: trust-bundle
-              readOnly: true
-              subPath: ca.crt
-            - mountPath: /var/run/secrets/dapr.io/sentrytoken
-              name: dapr-identity-token
-              readOnly: true
+            {{- include "gateway.identityInjector.volumeMounts" . | nindent 12 }}
+      {{- end }}
+      {{- end }}
+      containers:
+      {{- if .Values.gateway.controlplane.xds.mtls.enabled }}
+        - name: identity-injector
+          command:
+            - ./identity-injector
+          env:
+            {{- include "gateway.identityInjector.env" (dict "appID" "gateway-controlplane") | nindent 12 }}
+          image: {{ include "catalyst.image" (dict "image" .Values.gateway.identityInjector.image "consolidated" .Values.global.consolidated_image "global" .Values.global.image "context" .) }}
+          imagePullPolicy: {{ include "catalyst.imagePullPolicy" (dict "image" .Values.gateway.identityInjector.image "consolidated" .Values.global.consolidated_image "global" .Values.global.image) }}
+          resources:
+            {{- toYaml .Values.gateway.identityInjector.resources | nindent 12 }}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            {{- include "gateway.identityInjector.volumeMounts" . | nindent 12 }}
       {{- end }}
         - name: catalyst-gateway-controlplane
           env:
@@ -383,8 +377,8 @@ spec:
                   path: token
       {{- end }}
       nodeSelector:
-        {{- toYaml .Values.gateway.controlplane.nodeSelector | nindent 8 }}
+        {{- include "catalyst.nodeSelector" (dict "shared" .Values.shared.scheduling "component" .Values.gateway.controlplane) | nindent 8 }}
       affinity:
-        {{- toYaml .Values.gateway.controlplane.affinity | nindent 8 }}
+        {{- include "catalyst.affinity" (dict "shared" .Values.shared.scheduling "component" .Values.gateway.controlplane) | nindent 8 }}
       tolerations:
-        {{- toYaml .Values.gateway.controlplane.tolerations | nindent 8 }}
+        {{- include "catalyst.tolerations" (dict "shared" .Values.shared.scheduling "component" .Values.gateway.controlplane) | nindent 8 }}

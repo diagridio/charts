@@ -49,8 +49,8 @@
           "properties": {
             "provider": {
               "type": "string",
-              "enum": ["kubernetes", "aws"],
-              "default": "aws"
+              "enum": ["kubernetes", "aws.secretmanager"],
+              "default": "aws.secretmanager"
             },
             "aws": {
               "type": "object",

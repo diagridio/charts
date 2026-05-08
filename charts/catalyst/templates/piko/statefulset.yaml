@@ -85,10 +85,12 @@ spec:
             - name: proxy-certs
               mountPath: "/proxy-certs"
 {{- end }}
-      {{- with .Values.affinity }}
+      nodeSelector:
+        {{- include "catalyst.nodeSelector" (dict "shared" .Values.shared.scheduling "component" .Values.piko) | nindent 8 }}
       affinity:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- include "catalyst.affinity" (dict "shared" .Values.shared.scheduling "component" .Values.piko) | nindent 8 }}
+      tolerations:
+        {{- include "catalyst.tolerations" (dict "shared" .Values.shared.scheduling "component" .Values.piko) | nindent 8 }}
       volumes:
         - name: config
           configMap:

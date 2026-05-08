@@ -180,6 +180,95 @@ agent:
       localhostProfile: profiles/catalyst-agent.json
 ```
 
+### Pod Scheduling
+
+Every Catalyst workload exposes standard Kubernetes scheduling primitives — `nodeSelector`, `tolerations`, and `affinity` — so you can pin pods to specific node pools or tolerate node taints.
+
+**One knob for everything: `shared.scheduling`**
+
+`shared.scheduling` applies to every pod Catalyst runs or provisions:
+
+- **Control-plane pods** the chart renders directly: agent, management, gateway.envoy, gateway.controlplane, piko.
+- **Dapr sidecars** the agent provisions per app.
+- **Per-project Dapr control plane** (sentry, scheduler, operator, placement) the agent provisions per project.
+- **Per-project OTel collectors** (metrics Deployment + logs DaemonSet) the agent provisions.
+
+Pin everything to one pool with a single block:
+
+```yaml
+shared:
+  scheduling:
+    nodeSelector:
+      workload: catalyst
+    tolerations:
+      - key: workload
+        operator: Equal
+        value: catalyst
+        effect: NoSchedule
+```
+
+**Per-workload overrides**
+
+For cases where one workload needs different scheduling from the rest, set a per-workload block. Merge rules (consistent everywhere):
+- `nodeSelector` and `affinity` (maps): per-workload wins over `shared.scheduling` on key collision.
+- `tolerations` (list): per-workload is appended to `shared.scheduling.tolerations`.
+
+Control-plane per-component overrides:
+
+| Workload | Path |
+|---|---|
+| agent | `agent.{nodeSelector,tolerations,affinity}` |
+| management | `management.{nodeSelector,tolerations,affinity}` |
+| gateway envoy | `gateway.envoy.{nodeSelector,tolerations,affinity}` |
+| gateway control plane | `gateway.controlplane.{nodeSelector,tolerations,affinity}` |
+| piko | `piko.{nodeSelector,tolerations,affinity}` |
+
+Agent-provisioned per-workload overrides:
+
+| Workload | Path |
+|---|---|
+| Dapr sidecars | `agent.config.sidecar.{node_selector,tolerations,affinity}` |
+| Per-project Dapr control plane | `agent.config.internal_dapr.{node_selector,tolerations,affinity}` |
+| Per-project OTel collectors | `agent.config.otel.{node_selector,tolerations,affinity}` |
+
+Example — pin everything to one pool, but also spread the gateway across nodes:
+
+```yaml
+shared:
+  nodeSelector: { workload: catalyst }
+  tolerations:
+    - { key: workload, operator: Equal, value: catalyst, effect: NoSchedule }
+
+gateway:
+  envoy:
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: gateway-envoy
+              topologyKey: kubernetes.io/hostname
+```
+
+**Caveats worth knowing**
+
+- **Sidecar `affinity` override replaces the default pod anti-affinity.** When `agent.config.sidecar.affinity` is unset, the cra chart spreads sidecar replicas across nodes via a built-in `podAntiAffinity`. Setting `affinity` replaces that block entirely — include an equivalent `podAntiAffinity` in your override if you want to keep the spread.
+- **Sidecar tolerations are always appended to platform-managed ones.** The free-plan spot toleration (`diagrid.dev/spot`) is appended on top of shared + per-workload tolerations when the sidecar is scheduled on spot.
+- **Affinity map-merge is shallow.** If `shared.affinity` has `nodeAffinity` and a per-workload block sets `podAntiAffinity`, both end up on the pod. If both set the same top-level key (e.g. both set `nodeAffinity`), the per-workload value replaces shared's.
+- **For agent-provisioned workloads (sidecar, internal_dapr, otel), prefer `matchExpressions` over `matchLabels` inside affinity** when your label keys contain `.` (e.g. `kubernetes.io/arch`). The agent's config loader (viper) treats `.` as a path separator, so dotted keys inside `matchLabels` get split. Chart-rendered workloads (agent, management, gateway, piko) don't have this constraint.
+
+**Shared OTel subcharts** (the optional `opentelemetry-deployment` and `opentelemetry-daemonset` subcharts at the chart root) accept the same keys and pass them through to the upstream open-telemetry Helm subchart:
+
+```yaml
+opentelemetry-deployment:
+  enabled: true
+  nodeSelector: { workload: catalyst }
+```
+
+See the [Kubernetes scheduling docs](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/) for the full field reference.
+
 ### Gateway TLS
 
 To terminate TLS at the Catalyst Gateway, provide a certificate and key:
@@ -193,6 +282,24 @@ gateway:
 ```
 
 For step-by-step instructions covering self-signed (dev), bring-your-own certificates, cert-manager integration, private CA trust for sidecars, and rotation, see the [Gateway TLS guide](../../guides/gateway-tls/README.md).
+
+### Managed Domain
+
+Set this when you want Diagrid Cloud to allocate the region's public wildcard hostname and TLS certificate for you, instead of bringing your own. Your `--ingress` endpoint then only needs to resolve **locally** (or privately) to the gateway — the controlplane allocates a public wildcard subdomain (under `privatediagrid.net` for Diagrid Cloud) and a matching wildcard certificate, then delivers them to the dataplane.
+
+Use this if you do not want to own a public wildcard DNS zone for the region, or provision and rotate a wildcard TLS certificate for the gateway.
+
+Enable it at region creation time:
+
+```bash
+diagrid region create <region-id> --enable-managed-domain --ingress <local-endpoint>
+```
+
+With managed domain, `--ingress` is a locally resolvable address (e.g. an internal hostname or an IP). Without it, `--ingress` must be a publicly resolvable wildcard FQDN that you control (e.g. `*.my-region.company.com`).
+
+When managed domain is enabled, you can omit the `gateway.tls` block from your Helm values — the certificate is provisioned by the controlplane and delivered to the dataplane gateway. See [Gateway TLS](#gateway-tls) for the bring-your-own case.
+
+> **Note:** managed domains add a runtime dependency on the controlplane's DNS and certificate-issuance infrastructure. If you require strict isolation from external services, stick with a bring-your-own domain and certificate.
 
 ### Workflows
 
@@ -308,6 +415,37 @@ piko:
       secretName: "piko-proxy-tls"
 ```
 
+### Management API Tunnel
+
+Set this when the region was created with `--enable-public-management-api` (i.e. its spec has `exposeTunnel: true`). With that flag, the controlplane stands up a Piko upstream endpoint for the region; the management service in the dataplane must dial that upstream and register as its upstream so customers can reach the region's management API over the tunnel instead of via direct ingress.
+
+```yaml
+management:
+  config:
+    tunnel:
+      enabled: true
+      piko:
+        upstream_url: https://tunnel-upstream.r1.diagrid.io
+        audience: piko        # optional, defaults to "piko"
+```
+
+`upstream_url` is the Piko upstream of the controlplane that issued the region — the operator of that controlplane provides this value.
+
+The management service authenticates to Piko using a JWT-SVID issued by Dapr Sentry, so the Sentry remote endpoint configured during region join must already be in place (it is, by default).
+
+### Production Tuning
+
+For production deployments, start from the `values-production.yaml` overlay shipped alongside this chart:
+
+```bash
+helm install catalyst ./catalyst \
+  -f values-production.yaml \
+  -f my-environment.yaml \
+  --set join_token="${JOIN_TOKEN}"
+```
+
+The overlay enables HPAs, drops Kubernetes resource `limits` on Go components (which also drops the auto-derived `GOMEMLIMIT`), lowers log verbosity, and raises the per-project Dapr scheduler memory floor. See the [Production Tuning guide](../../guides/production/README.md) for the rationale behind each value, plus guidance on managed infrastructure (managed Kubernetes, managed PostgreSQL), PodDisruptionBudgets, securityContext hardening, and NetworkPolicies.
+
 ## Networking
 
 Catalyst Enterprise Self-Hosted requires outbound connectivity to Diagrid Cloud. Ensure your network allows access to:
@@ -319,6 +457,7 @@ Catalyst Enterprise Self-Hosted requires outbound connectivity to Diagrid Cloud.
 | `sentry.r1.diagrid.io` | Workload identity (mTLS). | Yes |
 | `trust.r1.diagrid.io` | Trust anchors (mTLS). | Yes |
 | `tunnels.trust.diagrid.io` | OIDC provider for Piko tunnels. | No |
+| `tunnel-upstream.r1.diagrid.io` | Management API tunnel upstream (Piko). | Only if `exposeTunnel` is set on the region. |
 | `catalyst-metrics.r1.diagrid.io` | Dapr runtime metrics. | No |
 | `catalyst-logs.r1.diagrid.io` | Dapr sidecar logs. | No |
 

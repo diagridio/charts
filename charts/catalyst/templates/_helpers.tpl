@@ -279,6 +279,68 @@ Usage:
 {{- end -}}
 
 {{/*
+catalyst.nodeSelectorAsList: converts a map[string]string (nodeSelector/matchLabels)
+into a list of { key, value } pairs. This form is safe to write into the agent's
+configmap because viper's default "." key delimiter would otherwise split well-
+known label keys like "kubernetes.io/arch" into nested paths during Unmarshal.
+Returns an empty list if the input is empty or missing.
+
+Input dict: { m: <map to convert> }
+*/}}
+{{- define "catalyst.nodeSelectorAsList" -}}
+{{- $out := list -}}
+{{- range $k, $v := .m -}}
+{{- $out = append $out (dict "key" $k "value" $v) -}}
+{{- end -}}
+{{- $out | toYaml -}}
+{{- end }}
+
+{{/*
+catalyst.nodeSelector: render a merged nodeSelector map.
+
+Applies in order (later wins on key collision):
+  1. shared.scheduling.nodeSelector         (chart-wide default — typically .Values.shared.scheduling)
+  2. component.nodeSelector      (per-component value)
+  3. componentMerge.nodeSelector (per-component merge patch, if any)
+
+Input dict: { shared, component, componentMerge }
+Caller is responsible for indenting the output (use | nindent N).
+*/}}
+{{- define "catalyst.nodeSelector" -}}
+{{- $out := dict -}}
+{{- if and .shared .shared.nodeSelector }}{{- $out = mergeOverwrite $out .shared.nodeSelector }}{{- end -}}
+{{- if and .component .component.nodeSelector }}{{- $out = mergeOverwrite $out .component.nodeSelector }}{{- end -}}
+{{- if and .componentMerge .componentMerge.nodeSelector }}{{- $out = mergeOverwrite $out .componentMerge.nodeSelector }}{{- end -}}
+{{- $out | toYaml -}}
+{{- end }}
+
+{{/*
+catalyst.affinity: same merge semantics as catalyst.nodeSelector, for affinity.
+Input dict: { shared, component, componentMerge }
+*/}}
+{{- define "catalyst.affinity" -}}
+{{- $out := dict -}}
+{{- if and .shared .shared.affinity }}{{- $out = mergeOverwrite $out .shared.affinity }}{{- end -}}
+{{- if and .component .component.affinity }}{{- $out = mergeOverwrite $out .component.affinity }}{{- end -}}
+{{- if and .componentMerge .componentMerge.affinity }}{{- $out = mergeOverwrite $out .componentMerge.affinity }}{{- end -}}
+{{- $out | toYaml -}}
+{{- end }}
+
+{{/*
+catalyst.tolerations: concatenated tolerations list.
+Order: shared + component + componentMerge (duplicates are the user's
+responsibility; Kubernetes accepts duplicate toleration entries).
+Input dict: { shared, component, componentMerge }
+*/}}
+{{- define "catalyst.tolerations" -}}
+{{- $out := list -}}
+{{- if and .shared .shared.tolerations }}{{- $out = concat $out .shared.tolerations -}}{{- end -}}
+{{- if and .component .component.tolerations }}{{- $out = concat $out .component.tolerations -}}{{- end -}}
+{{- if and .componentMerge .componentMerge.tolerations }}{{- $out = concat $out .componentMerge.tolerations -}}{{- end -}}
+{{- $out | toYaml -}}
+{{- end }}
+
+{{/*
 Validate global values shared by agent and management.
 Both services require sentry and correct secrets provider configuration.
 */}}
@@ -300,12 +362,12 @@ Both services require sentry and correct secrets provider configuration.
             {{- fail "global.secrets.redis.host is required when global.secrets.provider is redis!" -}}
         {{- end -}}
     {{- end -}}
-    {{- if eq .Values.global.secrets.provider "aws" -}}
+    {{- if eq .Values.global.secrets.provider "aws.secretmanager" -}}
         {{- if not .Values.global.secrets.aws -}}
-            {{- fail "global.secrets.aws must be configured when global.secrets.provider is aws!" -}}
+            {{- fail "global.secrets.aws must be configured when global.secrets.provider is aws.secretmanager!" -}}
         {{- end -}}
         {{- if not .Values.global.secrets.aws.region -}}
-            {{- fail "global.secrets.aws.region is required when global.secrets.provider is aws!" -}}
+            {{- fail "global.secrets.aws.region is required when global.secrets.provider is aws.secretmanager!" -}}
         {{- end -}}
     {{- end -}}
 {{- end -}}

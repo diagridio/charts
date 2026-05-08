@@ -13,7 +13,7 @@ global:
   charts:
     registry: "oci://709825985650.dkr.ecr.us-east-1.amazonaws.com/diagrid"
   secrets:
-    provider: aws
+    provider: aws.secretmanager
 
 agent:
   config:

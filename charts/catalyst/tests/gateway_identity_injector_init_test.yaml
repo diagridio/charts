@@ -1,0 +1,162 @@
+suite: Test Gateway identity-injector-init Initcontainer
+templates:
+  - gateway/deployment.yaml
+  - gateway/configmap.yaml
+tests:
+  # ----------------------------------------------------------------------
+  # When xds.mtls.enabled=true (the default), both gateway deployments must
+  # carry the identity-injector-init initContainer. Without it the long-running
+  # identity-injector sidecar races envoy/xds at cold start and the certs may
+  # not be on the shared volume by the time those containers try to read them.
+  # ----------------------------------------------------------------------
+  - it: gateway deployment includes identity-injector-init when xds.mtls.enabled=true
+    set:
+      join_token: "test-token"
+      gateway.controlplane.xds.mtls.enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers
+          content:
+            name: identity-injector-init
+          any: true
+        template: gateway/deployment.yaml
+        documentIndex: 0
+      # Init container must run the identity-injector binary with --exit-on-success
+      # so kubelet blocks regular containers until the cert + trust bundle are written.
+      - equal:
+          path: spec.template.spec.initContainers[?(@.name=="identity-injector-init")].command
+          value:
+            - ./identity-injector
+        template: gateway/deployment.yaml
+        documentIndex: 0
+      - equal:
+          path: spec.template.spec.initContainers[?(@.name=="identity-injector-init")].args
+          value:
+            - --exit-on-success
+        template: gateway/deployment.yaml
+        documentIndex: 0
+      # IDENTITY_APPID identifies which workload identity to fetch.
+      # gateway deployment uses appID=gateway.
+      - contains:
+          path: spec.template.spec.initContainers[?(@.name=="identity-injector-init")].env
+          content:
+            name: IDENTITY_APPID
+            value: gateway
+        template: gateway/deployment.yaml
+        documentIndex: 0
+      # Must mount the same shared emptyDir/volumes as the long-running sidecar
+      # so the cert it writes is visible to envoy.
+      - contains:
+          path: spec.template.spec.initContainers[?(@.name=="identity-injector-init")].volumeMounts
+          content:
+            name: tls-certs
+            mountPath: /var/run/secrets/diagrid.io
+        template: gateway/deployment.yaml
+        documentIndex: 0
+
+  - it: gateway-controlplane deployment includes identity-injector-init when xds.mtls.enabled=true
+    set:
+      join_token: "test-token"
+      gateway.controlplane.xds.mtls.enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers
+          content:
+            name: identity-injector-init
+          any: true
+        template: gateway/deployment.yaml
+        documentIndex: 1
+      - equal:
+          path: spec.template.spec.initContainers[?(@.name=="identity-injector-init")].args
+          value:
+            - --exit-on-success
+        template: gateway/deployment.yaml
+        documentIndex: 1
+      # gateway-controlplane uses a different appID than the envoy gateway.
+      - contains:
+          path: spec.template.spec.initContainers[?(@.name=="identity-injector-init")].env
+          content:
+            name: IDENTITY_APPID
+            value: gateway-controlplane
+        template: gateway/deployment.yaml
+        documentIndex: 1
+
+  # ----------------------------------------------------------------------
+  # Negative case: when xds.mtls is off there's no cert race to solve, so the
+  # init container must be absent. Keeps the chart safe for users who disable
+  # mTLS and don't ship the identity-injector image.
+  # ----------------------------------------------------------------------
+  - it: identity-injector-init is absent when xds.mtls.enabled=false
+    set:
+      join_token: "test-token"
+      gateway.controlplane.xds.mtls.enabled: false
+    asserts:
+      - notContains:
+          path: spec.template.spec.initContainers
+          content:
+            name: identity-injector-init
+          any: true
+        template: gateway/deployment.yaml
+        documentIndex: 0
+      - notContains:
+          path: spec.template.spec.initContainers
+          content:
+            name: identity-injector-init
+          any: true
+        template: gateway/deployment.yaml
+        documentIndex: 1
+
+  # ----------------------------------------------------------------------
+  # Image selection regression: the init container must resolve the same image
+  # as the long-running identity-injector sidecar. Drift between the two would
+  # mean cold-start runs a different binary than rotation, which is exactly
+  # the kind of mismatch a copy-pasted env/volumeMounts pair invites — the
+  # helper templates exist to prevent that.
+  # ----------------------------------------------------------------------
+  - it: identity-injector-init uses the consolidated catalyst-all image when consolidated_image.enabled=true
+    set:
+      join_token: "test-token"
+      gateway.controlplane.xds.mtls.enabled: true
+      global.consolidated_image.enabled: true
+      global.image.registry: "my-registry.io"
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.initContainers[?(@.name=="identity-injector-init")].image
+          pattern: ^my-registry\.io/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
+        template: gateway/deployment.yaml
+        documentIndex: 0
+      - matchRegex:
+          path: spec.template.spec.initContainers[?(@.name=="identity-injector-init")].image
+          pattern: ^my-registry\.io/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
+        template: gateway/deployment.yaml
+        documentIndex: 1
+
+  - it: identity-injector-init image equals identity-injector sidecar image (no drift)
+    set:
+      join_token: "test-token"
+      gateway.controlplane.xds.mtls.enabled: true
+      global.consolidated_image.enabled: true
+      global.image.registry: "my-registry.io"
+    asserts:
+      # gateway deployment: init container image must equal sidecar image.
+      - matchRegex:
+          path: spec.template.spec.initContainers[?(@.name=="identity-injector-init")].image
+          pattern: ^my-registry\.io/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
+        template: gateway/deployment.yaml
+        documentIndex: 0
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=="identity-injector")].image
+          pattern: ^my-registry\.io/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
+        template: gateway/deployment.yaml
+        documentIndex: 0
+      # gateway-controlplane deployment: same invariant.
+      - matchRegex:
+          path: spec.template.spec.initContainers[?(@.name=="identity-injector-init")].image
+          pattern: ^my-registry\.io/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
+        template: gateway/deployment.yaml
+        documentIndex: 1
+      - matchRegex:
+          path: spec.template.spec.containers[?(@.name=="identity-injector")].image
+          pattern: ^my-registry\.io/catalyst-all:[0-9]+\.[0-9]+\.[0-9]+$
+        template: gateway/deployment.yaml
+        documentIndex: 1

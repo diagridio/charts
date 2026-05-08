@@ -1,0 +1,121 @@
+# Production overlay for Catalyst.
+#
+# Apply on top of your environment-specific values:
+#
+#   helm install catalyst ./catalyst \
+#     -f values-production.yaml \
+#     -f my-environment.yaml \
+#     --set join_token="${JOIN_TOKEN}"
+#
+# Defaults shipped in values.yaml are tuned for evaluation; the values below
+# are the recommended starting point for self-hosted production deployments.
+#
+# Rationale: ../../guides/production/README.md
+
+# -----------------------------------------------------------------------------
+# Agent
+# -----------------------------------------------------------------------------
+# Drop Kubernetes resource `limits` on Go components. Memory limits cause
+# OOMKill on bursts; CPU limits cause GC throttling. Keep `requests` so the
+# scheduler still places pods on adequately-sized nodes.
+#
+# Note: the chart auto-derives GOMEMLIMIT from `agent.resources.limits`
+# (templates/_helpers.tpl :: catalyst.GetGoLangGOMEMLIMITFromResourceLimits).
+# Dropping limits also drops the auto-derived GOMEMLIMIT env var, which is the
+# behaviour we want here. To keep a soft GC ceiling, set
+# `agent.goSoftLimit.override: <bytes>` explicitly.
+agent:
+  logLevel: error
+  resources:
+    limits: null
+    requests:
+      cpu: 100m
+      memory: 500Mi
+
+  config:
+    project:
+      # External PostgreSQL is the recommended state store for production —
+      # use a managed service (Amazon RDS, Cloud SQL, Azure Database for
+      # PostgreSQL). See ../../guides/production/README.md#managed-infrastructure.
+      #
+      # Provide connection details via a Kubernetes secret rather than inline
+      # plaintext: create a secret with keys `host`, `port`, `username`,
+      # `password` (and optionally `proxy_host`) and reference it below from
+      # your per-environment values file:
+      #
+      #   external_postgresql:
+      #     existing_secret_name: catalyst-postgres
+      #     existing_secret_namespace: catalyst
+      default_managed_state_store_type: postgresql-shared-external
+      external_postgresql:
+        enabled: true
+        auth_type: connectionString
+
+    # Sidecar (Dapr runtime) tuning — these values are passed through to the
+    # per-AppID `cra` subchart that the agent provisions for every app.
+    sidecar:
+      # Cuts log volume substantially in steady state. Bump to "info"/"debug"
+      # via `helm upgrade` when debugging incidents.
+      log_level: error
+      # Per-AppID HPA. Disabled by default — enable for any production app
+      # that takes real traffic. min=2 keeps capacity headroom across
+      # rolling updates and node drains.
+      autoscaling:
+        enabled: true
+        min_replicas: 2
+        max_replicas: 10
+        target_cpu_utilization_percentage: 80
+      resources:
+        limits: null
+        requests:
+          cpu: 100m
+          memory: 128Mi
+
+    internal_dapr:
+      # Per-project Dapr scheduler. The 175Mi default ceiling triggers
+      # OOMKill once job count climbs; drop limits and raise the request
+      # floor so the pod is scheduled with enough headroom.
+      scheduler_resources:
+        limits: null
+        requests:
+          memory: 256Mi
+      scheduler:
+        # Increase concurrent job streams for high-fanout workloads.
+        # Plumbs through to the Dapr scheduler --scheduler-job-streams flag.
+        job_streams: 100
+
+# -----------------------------------------------------------------------------
+# Management
+# -----------------------------------------------------------------------------
+# Same drop-limits rationale as the agent. HPA is shipped disabled in the
+# default values; enable it for production.
+management:
+  logLevel: error
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 80
+  resources:
+    limits: null
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+# -----------------------------------------------------------------------------
+# Gateway
+# -----------------------------------------------------------------------------
+# Envoy is the data-plane hot path. Default HPA caps at 5 replicas with an
+# 80% target — bump max for higher traffic, lower target for stricter
+# latency SLOs.
+gateway:
+  envoy:
+    autoscaling:
+      enabled: true
+      minReplicas: 3
+      maxReplicas: 10
+      targetCPUUtilizationPercentage: 70
+  identityInjector:
+    resources:
+      limits: null
+

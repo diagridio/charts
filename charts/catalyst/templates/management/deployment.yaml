@@ -188,17 +188,8 @@ spec:
               path: token
       {{- include "inject.patch" (dict "patch" .Values.management.patch.volumes "indent" 6) }}
       nodeSelector:
-        {{- include "merge.maps" (dict "base" .Values.management.nodeSelector "overrides" .Values.management.merge.nodeSelector) | nindent 8 }}
+        {{- include "catalyst.nodeSelector" (dict "shared" .Values.shared.scheduling "component" .Values.management "componentMerge" .Values.management.merge) | nindent 8 }}
       affinity:
-        {{- include "merge.maps" (dict "base" .Values.management.affinity "overrides" .Values.management.merge.affinity) | nindent 8 }}
+        {{- include "catalyst.affinity" (dict "shared" .Values.shared.scheduling "component" .Values.management "componentMerge" .Values.management.merge) | nindent 8 }}
       tolerations:
-        {{- if or .Values.management.tolerations .Values.management.merge.tolerations }}
-        {{- if .Values.management.tolerations }}
-        {{- toYaml .Values.management.tolerations | nindent 8 }}
-        {{- end }}
-        {{- if .Values.management.merge.tolerations }}
-        {{- toYaml .Values.management.merge.tolerations | nindent 8 }}
-        {{- end }}
-        {{- else }}
-        []
-        {{- end }}
+        {{- include "catalyst.tolerations" (dict "shared" .Values.shared.scheduling "component" .Values.management "componentMerge" .Values.management.merge) | nindent 8 }}

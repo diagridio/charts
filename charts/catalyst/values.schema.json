@@ -130,7 +130,7 @@
                             "type": "string",
                             "enum": [
                                 "kubernetes",
-                                "aws",
+                                "aws.secretmanager",
                                 "redis",
                                 "postgresql"
                             ],

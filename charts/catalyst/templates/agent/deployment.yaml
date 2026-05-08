@@ -212,17 +212,8 @@ spec:
       {{- end }}
       {{- include "inject.patch" (dict "patch" .Values.agent.patch.volumes "indent" 6) }}
       nodeSelector:
-        {{- include "merge.maps" (dict "base" .Values.agent.nodeSelector "overrides" .Values.agent.merge.nodeSelector) | nindent 8 }}
+        {{- include "catalyst.nodeSelector" (dict "shared" .Values.shared.scheduling "component" .Values.agent "componentMerge" .Values.agent.merge) | nindent 8 }}
       affinity:
-        {{- include "merge.maps" (dict "base" .Values.agent.affinity "overrides" .Values.agent.merge.affinity) | nindent 8 }}
+        {{- include "catalyst.affinity" (dict "shared" .Values.shared.scheduling "component" .Values.agent "componentMerge" .Values.agent.merge) | nindent 8 }}
       tolerations:
-        {{- if or .Values.agent.tolerations .Values.agent.merge.tolerations }}
-        {{- if .Values.agent.tolerations }}
-        {{- toYaml .Values.agent.tolerations | nindent 8 }}
-        {{- end }}
-        {{- if .Values.agent.merge.tolerations }}
-        {{- toYaml .Values.agent.merge.tolerations | nindent 8 }}
-        {{- end }}
-        {{- else }}
-        []
-        {{- end }}
+        {{- include "catalyst.tolerations" (dict "shared" .Values.shared.scheduling "component" .Values.agent "componentMerge" .Values.agent.merge) | nindent 8 }}

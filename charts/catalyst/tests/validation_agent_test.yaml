@@ -17,12 +17,12 @@ tests:
       - failedTemplate:
           errorMessage: "global.secrets.redis.host is required when global.secrets.provider is redis!"
 
-  - it: should fail agent configmap when secrets provider is aws but region is missing
+  - it: should fail agent configmap when secrets provider is aws.secretmanager but region is missing
     values:
       - values/aws-provider-no-region.yaml
     asserts:
       - failedTemplate:
-          errorMessage: "global.secrets.aws.region is required when global.secrets.provider is aws!"
+          errorMessage: "global.secrets.aws.region is required when global.secrets.provider is aws.secretmanager!"
 
   - it: should fail agent configmap when default_managed_state_store_type is empty
     set:
