@@ -140,6 +140,20 @@ rules:
 - apiGroups: ["discovery.k8s.io"]
   resources: ["endpointslices"]
   verbs: ["get"]
+
+# Upstream kubernetes-sigs/agent-sandbox CRs the gVisor sandbox Provider
+# materializes per-project.
+- apiGroups: ["agents.x-k8s.io"]
+  resources: ["sandboxes"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# Cluster-scoped RuntimeClass read access — the gVisor sandbox Provider's
+# Preflight check verifies the configured RuntimeClass is registered
+# before any Sandbox is created. Granted with `get` only (no list/watch)
+# because the agent only ever reads the named class once at boot.
+- apiGroups: ["node.k8s.io"]
+  resources: ["runtimeclasses"]
+  verbs: ["get"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

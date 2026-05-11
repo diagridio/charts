@@ -449,6 +449,56 @@ agent:
     denylist:
       enabled: false
     featureflags: {}
+    # Sandbox feature configuration.
+    sandbox:
+      enabled: false
+      # provider names the isolation backend. Today only "gvisor" is
+      # supported; a future Kata or firecracker Provider would slot in
+      # here.
+      provider: gvisor
+      gvisor:
+        # Kubernetes RuntimeClass installed in the cluster.
+        # MUST match the name installed by the gvisor-runtime DaemonSet.
+        runtime_class_name: gvisor
+        identity_injector:
+          # REQUIRED when sandbox.enabled. Full image reference for
+          # the identity-injector sidecar (the SPIFFE-helper that
+          # exchanges SA tokens for SVIDs).
+          image: ""
+          pull_policy: IfNotPresent
+        # Profiles MUST contain every name in provider.RequiredProfiles.
+        profiles:
+          - name: "cra.diagrid.io/v1beta1/DurableAgent/default"
+            # REQUIRED when sandbox.enabled.
+            guest_image: ""
+            pull_policy: IfNotPresent
+            resources:
+              requests:
+                cpu: "100m"
+                memory: "128Mi"
+              limits:
+                cpu: "500m"
+                memory: "512Mi"
+            network_policy:
+              # Empty falls back to "<sandboxName>-agent" (matches the
+              # AppIdentity pod label the agent stamps).
+              agent_pod_label_key: app
+              agent_pod_label_value: ""
+              # Egress blocklist. The default — only the cloud metadata
+              # IMDS endpoint — is the agent's compiled default; do NOT
+              # add RFC1918 CIDRs (10/8, 172.16/12, 192.168/16) without
+              # checking your cluster: K8s pod and service CIDRs are
+              # typically inside RFC1918, and blocking them prevents
+              # the sandbox from reaching Sentry / kube-dns / the
+              # control plane and the init container deadline-fires.
+              blocked_egress_cidrs:
+                - "169.254.169.254/32"
+              # Off by default: sandboxes reach the in-cluster control
+              # plane (Sentry, kube-dns, internal services) but not
+              # the public internet. Opt-in per profile when the
+              # workflow genuinely needs outbound (pip install, git
+              # clone, …) and audit the egress posture explicitly.
+              allow_public_internet: false
   metrics:
     port: 9090
   replicaCount: 1
