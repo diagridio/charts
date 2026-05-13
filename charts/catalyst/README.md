@@ -51,18 +51,22 @@ Catalyst components require broad permissions to dynamically manage resources. W
 
 ### Images
 
-The chart deploys multiple images. Below is a reference for users who need to mirror images to private registries.
+The following images are deployed by the chart. Use this list as a starting point for building a registry allowlist or for mirroring to a private registry.
 
 #### Installation Images
 
 Most images are hosted in the Diagrid public repository:
-`REPO=us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public`
+`REPO=us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public`
 
-By default, a consolidated image is used:
+By default, these images are installed:
 
 | Component | Default Image | Description |
 |-----------|--------------|-------------|
-| **Catalyst** | `$REPO/catalyst-all:<tag>` | Catalyst services |
+| **Alpine k8s** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy/alpine/k8s:<tag>` | Utility image used by Helm install and cleanup hooks |
+| **Envoy Proxy** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy/envoyproxy/envoy:<tag>` | Envoy proxy for gateway |
+| **Catalyst** | `$REPO/catalyst-all:<tag>` | Consolidated Catalyst services image |
+| **Piko** | `$REPO/diagrid-piko:<tag>` | Piko reverse tunneling service |
+| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/dapr:<tag>` | Catalyst Dapr control plane services |
 
 Alternatively, separate images can be used:
 
@@ -79,6 +83,7 @@ Dependencies:
 |-----------|--------------|-------------|
 | **Envoy Proxy** | `envoyproxy/envoy:<tag>` | Envoy proxy for gateway |
 | **Piko** | `$REPO/diagrid-piko:<tag>` | Piko reverse tunneling service |
+| **Alpine k8s** | `alpine/k8s:<tag>` | Utility image used by Helm install and cleanup hooks |
 
 #### Runtime Images
 

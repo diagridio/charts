@@ -69,6 +69,9 @@
   {{- if .Values.global.charts.registry -}}
     {{- $_ := set $agentConfig.artifacts "internal_repo_url" .Values.global.charts.registry -}}
   {{- end -}}
+  {{- if .Values.global.charts.daprChartName -}}
+    {{- $_ := set $agentConfig.artifacts "internal_dapr_chart_name" .Values.global.charts.daprChartName -}}
+  {{- end -}}
   {{- if or .Values.global.charts.username .Values.global.charts.existingSecret -}}
     {{- $_ := set $agentConfig.artifacts "internal_registry_username" .Values.global.charts.username -}}
   {{- end -}}

@@ -201,3 +201,42 @@ tests:
           content:
             name: charts-secret
         template: agent/deployment.yaml
+
+  - it: should configure agent configmap with overridden internal dapr chart name
+    set:
+      join_token: "test-token"
+      global.charts.daprChartName: "catalyst-dapr"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "internal_dapr_chart_name: catalyst-dapr"
+        template: agent/configmap.yaml
+
+  - it: should render default internal_dapr_chart_name as dapr
+    set:
+      join_token: "test-token"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "internal_dapr_chart_name: dapr"
+        template: agent/configmap.yaml
+
+  - it: should not render internal_dapr_chart_name when daprChartName is explicitly empty
+    set:
+      join_token: "test-token"
+      global.charts.daprChartName: ""
+    asserts:
+      - notMatchRegex:
+          path: data["config.yaml"]
+          pattern: "internal_dapr_chart_name"
+        template: agent/configmap.yaml
+
+  - it: should render overridden internal_dapr image_name from values
+    set:
+      join_token: "test-token"
+      agent.config.internal_dapr.image_name: "catalyst-dapr"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: 'image_name: ["'']?catalyst-dapr["'']?'
+        template: agent/configmap.yaml

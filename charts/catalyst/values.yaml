@@ -36,6 +36,10 @@ global:
     # Registry URL for artifact storage
     # Example: "oci://my-registry.example.com/diagrid/catalyst"
     registry: "oci://public.ecr.aws/diagrid"
+    # daprChartName is the chart name (path) used to pull the internal dapr
+    # Helm chart from the registry. Override per overlay when the destination
+    # registry hosts the dapr chart under a different name.
+    daprChartName: "dapr"
     # Basic authentication credentials
     username: ""
     password: ""
@@ -414,6 +418,12 @@ agent:
       # container_registry is the registry for internal Diagrid Dapr images.
       # If global.image.registry is set, it will be used instead.
       container_registry: us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public
+      # image_name overrides the basename of the dapr container image inside
+      # container_registry, used for dapr_operator/sentry/placement/scheduler.
+      # Defaults to "dapr" via the agent's call-site fallback when unset.
+      # Override per overlay when the destination registry hosts the dapr
+      # multi-binary image under a different name.
+      # image_name: ""
       sentry_resources:
         limits:
           memory: 100Mi

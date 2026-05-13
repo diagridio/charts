@@ -24,7 +24,10 @@ rules:
     verbs: ["get", "list"]
   - apiGroups: [""]
     resources: ["configmaps"]
-    verbs: ["get", "list", "watch"]
+    # create/update/patch are required for the controlplane-cache ConfigMap
+    # written by the gateway leader to persist Region/Certificate specs for
+    # last-known-good recovery on controlplane outage.
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
   {{- if .Values.global.waitForDaprConfig.enabled }}
   # Read-only access used by the wait-for-dapr-config init container to
   # block startup until the cra-agent has created the Configuration CR
