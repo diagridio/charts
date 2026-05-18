@@ -1,0 +1,9 @@
+# Sample patches.yaml fixture for tests.
+patches:
+  - file: charts/dapr/Chart.yaml
+    ops:
+      - '.name = strenv(CHART_NAME)'
+  - file: charts/dapr/values.yaml
+    ops:
+      - '.global.registry = strenv(CHART_REGISTRY)'
+      - '.global.tag = strenv(IMAGE_TAG)'

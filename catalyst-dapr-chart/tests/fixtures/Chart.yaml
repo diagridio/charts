@@ -1,0 +1,6 @@
+apiVersion: v2
+name: dapr
+description: A Helm chart for Dapr (Diagrid fork)
+type: application
+version: 1.17.5-catalyst.7
+appVersion: "1.17.5"

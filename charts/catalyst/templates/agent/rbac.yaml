@@ -47,12 +47,17 @@ rules:
   resources: ["pods/log"]
   verbs: ["get"]
 
-# PersistentVolumeClaims left behind by dapr-scheduler-server and
-# dapr-placement-server StatefulSets are cleaned up on teardown. Both single
-# delete (vcluster handler) and deletecollection (by label selector) are used.
+# PVCs are touched in two flows:
+#   * teardown — single delete (vcluster handler) and deletecollection by
+#     label selector for dapr-scheduler-server / dapr-placement-server
+#     StatefulSets;
+#   * boot — get on shared-postgresql/data-shared-postgresql-0 to detect a
+#     data directory left behind after a chart uninstall, so the agent can
+#     refuse to seed a fresh admin password against an existing pg_authid
+#     (see internal/infra/postgresql.hasOrphanPVC).
 - apiGroups: [""]
   resources: ["persistentvolumeclaims"]
-  verbs: ["delete", "deletecollection"]
+  verbs: ["get", "delete", "deletecollection"]
 
 # Helm emits events during chart operations.
 - apiGroups: [""]

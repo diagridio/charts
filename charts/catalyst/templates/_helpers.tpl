@@ -243,8 +243,9 @@ Usage:
 {{- define "catalyst.waitForDaprConfigInitContainer" -}}
 {{- $w := .context.Values.global.waitForDaprConfig -}}
 {{- if $w.enabled -}}
+{{- $wRegistry := or $w.image.registry .context.Values.global.registry -}}
 - name: wait-for-dapr-config
-  image: "{{ $w.image.registry }}/{{ $w.image.repository }}:{{ $w.image.tag }}"
+  image: "{{ $wRegistry }}/{{ $w.image.repository }}:{{ $w.image.tag }}"
   imagePullPolicy: {{ $w.image.pullPolicy }}
   command:
     - sh

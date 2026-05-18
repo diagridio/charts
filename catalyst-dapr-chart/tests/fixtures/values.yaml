@@ -1,0 +1,7 @@
+global:
+  registry: 709825985650.dkr.ecr.us-east-1.amazonaws.com/diagrid
+  tag: "1.17.5-catalyst.7-multi"
+  rbac:
+    skipClusterRBAC: false
+  operator:
+    disableWebhooks: false

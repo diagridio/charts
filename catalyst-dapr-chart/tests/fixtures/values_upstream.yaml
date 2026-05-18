@@ -1,0 +1,4 @@
+# Simulates upstream dapr/dapr chart values (missing fork-only fields).
+global:
+  registry: docker.io/daprio
+  tag: "1.17.5"

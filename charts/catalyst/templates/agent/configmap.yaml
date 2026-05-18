@@ -3,6 +3,12 @@
 {{- if .Values.join_token -}}
   {{- $_ := set $agentConfig.host "join_token" .Values.join_token -}}
 {{- end -}}
+{{- /* Default ingress.service.namespace to the release namespace when the value is
+       empty. values-aws-marketplace.yaml leaves it blank with a comment promising
+       render-time resolution; this block fulfills that promise. */ -}}
+{{- if and $agentConfig.host.ingress.service.name (not $agentConfig.host.ingress.service.namespace) -}}
+  {{- $_ := set $agentConfig.host.ingress.service "namespace" .Release.Namespace -}}
+{{- end -}}
 {{- /* Propagate top-level shared.scheduling so the agent applies it to every
        workload it provisions (sidecars, per-project Dapr, per-project OTel).
        Two conversions happen here to dodge viper gotchas in the agent:

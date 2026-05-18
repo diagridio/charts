@@ -12,11 +12,52 @@ global:
     pullPolicy: IfNotPresent
   charts:
     registry: "oci://709825985650.dkr.ecr.us-east-1.amazonaws.com/diagrid"
+    # Override cra-agent's hardcoded "dapr" chart name. The bare diagrid/dapr
+    # repo on 709 AMMP ECR is owned by Conductor's container listing
+    # (prod-lumzkadvijefc); Catalyst publishes the renamed catalyst-dapr-chart
+    # OCI helm artifact under its own listing's repo set, which buyers
+    # entitled to the Catalyst listing can pull.
+    daprChartName: "catalyst-dapr-chart"
   secrets:
     provider: aws.secretmanager
+    # Required by the chart helper validation that gates the AMMP overlay
+    # render. The helm-installer Lambda also supplies this via --set, but
+    # baking it here lets manual `helm template -f values-aws-marketplace.yaml`
+    # invocations succeed without extra flags.
+    aws:
+      region: us-east-1
+  # waitForDaprConfig init container polls for the DaprConfiguration CR before
+  # the gateway-envoy / management pods proceed. On AMMP the agent installs
+  # root-dapr-system (unconditionally, in verifyRootDapr at agent boot) using
+  # the OCI chart from 709 ECR; this init container guards the pre-CR race
+  # window while that install completes. The alpine/k8s image is mirrored to
+  # the 709 AMMP ECR so the rendered manifest stays inside the listing scope.
+  waitForDaprConfig:
+    image:
+      registry: "709825985650.dkr.ecr.us-east-1.amazonaws.com/diagrid"
+      repository: "alpine/k8s"
+      tag: "1.36.0"
 
 agent:
   config:
+    # cra-agent installs the internal Dapr control-plane (verifyRootDapr at
+    # boot) by pulling the OCI helm chart at <global.charts.registry>/<global.charts.daprChartName>
+    # then rendering it. The four bulk setters in
+    # services/catalyst/agent/pkg/project/workflow/handlers/dapr/dapr.go (≈L443-446)
+    # rewrite dapr_{operator,sentry,placement,scheduler}.image.name to
+    # internal_dapr.image_name at install time. Catalyst publishes a single
+    # multi-binary image at <global.image.registry>/catalyst-dapr:<image_tag>
+    # whose behavior is selected by the container's argv, so the four
+    # sub-charts all converge on this one image.
+    internal_dapr:
+      image_name: "catalyst-dapr"
+      image_tag: "1.17.5-catalyst.5-multi"
+    project:
+      # Pin the in-cluster managed-backend defaults for AMMP deployments.
+      # Matches the self-hosted path confirmed for AMMP buyers (Kafka +
+      # Postgres run in-cluster via the *-shared-selfhosted chart variants).
+      default_managed_pubsub_type: kafka-shared-selfhosted
+      default_managed_state_store_type: postgresql-shared-selfhosted
     host:
       # Agent reaches the data-plane gateway via the LoadBalancer-exposed
       # gateway-envoy service in the release namespace.
@@ -30,6 +71,11 @@ gateway:
   envoy:
     service:
       type: LoadBalancer
+      # https443Alias adds a port:443 -> targetPort:8443 entry on the Service.
+      # AWS Load Balancer Controller reconciles NLB listeners from the Service
+      # port list — without a :443 entry the NLB has no :443 listener and
+      # buyer HTTPS traffic times out at the TCP layer.
+      https443Alias: true
       annotations:
         service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
         service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
@@ -46,8 +92,14 @@ opentelemetry-deployment:
   enabled: false
   image:
     repository: "709825985650.dkr.ecr.us-east-1.amazonaws.com/diagrid/opentelemetry-collector-k8s"
+    # AMMP validation reads merged values including disabled sub-charts;
+    # all image refs require an explicit tag.
+    tag: "0.138.0"
 
 opentelemetry-daemonset:
   enabled: false
   image:
     repository: "709825985650.dkr.ecr.us-east-1.amazonaws.com/diagrid/opentelemetry-collector-k8s"
+    # AMMP validation reads merged values including disabled sub-charts;
+    # all image refs require an explicit tag.
+    tag: "0.138.0"
