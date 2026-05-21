@@ -244,9 +244,7 @@ public overlay:
 - **PostgreSQL connection details** — host, credentials, TLS. See
   [Managed infrastructure](#managed-infrastructure) above.
 - **Image registries** — `global.image.registry` and the various
-  per-component `image_registry` knobs. See the AWS Marketplace overlay
-  ([`values-aws-marketplace.yaml`](../../charts/catalyst/values-aws-marketplace.yaml))
-  for a registry-mirroring example.
+  per-component `image_registry` knobs. 
 - **NATS endpoints, Sentry trust anchors** — region-specific.
 - **Secrets provider** — `global.secrets.provider`. See the Secrets section
   of the chart README.

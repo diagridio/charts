@@ -3,9 +3,11 @@
 {{- if .Values.join_token -}}
   {{- $_ := set $agentConfig.host "join_token" .Values.join_token -}}
 {{- end -}}
-{{- /* Default ingress.service.namespace to the release namespace when the value is
-       empty. values-aws-marketplace.yaml leaves it blank with a comment promising
-       render-time resolution; this block fulfills that promise. */ -}}
+{{- /* Default ingress.service.namespace to the release namespace when the
+       value is empty. Marketplace deployments leave it blank in their buyer-
+       side overlay (deploy/aws-marketplace/cloudformation/catalyst-values.yaml.tmpl
+       in the cloudgrid repo) with a comment promising render-time resolution;
+       this block fulfills that promise. */ -}}
 {{- if and $agentConfig.host.ingress.service.name (not $agentConfig.host.ingress.service.namespace) -}}
   {{- $_ := set $agentConfig.host.ingress.service "namespace" .Release.Namespace -}}
 {{- end -}}

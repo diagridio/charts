@@ -196,7 +196,7 @@ helm install catalyst oci://public.ecr.aws/diagrid/catalyst \
      --set join_token="${JOIN_TOKEN}" \
      --set-file gateway.tls.cert=server.pem \
      --set-file gateway.tls.key=server-key.pem \
-     --version 1.53.0
+     --version 1.54.0
 ```
 
 ## Step 5: Verify the Installation ✅
