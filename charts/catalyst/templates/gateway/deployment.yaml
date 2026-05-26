@@ -233,6 +233,8 @@ spec:
               value: {{ .Values.gateway.ha.enabled | quote }}
             - name: GATEWAY_TLS_ENABLED
               value: {{ .Values.gateway.tls.enabled | quote }}
+            - name: ALLOW_LOCAL_DEV_ORIGIN
+              value: {{ .Values.gateway.allowLocalDevOrigin | default false | quote }}
           {{- if .Values.gateway.controlplane.xds.mtls.enabled }}
             - name: XDS_SERVER_TLS_CERT
               value: "/var/run/secrets/diagrid.io/tls/tls.crt"
