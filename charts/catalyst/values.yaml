@@ -371,6 +371,14 @@ agent:
         requests:
           cpu: 10m
           memory: 25Mi
+      # Go soft memory limit (GOMEMLIMIT) for the sidecar runtime container.
+      # By default the sidecar sets GOMEMLIMIT to `percent`% of
+      # resources.limits.memory (90% when unset). Use `override` to pin a fixed
+      # value (e.g. "600MiB"), or set it to "0" to disable GOMEMLIMIT entirely
+      # while keeping the memory limit in place.
+      soft_mem_limit: {}
+      #   percent: 90
+      #   override: "0"
       service_account_annotations: []
     otel:
       enabled: true
