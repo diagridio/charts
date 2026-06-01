@@ -801,6 +801,15 @@ management:
     profiling:
       enabled: false
     featureflags: {}
+    # Reverse tunnel to the Piko server, enabling browser/control-plane
+    # access to management without a direct inbound route.
+    tunnel:
+      # When false, management does not establish a Piko upstream tunnel.
+      enabled: false
+      piko:
+        # Address of the Piko server's upstream port that management dials
+        # to register as a tunnel upstream.
+        upstream_url: "https://tunnel-upstream.r1.diagrid.io"
   # When autoscaling.enabled is true, this field is ignored and the HPA manages replicas.
   replicaCount: 2
   # Optional HorizontalPodAutoscaler for the management service.
