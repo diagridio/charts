@@ -40,6 +40,13 @@ global:
     # Helm chart from the registry. Override per overlay when the destination
     # registry hosts the dapr chart under a different name.
     daprChartName: "dapr"
+    # Non-empty routes Bitnami chart/image pulls to that registry (AMMP ECR overlay); empty uses GCP pull-through.
+    bitnamiChartRegistry: ""
+    bitnamiImageRegistry: ""
+    # Empty defers to the agent's built-in defaults.
+    bitnamiKafkaChartVersion: ""
+    bitnamiPostgresqlChartVersion: ""
+    bitnamiRedisChartVersion: ""
     # Basic authentication credentials
     username: ""
     password: ""
@@ -264,6 +271,14 @@ agent:
       # disable_network_policies disables all Kubernetes NetworkPolicy resources for project namespaces.
       # When true, no network policies are created and any previously created policies are removed on the next reconcile.
       disable_network_policies: false
+      # externally_managed_namespaces indicates the agent does not own the lifecycle of project
+      # namespaces. When true, the project namespace is neither created nor deleted by the agent —
+      # it must be pre-provisioned (and reaped) by an external owner — and the agent manages only
+      # the in-namespace resources (network policies, image-pull secret). Set this when the agent
+      # runs with least-privilege RBAC that lacks create/delete on namespaces; this same value also
+      # drives the namespaces verbs in templates/agent/rbac.yaml so the two cannot drift.
+      # Defaults to false, preserving the Helm-managed namespace behaviour.
+      externally_managed_namespaces: false
       # blocked_egress denies network destinations from the sidecar 0.0.0.0/0
       # egress rule. Each rule's CIDRs are flattened into the NetworkPolicy
       # IPBlock.except list — NetworkPolicy's "except" only supports CIDRs, so
@@ -425,7 +440,7 @@ agent:
       affinity: {}
       # container_registry is the registry for internal Diagrid Dapr images.
       # If global.image.registry is set, it will be used instead.
-      container_registry: us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public
+      container_registry: us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public
       # image_name overrides the basename of the dapr container image inside
       # container_registry, used for dapr_operator/sentry/placement/scheduler.
       # Defaults to "dapr" via the agent's call-site fallback when unset.

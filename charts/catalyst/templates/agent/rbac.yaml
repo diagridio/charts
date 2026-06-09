@@ -7,12 +7,19 @@ rules:
 # Agent binary — direct kubernetes client calls (non-Helm)
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Project namespaces — create/delete, plus get/list on boot.
+# Project namespaces — get/list/watch always; create/delete only when the agent owns
+# the namespace lifecycle. When project.externally_managed_namespaces is true the
+# namespace is pre-provisioned and reaped by an external owner, so the agent needs
+# neither create nor delete on namespaces.
 # `watch` is required for no-escalation when installing the Dapr chart
 # (dapr-scheduler ClusterRole grants namespaces:{get,list,watch}).
 - apiGroups: [""]
   resources: ["namespaces"]
+  {{- if .Values.agent.config.project.externally_managed_namespaces }}
+  verbs: ["get", "list", "watch"]
+  {{- else }}
   verbs: ["get", "list", "watch", "create", "delete"]
+  {{- end }}
 
 # Leader-election lease for the agent itself (cra-agent namespace).
 - apiGroups: ["coordination.k8s.io"]

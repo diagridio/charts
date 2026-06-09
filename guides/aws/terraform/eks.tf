@@ -102,6 +102,23 @@ module "eks" {
     }
   }
 
+  # The module's default node SG rules allow node-to-node UDP only on port 53
+  # (ingress_self_coredns_udp). vcluster's CoreDNS listens on UDP/1053, which nothing
+  # in the defaults covers, so cross-AZ DNS over UDP gets dropped while TCP works.
+  # SGs are stateful, so we only need to allow the destination port 1053 (the reply
+  # to the client's ephemeral port is allowed automatically). TCP/1053 is already
+  # covered by the module's ingress_nodes_ephemeral (1025-65535) rule.
+  node_security_group_additional_rules = {
+    ingress_self_vcluster_coredns_udp = {
+      description = "Node to node vcluster CoreDNS (UDP/1053)"
+      protocol    = "udp"
+      from_port   = 1053
+      to_port     = 1053
+      type        = "ingress"
+      self        = true
+    }
+  }
+
   # Node groups configuration
   eks_managed_node_groups = {
     workers = {
