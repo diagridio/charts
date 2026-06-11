@@ -128,10 +128,11 @@ rules:
 # Dapr resources: per-project components/configurations/subscriptions/
 # resiliencies/httpendpoints (dapr-component, dapr-resource, and
 # dynamic-artifact-release charts), plus the agent's own
-# createDaprConfiguration in cra-agent. `mcpservers` is granted to
-# dapr-operator-admin in newer Dapr charts (required for no-escalation).
+# createDaprConfiguration in cra-agent. `mcpservers` and
+# `workflowaccesspolicies` are granted to dapr-operator-admin in newer Dapr
+# charts (required for no-escalation).
 - apiGroups: ["dapr.io"]
-  resources: ["components", "configurations", "subscriptions", "resiliencies", "httpendpoints", "mcpservers"]
+  resources: ["components", "configurations", "subscriptions", "resiliencies", "httpendpoints", "mcpservers", "workflowaccesspolicies"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 
 # CRDs applied by the Dapr chart (components/configurations/subscriptions/

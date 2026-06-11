@@ -378,7 +378,7 @@ agent:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       image_name: "{{ ternary .Values.global.consolidated_image.repository \"sidecar\" .Values.global.consolidated_image.enabled }}"
       # image_tag is the sidecar image version
-      image_tag: "1.56.0"
+      image_tag: "1.57.0"
       resources:
         limits:
           cpu: 300m
@@ -409,7 +409,7 @@ agent:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       image_name: "{{ ternary .Values.global.consolidated_image.repository \"catalyst-otel-collector\" .Values.global.consolidated_image.enabled }}"
       # image_tag is the otel collector image version
-      image_tag: "1.56.0"
+      image_tag: "1.57.0"
       image_pull_policy: "Always"
       metrics_endpoint: https://catalyst-metrics.r1.diagrid.io/api/v1/push
       loki_endpoint: https://catalyst-logs.r1.diagrid.io/loki/api/v1/push
@@ -440,7 +440,7 @@ agent:
       affinity: {}
       # container_registry is the registry for internal Diagrid Dapr images.
       # If global.image.registry is set, it will be used instead.
-      container_registry: us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public
+      container_registry: us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public
       # image_name overrides the basename of the dapr container image inside
       # container_registry, used for dapr_operator/sentry/placement/scheduler.
       # Defaults to "dapr" via the agent's call-site fallback when unset.
@@ -463,7 +463,7 @@ agent:
           registry: us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public
           # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
           name: "{{ ternary .Values.global.consolidated_image.repository \"private-sentry\" .Values.global.consolidated_image.enabled }}"
-          tag: "1.56.0"
+          tag: "1.57.0"
         jwt:
           enabled: true
           # managed means agent automatically does key rotation and JWKS updates.
@@ -544,7 +544,7 @@ agent:
     # Example: "diagrid/cra-agent" or "cra-agent"
     repository: cra-agent
     # tag is the image tag/version to use
-    tag: "1.56.0"
+    tag: "1.57.0"
     # pullPolicy is the image pull policy for this specific image.
     # If empty, uses global.image.pullPolicy.
     # Valid values: Always, IfNotPresent, Never
@@ -631,7 +631,7 @@ gateway:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       repository: identity-injector
       # tag is the image tag/version to use
-      tag: "1.56.0"
+      tag: "1.57.0"
       # pullPolicy is the image pull policy for this specific image.
       # If empty, uses global.image.pullPolicy.
       pullPolicy: ""
@@ -744,7 +744,7 @@ gateway:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       repository: catalyst-gateway
       # tag is the image tag/version to use
-      tag: "1.56.0"
+      tag: "1.57.0"
       # pullPolicy is the image pull policy for this specific image.
       # If empty, uses global.image.pullPolicy.
       pullPolicy: ""
@@ -847,7 +847,7 @@ management:
     # Deprecated: This field supports template evaluation for backwards compatibility.
     repository: "{{ ternary .Values.global.consolidated_image.repository \"catalyst-management\" .Values.global.consolidated_image.enabled }}"
     # tag is the image tag/version to use
-    tag: "1.56.0"
+    tag: "1.57.0"
     # pullPolicy is the image pull policy for this specific image.
     # If empty, uses global.image.pullPolicy.
     pullPolicy: ""

@@ -80,6 +80,11 @@ data:
               common_tls_context:
                 tls_params:
                   tls_minimum_protocol_version: TLSv1_2
+                  signature_algorithms:
+                    - ed25519
+                    - ecdsa_secp256r1_sha256
+                    - rsa_pss_rsae_sha256
+                    - rsa_pkcs1_sha256
                 validation_context:
                   trusted_ca:
                     filename: /var/run/secrets/diagrid.io/trust/ca.crt
