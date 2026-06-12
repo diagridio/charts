@@ -432,6 +432,8 @@ agent:
           cpu: 75m
           memory: 500Mi
     internal_dapr:
+      # log_level sets the default log level for all Dapr control-plane components. Can be overridden by individual component settings.
+      log_level: info
       # Scheduling overrides for per-project Dapr control-plane pods (sentry,
       # scheduler, operator, placement). Merged with top-level shared.* and
       # propagated via global.{nodeSelector,tolerations,affinity} on the Dapr Helm chart.
