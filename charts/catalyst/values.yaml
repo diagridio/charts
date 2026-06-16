@@ -463,7 +463,7 @@ agent:
       affinity: {}
       # container_registry is the registry for internal Diagrid Dapr images.
       # If global.image.registry is set, it will be used instead.
-      container_registry: us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public
+      container_registry: us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public
       # image_name overrides the basename of the dapr container image inside
       # container_registry, used for dapr_operator/sentry/placement/scheduler.
       # Defaults to "dapr" via the agent's call-site fallback when unset.
