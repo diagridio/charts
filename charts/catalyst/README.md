@@ -150,7 +150,7 @@ By default, this is the full list of images that are installed in your cluster:
 | **Envoy Proxy** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy/envoyproxy/envoy:distroless-v1.38.0` | Envoy proxy for gateway |
 | **Catalyst** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.58.0` | Consolidated Catalyst services image |
 | **Piko** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/diagrid-piko:v1.0.1` | Piko reverse tunneling service |
-| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.18.0-catalyst.1` | Catalyst Dapr control plane services |
+| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.18.1-catalyst.1` | Catalyst Dapr control plane services |
 | **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.58.0` | Catalyst dapr server |
 | **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.58.0` | OTel collector for telemetry |
 
@@ -179,7 +179,7 @@ The Agent provisions these at runtime:
 |-----------|--------------|-------------|
 | **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/sidecar:1.58.0` | Catalyst dapr server |
 | **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-otel-collector:1.58.0` | OTel collector for telemetry |
-| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.18.0-catalyst.1` | Catalyst Dapr control plane services |
+| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.18.1-catalyst.1` | Catalyst Dapr control plane services |
 
 #### Optional Images
 
@@ -255,6 +255,21 @@ agent:
 ```
 
 For an end-to-end walkthrough using `cert-manager` and `trust-manager` to provision these certificates, see the [Dapr PKI guide](../../guides/dapr-pki/README.md).
+
+### Workload Identity Federation (JWT-SVID Audiences)
+
+Sidecars mint JWT-SVIDs from the public (Diagrid) Sentry that identify the workload by its SPIFFE ID (`spiffe://<region-trust-domain>/ns/<project>/<app-id>`). By default those tokens are audience-scoped to the trust domain. To present a workload's SVID as a **federated credential** to an external identity provider, add the audience that provider expects via `global.sentry.jwt_audiences`:
+
+```yaml
+global:
+  sentry:
+    jwt_audiences:
+      - api://AzureADTokenExchange
+```
+
+The most common use is **Microsoft Entra ID Workload Identity Federation**. Register a federated identity credential on an App Registration whose `issuer` is the region's public OIDC issuer (e.g. `https://oidc.r1.diagrid.io`), `subject` is the workload's SPIFFE ID, and `audiences` is `api://AzureADTokenExchange`. With that audience configured here, every sidecar the agent provisions receives an SVID that can be exchanged at Azure's token endpoint for an Entra ID access token — no client secret required.
+
+The value applies to all sidecars in the deployment; it is empty by default (no extra audiences, no behavior change).
 
 ### Pod Security and Seccomp Profiles
 

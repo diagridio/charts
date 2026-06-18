@@ -139,6 +139,12 @@ global:
     trust_domain: prj-root.trust.diagrid.io
     namespace: root-dapr-system
     trust_anchors_file: "/var/run/secrets/diagrid.io/trust/ca.crt"
+    # jwt_audiences are extra audiences embedded in the JWT-SVIDs that sidecars
+    # mint from the public (Diagrid) Sentry. Set this to present a workload's
+    # SVID as a federated credential to an external identity provider — e.g.
+    # "api://AzureADTokenExchange" for Microsoft Entra ID Workload Identity
+    # Federation. Empty by default (no extra audiences). See the README.
+    jwt_audiences: []
   # Global feature flags
   featureflags: {}
   # Consolidated image allows you to use a single image for
