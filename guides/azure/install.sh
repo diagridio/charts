@@ -166,6 +166,66 @@ FIREWALL_NAME="catalyst-firewall"
 FIREWALL_SUBNET_NAME="AzureFirewallSubnet"  # Special subnet name required for Azure Firewall
 FIREWALL_SUBNET_PREFIX="10.42.2.0/24"       # Dedicated subnet for firewall
 
+# Azure Firewall serializes all write operations on a single firewall: starting a
+# new change (rule collection, IP config, etc.) while the previous one is still
+# settling fails with "AnotherOperationInProgress". fw_run waits until the
+# firewall is idle (provisioningState=Succeeded) before issuing the wrapped
+# command, and retries that command if it still hits the transient busy error.
+# Usage: fw_run az network firewall <...> create <...>
+fw_run() {
+  local attempt=1
+  local max_attempts=20
+  local rc pid tmp waited secs
+
+  while true; do
+    # Wait (up to ~10 min) for any in-flight firewall operation to finish before
+    # starting a new one. Azure serializes all writes to a single firewall.
+    waited=0
+    while [ "$(az network firewall show \
+        --resource-group "$RESOURCE_GROUP" \
+        --name "$FIREWALL_NAME" \
+        --query provisioningState -o tsv 2>/dev/null)" != "Succeeded" ]; do
+      [ "$waited" -eq 0 ] && echo "  ⏳ Firewall busy with another operation; waiting for it to finish..."
+      [ "$waited" -ge 600 ] && break
+      sleep 15
+      waited=$((waited + 15))
+    done
+
+    # Run the command in the background with a heartbeat. Azure Firewall rule and
+    # IP-config changes legitimately take several minutes each, and az prints no
+    # progress when its output is captured — without the heartbeat it looks hung.
+    tmp=$(mktemp)
+    "$@" >"$tmp" 2>&1 &
+    pid=$!
+    secs=0
+    while kill -0 "$pid" 2>/dev/null; do
+      sleep 20
+      secs=$((secs + 20))
+      printf '  … still applying (%dm%02ds elapsed, Azure Firewall changes are slow)\n' "$((secs / 60))" "$((secs % 60))"
+    done
+    wait "$pid" && rc=0 || rc=$?
+
+    if [ "$rc" -eq 0 ]; then
+      rm -f "$tmp"
+      return 0
+    fi
+
+    if [ "$attempt" -lt "$max_attempts" ] && grep -qi "AnotherOperationInProgress" "$tmp"; then
+      echo "  ⏳ Firewall busy (AnotherOperationInProgress); retry ${attempt}/${max_attempts} in 20s..."
+      rm -f "$tmp"
+      sleep 20
+      attempt=$((attempt + 1))
+      continue
+    fi
+
+    # Non-transient failure or retries exhausted: surface the captured error and
+    # let 'set -e' abort the script.
+    cat "$tmp" >&2
+    rm -f "$tmp"
+    return "$rc"
+  done
+}
+
 # Create the Firewall subnet if it doesn't exist
 # Azure Firewall requires a dedicated subnet named "AzureFirewallSubnet"
 if ! az network vnet subnet show --resource-group "$RESOURCE_GROUP" --vnet-name "$VNET_NAME" --name "$FIREWALL_SUBNET_NAME" &>/dev/null; then
@@ -203,24 +263,43 @@ fi
 if ! az network firewall show --resource-group "$RESOURCE_GROUP" --name "$FIREWALL_NAME" &>/dev/null; then
 
   echo "> Creating Azure Firewall $FIREWALL_NAME..."
-  
-  # Get the public IP ID (now it exists)
-  PUBLIC_IP_ID=$(az network public-ip show \
-    --resource-group "$RESOURCE_GROUP" \
-    --name "$FIREWALL_NAME" \
-    --query id -o tsv)
-  
-  # Create firewall with VNet and public IP configuration
+
+  # Create the firewall resource itself. The IP configuration (which attaches the
+  # public IP and allocates the private IP from AzureFirewallSubnet) is created
+  # separately below — newer azure-firewall CLI versions no longer auto-create it
+  # from --vnet-name/--public-ip on `firewall create`.
   az network firewall create \
     --name "$FIREWALL_NAME" \
     --resource-group "$RESOURCE_GROUP" \
-    --location "$LOCATION" \
-    --vnet-name "$VNET_NAME" \
-    --public-ip-address "$PUBLIC_IP_ID"
+    --location "$LOCATION"
 
-  echo "✅ Azure Firewall $FIREWALL_NAME created with VNet and public IP."
+  echo "✅ Azure Firewall $FIREWALL_NAME created."
 else
   echo "✅ Azure Firewall $FIREWALL_NAME already exists."
+fi
+
+# Ensure the firewall has an IP configuration.
+# Without an IP configuration the firewall has no private IP, which breaks the
+# route-table next-hop configuration below (MissingNextHopIpAddress). This runs
+# for both newly-created and pre-existing firewalls so it self-heals firewalls
+# that were created before this step existed.
+FW_IPCONFIG_NAME="${FW_IPCONFIG_NAME:-${FIREWALL_NAME}-ipconfig}"
+if [ -z "$(az network firewall ip-config list \
+    --resource-group "$RESOURCE_GROUP" \
+    --firewall-name "$FIREWALL_NAME" \
+    --query "[0].name" -o tsv 2>/dev/null)" ]; then
+
+  echo "> Creating firewall IP configuration $FW_IPCONFIG_NAME..."
+  fw_run az network firewall ip-config create \
+    --resource-group "$RESOURCE_GROUP" \
+    --firewall-name "$FIREWALL_NAME" \
+    --name "$FW_IPCONFIG_NAME" \
+    --public-ip-address "$FIREWALL_NAME" \
+    --vnet-name "$VNET_NAME"
+
+  echo "✅ Firewall IP configuration $FW_IPCONFIG_NAME created."
+else
+  echo "✅ Firewall IP configuration already exists."
 fi
 
 # =============================================================================
@@ -239,6 +318,14 @@ FW_PRIVATE_IP=$(az network firewall show \
   --resource-group "$RESOURCE_GROUP" \
   --name "$FIREWALL_NAME" \
   --query "ipConfigurations[0].privateIPAddress" -o tsv)
+
+# Fail fast with an actionable message rather than letting the empty value
+# surface later as a cryptic "MissingNextHopIpAddress" on route creation.
+if [ -z "$FW_PRIVATE_IP" ]; then
+  echo "❌ Firewall $FIREWALL_NAME has no private IP — its IP configuration is missing or still provisioning."
+  echo "   Inspect with: az network firewall show -g $RESOURCE_GROUP -n $FIREWALL_NAME --query ipConfigurations -o json"
+  exit 1
+fi
 
 echo "✅ Firewall $FIREWALL_NAME is configured with public IP: $FW_PUBLIC_IP"
 echo "✅ Firewall private IP for routing: $FW_PRIVATE_IP"
@@ -310,7 +397,7 @@ if ! az network firewall network-rule list \
     | grep -q "AllowNetworkAzure"; then
 
   echo "> Configuring network rules (time) for the firewall..."
-  az network firewall network-rule create \
+  fw_run az network firewall network-rule create \
     --firewall-name "$FIREWALL_NAME" \
     --resource-group "$RESOURCE_GROUP" \
     --collection-name "AllowTimeCollectionGroup" \
@@ -336,7 +423,7 @@ if ! az network firewall network-rule list \
     | grep -q "AllowNetworkAzure"; then
 
   echo "> Configuring network rules (dns) for the firewall..."
-  az network firewall network-rule create \
+  fw_run az network firewall network-rule create \
     --firewall-name "$FIREWALL_NAME" \
     --resource-group "$RESOURCE_GROUP" \
     --collection-name "AllowDNSCollectionGroup" \
@@ -362,7 +449,7 @@ if ! az network firewall network-rule list \
     | grep -q "AllowNetworkAzure"; then
 
   echo "> Configuring network rules (servicetags) for the firewall..."
-  az network firewall network-rule create \
+  fw_run az network firewall network-rule create \
     --firewall-name "$FIREWALL_NAME" \
     --resource-group "$RESOURCE_GROUP" \
     --collection-name "AllowServiceTagsCollectionGroup" \
@@ -388,7 +475,7 @@ if ! az network firewall network-rule list \
     | grep -q "AllowNetworkAzure"; then
 
   echo "> Configuring network rules (apitcp) for the firewall..."
-  az network firewall network-rule create \
+  fw_run az network firewall network-rule create \
     --firewall-name "$FIREWALL_NAME" \
     --resource-group "$RESOURCE_GROUP" \
     --collection-name "AllowApiTcpCollectionGroup" \
@@ -414,7 +501,7 @@ if ! az network firewall network-rule list \
     | grep -q "AllowNetworkAzure"; then
 
   echo "> Configuring network rules (apiudp) for the firewall..."
-  az network firewall network-rule create \
+  fw_run az network firewall network-rule create \
     --firewall-name "$FIREWALL_NAME" \
     --resource-group "$RESOURCE_GROUP" \
     --collection-name "AllowApiUdpCollectionGroup" \
@@ -445,8 +532,9 @@ if ! az network firewall application-rule list \
 
   echo "> Configuring application rules for the firewall..."
   TARGET_FQDNS=(
-    # diagrid - Catalyst Private service endpoints
+    # diagrid - Catalyst Private service endpoints (.io = prod, .dev = staging)
     "*.diagrid.io"
+    "*.diagrid.dev"
     # kubernetes - K8s image downloads
     "*.dl.k8s.io"
     "dl.k8s.io"
@@ -471,6 +559,8 @@ if ! az network firewall application-rule list \
     "packages.microsoft.com"
     "packages.aks.azure.com"
     "vault.azure.net"
+    "*.vault.azure.net"
+    "*.documents.azure.com"
     "*.ods.opinsights.azure.com"
     "*.oms.opinsights.azure.com"
     "dc.services.visualstudio.com"
@@ -522,7 +612,7 @@ if ! az network firewall application-rule list \
     'api.snapcraft.io'
   )
 
-  az network firewall application-rule create \
+  fw_run az network firewall application-rule create \
     --firewall-name "$FIREWALL_NAME" \
     --resource-group "$RESOURCE_GROUP" \
     --collection-name "AllowApplicationRuleCollectionGroup" \
@@ -548,7 +638,7 @@ if ! az network firewall application-rule list \
 
   echo "> Configuring application rules (aks) for the firewall..."
 
-  az network firewall application-rule create \
+  fw_run az network firewall application-rule create \
     --firewall-name "$FIREWALL_NAME" \
     --resource-group "$RESOURCE_GROUP" \
     --collection-name "AllowAKSCollectionGroup" \
@@ -591,6 +681,8 @@ if ! az aks show --resource-group "$RESOURCE_GROUP" --name "$AKS_NAME" &>/dev/nu
     --service-cidr 10.42.0.0/24 \
     --enable-managed-identity \
     --enable-private-cluster \
+    --enable-oidc-issuer \
+    --enable-workload-identity \
     --node-count 3 \
     --ssh-key-value "$SSH_KEY_PATH.pub" \
     --outbound-type userDefinedRouting
@@ -599,6 +691,29 @@ if ! az aks show --resource-group "$RESOURCE_GROUP" --name "$AKS_NAME" &>/dev/nu
 else
   echo "✅ AKS cluster $AKS_NAME already exists."
 fi
+
+# Ensure OIDC issuer + workload identity are enabled (idempotent).
+# The `az aks create` above sets these for new clusters; this `update` enables
+# them on clusters created before these flags existed. Required for Azure AD
+# Workload Identity (federated credentials) used by Dapr Azure components.
+OIDC_ENABLED=$(az aks show -g "$RESOURCE_GROUP" -n "$AKS_NAME" --query "oidcIssuerProfile.enabled" -o tsv 2>/dev/null)
+WI_ENABLED=$(az aks show -g "$RESOURCE_GROUP" -n "$AKS_NAME" --query "securityProfile.workloadIdentity.enabled" -o tsv 2>/dev/null)
+if [ "$OIDC_ENABLED" != "true" ] || [ "$WI_ENABLED" != "true" ]; then
+  echo "> Enabling OIDC issuer and workload identity on $AKS_NAME (this can take a few minutes)..."
+  az aks update \
+    --resource-group "$RESOURCE_GROUP" \
+    --name "$AKS_NAME" \
+    --enable-oidc-issuer \
+    --enable-workload-identity
+  echo "✅ OIDC issuer and workload identity enabled."
+else
+  echo "✅ OIDC issuer and workload identity already enabled."
+fi
+
+# Surface the OIDC issuer URL — needed to create federated identity credentials
+# for Azure AD Workload Identity (e.g. `az ad app federated-credential create`).
+OIDC_ISSUER_URL=$(az aks show -g "$RESOURCE_GROUP" -n "$AKS_NAME" --query "oidcIssuerProfile.issuerUrl" -o tsv 2>/dev/null)
+echo "ℹ️  AKS OIDC issuer URL: $OIDC_ISSUER_URL"
 
 # =============================================================================
 # KUBERNETES API SERVER FIREWALL RULES
@@ -615,7 +730,7 @@ if ! az network firewall application-rule list \
     --collection-name "AllowKubernetesApiRuleCollectionGroup" 2>/dev/null | grep -q "$KUBE_API_SERVER_IP"; then
 
   echo "> Adding Kubernetes API server IP to firewall rules..."
-  az network firewall application-rule create \
+  fw_run az network firewall application-rule create \
     --firewall-name "$FIREWALL_NAME" \
     --resource-group "$RESOURCE_GROUP" \
     --collection-name "AllowKubernetesApiRuleCollectionGroup" \
@@ -640,24 +755,53 @@ AZURE_SUBSCRIPTION=$(az account show --query id -o tsv)
 # Create a VM if it doesn't exist
 # This VM serves as a management jumpbox for accessing the private AKS cluster
 if ! az vm show --resource-group "$RESOURCE_GROUP" --name "$VM_NAME" >/dev/null 2>&1; then
-  echo "> Creating VM $VM_NAME..."
-  az vm create \
-    --resource-group "$RESOURCE_GROUP" \
-    --name "$VM_NAME" \
-    --image Ubuntu2404 \
-    --vnet-name "$VNET_NAME" \
-    --subnet "$SUBNET_NAME" \
-    --admin-username "$ADMIN_USERNAME" \
-    --authentication-type ssh \
-    --size "$VM_SIZE" \
-    --ssh-key-values "$SSH_KEY_PATH.pub" \
-    --assign-identity \
-    --role contributor \
-    --public-ip-address "" \
-    --nsg-rule NONE \
-    --scope "/subscriptions/$AZURE_SUBSCRIPTION/resourceGroups/$RESOURCE_GROUP"
+  # VM size availability depends on the region, subscription and current
+  # capacity. Try the requested size first, then fall back through known-small
+  # alternatives when Azure reports the size is unavailable (SkuNotAvailable).
+  # `az vm create` is preflight-validated as a single ARM deployment, so a
+  # SkuNotAvailable failure creates nothing and is safe to retry with another size.
+  VM_SIZE_CANDIDATES=("$VM_SIZE" "Standard_B2as_v2" "Standard_B2s_v2" "Standard_D2s_v3" "Standard_D2as_v5" "Standard_DS2_v2")
+  vm_created=false
+  for candidate in "${VM_SIZE_CANDIDATES[@]}"; do
+    echo "> Creating VM $VM_NAME (size $candidate, this can take a minute or two)..."
+    if vm_out=$(az vm create \
+      --resource-group "$RESOURCE_GROUP" \
+      --name "$VM_NAME" \
+      --image Ubuntu2404 \
+      --vnet-name "$VNET_NAME" \
+      --subnet "$SUBNET_NAME" \
+      --admin-username "$ADMIN_USERNAME" \
+      --authentication-type ssh \
+      --size "$candidate" \
+      --ssh-key-values "$SSH_KEY_PATH.pub" \
+      --assign-identity \
+      --role contributor \
+      --public-ip-address "" \
+      --nsg-rule NONE \
+      --scope "/subscriptions/$AZURE_SUBSCRIPTION/resourceGroups/$RESOURCE_GROUP" 2>&1); then
+      echo "✅ VM $VM_NAME created (size $candidate)."
+      vm_created=true
+      break
+    fi
 
-  echo "✅ VM $VM_NAME created."
+    # Only fall through to the next size on a capacity/availability error;
+    # any other failure is fatal and is surfaced as-is.
+    if printf '%s' "$vm_out" | grep -qi "SkuNotAvailable\|not available in location"; then
+      echo "⚠️  Size $candidate is not available in $LOCATION; trying the next candidate..."
+      continue
+    fi
+
+    printf '%s\n' "$vm_out" >&2
+    exit 1
+  done
+
+  if [ "$vm_created" != "true" ]; then
+    echo "❌ Could not create VM $VM_NAME: none of the candidate sizes are available in $LOCATION."
+    echo "   List sizes offered in this region with:"
+    echo "     az vm list-skus --location $LOCATION --resource-type virtualMachines -o table"
+    echo "   Then re-run with an available size, e.g.: VM_SIZE=Standard_D2s_v4 $0"
+    exit 1
+  fi
 else
   echo "✅ VM $VM_NAME already exists."
 fi
@@ -702,7 +846,7 @@ if ! az network firewall nat-rule show \
 
   if [ "$COUNT" -eq 0 ]; then
       echo "Creating DNAT rule $DNAT_RULE_NAME..."
-      az network firewall nat-rule create \
+      fw_run az network firewall nat-rule create \
         --firewall-name "$FIREWALL_NAME" \
         --resource-group "$RESOURCE_GROUP" \
         --collection-name "$DNAT_COLLECTION_NAME" \
@@ -717,7 +861,7 @@ if ! az network firewall nat-rule show \
         --translated-address "$VM_PRIVATE_IP"
   else
       echo "Updating DNAT rule $DNAT_RULE_NAME..."
-      az network firewall nat-rule create \
+      fw_run az network firewall nat-rule create \
         --firewall-name "$FIREWALL_NAME" \
         --resource-group "$RESOURCE_GROUP" \
         --collection-name "$DNAT_COLLECTION_NAME" \

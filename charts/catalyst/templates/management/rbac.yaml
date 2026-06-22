@@ -11,10 +11,10 @@ rules:
 - apiGroups: [""]
   resources: ["secrets"]
   verbs: ["get", "list", "watch", "create", "update", "delete"]
-# Namespaces — get + list (project namespace lookup)
+# Namespaces — get + list (project namespace lookup) + watch (project name resolver informer)
 - apiGroups: [""]
   resources: ["namespaces"]
-  verbs: ["get", "list"]
+  verbs: ["get", "list", "watch"]
 # Leases — leader election (get-or-create, periodic update)
 - apiGroups: ["coordination.k8s.io"]
   resources: ["leases"]

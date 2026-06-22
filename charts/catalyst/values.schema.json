@@ -377,6 +377,7 @@
                 "logLevel": {
                     "type": "string",
                     "enum": [
+                        "trace",
                         "debug",
                         "info",
                         "warn",
