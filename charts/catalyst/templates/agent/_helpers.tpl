@@ -44,6 +44,27 @@ app.kubernetes.io/component: agent
 {{- end }}
 
 {{/*
+agent.defaultAffinity: a soft pod anti-affinity that spreads agent replicas
+across nodes so a single node failure can't take out the whole fleet. It is a
+preference (preferredDuringScheduling), so it never blocks scheduling — at a
+single replica it is a no-op. Applied by agent/deployment.yaml only when no
+affinity is configured via values; any user-supplied affinity replaces it.
+*/}}
+{{- define "agent.defaultAffinity" -}}
+podAntiAffinity:
+  preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: 100
+      podAffinityTerm:
+        topologyKey: kubernetes.io/hostname
+        labelSelector:
+          matchLabels:
+            {{- /* full selector labels (name+instance+component) so this only
+                   spreads replicas of THIS agent Deployment, not every agent
+                   pod in the namespace from other releases/hosts */}}
+            {{- include "agent.selectorLabels" . | nindent 12 }}
+{{- end }}
+
+{{/*
 Create the name of the service account to use for agent
 */}}
 {{- define "agent.serviceAccountName" -}}

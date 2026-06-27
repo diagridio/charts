@@ -518,6 +518,35 @@ else
   echo "✅ Network rules (apiudp) already exist for the firewall."
 fi
 
+# Create network rule (ServiceBus) collection if it doesn't exist
+# Allows AMQP (TCP 5671) and HTTPS (443) egress to Azure Service Bus, used by the
+# Dapr Service Bus pub/sub and binding components (pubsub.azure.servicebus.*). The
+# Dapr SDK speaks AMQP over TCP 5671, which FQDN application rules can't filter, so
+# this is a network rule against the regional ServiceBus service tag.
+if ! az network firewall network-rule list \
+    --firewall-name "$FIREWALL_NAME" \
+    --resource-group "$RESOURCE_GROUP" \
+    --collection-name "AllowServiceBusCollectionGroup" 2>/dev/null \
+    | grep -q "AllowNetworkAzure"; then
+
+  echo "> Configuring network rules (servicebus) for the firewall..."
+  fw_run az network firewall network-rule create \
+    --firewall-name "$FIREWALL_NAME" \
+    --resource-group "$RESOURCE_GROUP" \
+    --collection-name "AllowServiceBusCollectionGroup" \
+    --name "AllowNetworkAzure" \
+    --protocols "TCP" \
+    --priority 105 \
+    --action "Allow" \
+    --source-addresses "*" \
+    --destination-addresses "ServiceBus.$LOCATION" \
+    --destination-ports 5671 443
+
+  echo "✅ Network rules (servicebus) configured for the firewall."
+else
+  echo "✅ Network rules (servicebus) already exist for the firewall."
+fi
+
 # =============================================================================
 # FIREWALL APPLICATION RULES
 # =============================================================================

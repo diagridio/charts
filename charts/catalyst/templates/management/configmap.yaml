@@ -13,6 +13,55 @@
   {{- $_ := set $configMap "secrets_postgresql" .Values.global.secrets.postgresql -}}
 {{- end -}}
 {{- $_ := set $configMap "featureflags" .Values.global.featureflags -}}
+{{- /* Derive connect-only access to the shared region database (db_region) from
+       the agent's managed Postgres credentials, so no separate management value
+       is required: the agent provisions db_region with these same region master
+       credentials, and management only ever connects to it (no DDL).
+
+       This MUST mirror the agent's own resolveManagedPostgresqlConfig
+       (services/catalyst/agent/internal/boot/regiondb.go): the agent prefers the
+       shared self-hosted Postgres (only present when
+       default_managed_state_store_type == postgresql-shared-selfhosted) and
+       otherwise falls back to project.external_postgresql whenever it is enabled
+       — independent of the state-store type (e.g. external Postgres configured
+       for the scheduler's managed-postgresql backend). We therefore key the
+       self-hosted branch off the state-store type and the external branch off
+       external_postgresql.enabled, in that precedence order.
+
+       An explicit management.config.region_postgresql, if set, always wins. */ -}}
+{{- $agent := .Values.agent | default dict -}}
+{{- $stateStoreType := dig "config" "project" "default_managed_state_store_type" "" $agent -}}
+{{- $extPg := dig "config" "project" "external_postgresql" dict $agent -}}
+{{- if not (hasKey $configMap "region_postgresql") -}}
+  {{- /* Self-hosted path (e.g. onebox), checked first to match the agent's
+         preference. Rather than hardcoding the agent's Bitnami coordinates here,
+         we only propagate the managed state store type: management derives the
+         host/port/username/secret/password-key in code from the shared
+         conventions (services/catalyst/pkg/sharedpostgresql), the same source
+         the agent uses. This keeps the two from drifting. */ -}}
+  {{- if eq $stateStoreType "postgresql-shared-selfhosted" -}}
+    {{- $_ := set $configMap "region_postgresql" (dict
+        "enabled" true
+        "managed_state_store_type" $stateStoreType
+      ) -}}
+  {{- /* External path: the agent uses project.external_postgresql whenever it is
+         enabled. Its existing-secret carries the full connection tuple (keys:
+         host, port, username, password), which management reuses. When external
+         Postgres is enabled but configured inline (no existing_secret_name),
+         credentials can't be auto-derived here — set an explicit
+         management.config.region_postgresql override instead. The region
+         database name is a fixed invariant owned by the agent
+         (mcpstore.RegionDatabaseName), so it is not set here. */ -}}
+  {{- else if and $extPg.enabled $extPg.existing_secret_name -}}
+    {{- $_ := set $configMap "region_postgresql" (dict
+        "enabled" true
+        "disable_tls" (default false $extPg.disable_tls)
+        "max_conns" (default 2 $extPg.max_conns)
+        "existing_secret_name" $extPg.existing_secret_name
+        "existing_secret_namespace" (default .Release.Namespace $extPg.existing_secret_namespace)
+      ) -}}
+  {{- end -}}
+{{- end -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:

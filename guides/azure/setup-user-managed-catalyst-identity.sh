@@ -23,6 +23,32 @@ assign_role() {
     fi
 }
 
+# assign_cosmos_data_role PRINCIPAL_ID ACCOUNT RESOURCE_GROUP — idempotently grant
+# the Cosmos DB Built-in Data Contributor data-plane role on the account. Cosmos DB
+# has its own data-plane RBAC system, separate from Azure resource-manager roles, so
+# it can't go through assign_role.
+assign_cosmos_data_role() {
+    local principal_id="$1" account="$2" rg="$3"
+    # Built-in "Cosmos DB Built-in Data Contributor" role definition id.
+    local role_def_id="00000000-0000-0000-0000-000000000002"
+    if [[ -n "$(az cosmosdb sql role assignment list \
+        --account-name "${account}" \
+        --resource-group "${rg}" \
+        --query "[?principalId=='${principal_id}' && contains(roleDefinitionId, '${role_def_id}')].id | [0]" \
+        --output tsv 2>/dev/null)" ]]; then
+        log "Cosmos DB data role already assigned on '${account}'; skipping."
+    else
+        log "Assigning 'Cosmos DB Built-in Data Contributor' to the identity on Cosmos DB '${account}'..."
+        az cosmosdb sql role assignment create \
+            --account-name "${account}" \
+            --resource-group "${rg}" \
+            --role-definition-id "${role_def_id}" \
+            --principal-id "${principal_id}" \
+            --scope "/" \
+            --output none
+    fi
+}
+
 # Defaults (override with the flags below or matching env vars)
 RESOURCE_GROUP="${RESOURCE_GROUP:-rg1}"
 LOCATION="${LOCATION:-westeurope}"
@@ -36,6 +62,8 @@ CATALYST_APP="${CATALYST_APP:-app1}"
 # Optional: when set, grant the identity data-plane access to these resources
 CATALYST_KEYVAULT="${CATALYST_KEYVAULT:-}"
 CATALYST_STORAGE_ACCOUNT="${CATALYST_STORAGE_ACCOUNT:-}"
+CATALYST_COSMOSDB="${CATALYST_COSMOSDB:-}"
+CATALYST_SERVICEBUS="${CATALYST_SERVICEBUS:-}"
 
 usage() {
     cat <<EOF
@@ -50,8 +78,10 @@ Options:
   --cluster-name NAME      AKS cluster name             (default: ${CLUSTER_NAME})
   --project NAME           Catalyst project name        (default: ${CATALYST_PROJECT})
   --app NAME               AppID name                   (default: ${CATALYST_APP})
-  --keyvault NAME          Grant 'Key Vault Secrets User' on this Key Vault        (optional)
-  --storage-account NAME   Grant 'Storage Blob Data Contributor' on this account   (optional)
+  --keyvault NAME          Grant 'Key Vault Secrets User' on this Key Vault              (optional)
+  --storage-account NAME   Grant 'Storage Blob Data Contributor' on this account         (optional)
+  --cosmosdb NAME          Grant 'Cosmos DB Built-in Data Contributor' on this account   (optional)
+  --servicebus NAME        Grant 'Azure Service Bus Data Owner' on this namespace        (optional)
   -h, --help               Show this help and exit
 
 Each option may also be supplied via an env var of the same name, e.g.:
@@ -68,6 +98,8 @@ while [[ $# -gt 0 ]]; do
         --app) CATALYST_APP="$2"; shift 2 ;;
         --keyvault) CATALYST_KEYVAULT="$2"; shift 2 ;;
         --storage-account) CATALYST_STORAGE_ACCOUNT="$2"; shift 2 ;;
+        --cosmosdb) CATALYST_COSMOSDB="$2"; shift 2 ;;
+        --servicebus) CATALYST_SERVICEBUS="$2"; shift 2 ;;
         -h|--help) usage; exit 0 ;;
         *) echo "Unknown option: $1" >&2; usage >&2; exit 1 ;;
     esac
@@ -167,8 +199,27 @@ if [[ -n "${CATALYST_STORAGE_ACCOUNT}" ]]; then
     assign_role "${PRINCIPAL_ID}" "Storage Blob Data Contributor" "${STORAGE_SCOPE}" "storage account '${CATALYST_STORAGE_ACCOUNT}'"
 fi
 
+if [[ -n "${CATALYST_COSMOSDB}" ]]; then
+    log "Resolving Cosmos DB account '${CATALYST_COSMOSDB}'..."
+    assign_cosmos_data_role "${PRINCIPAL_ID}" "${CATALYST_COSMOSDB}" "${RESOURCE_GROUP}"
+fi
+
+if [[ -n "${CATALYST_SERVICEBUS}" ]]; then
+    log "Resolving Service Bus namespace '${CATALYST_SERVICEBUS}'..."
+    SERVICEBUS_SCOPE="$(az servicebus namespace show --name "${CATALYST_SERVICEBUS}" --resource-group "${RESOURCE_GROUP}" --query id --output tsv)"
+    assign_role "${PRINCIPAL_ID}" "Azure Service Bus Data Owner" "${SERVICEBUS_SCOPE}" "Service Bus namespace '${CATALYST_SERVICEBUS}'"
+fi
+
 echo '--- User-Assigned Managed Identity ready ---'
-echo 'Add the following annotation to the appid service account:'
+echo 'Merge the following to your Catalyst chart values under agent.config:'
 echo ''
-echo "  azure.workload.identity/client-id: $USER_ASSIGNED_CLIENT_ID"
+echo ' agent:'
+echo '   config:'
+echo '     sidecar:'
+echo '       service_account_annotations:'
+echo '         - key: "azure.workload.identity/client-id"'
+echo "           value: \"$USER_ASSIGNED_CLIENT_ID\""
+echo '       pod_labels:'
+echo '         - key: "azure.workload.identity/use"'
+echo '           value: "true"'
 

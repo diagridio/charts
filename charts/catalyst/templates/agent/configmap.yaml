@@ -97,20 +97,32 @@
   {{- if .Values.global.charts.bitnamiRedisChartVersion -}}
     {{- $_ := set $agentConfig.artifacts "bitnami_redis_chart_version" .Values.global.charts.bitnamiRedisChartVersion -}}
   {{- end -}}
-  {{- if or .Values.global.charts.username .Values.global.charts.existingSecret -}}
-    {{- $_ := set $agentConfig.artifacts "internal_registry_username" .Values.global.charts.username -}}
+  {{- /* Registry credentials. With existingSecret the agent reads them from the */ -}}
+  {{- /* secret mounted at /var/run/secrets/charts — it treats an absolute path */ -}}
+  {{- /* as a file reference — so nothing sensitive is written into the ConfigMap. */ -}}
+  {{- /* With inline values (no existingSecret) the literals are emitted instead. */ -}}
+  {{- if .Values.global.charts.existingSecret -}}
+    {{- $_ := set $agentConfig.artifacts "internal_registry_username" "/var/run/secrets/charts/username" -}}
+    {{- $_ := set $agentConfig.artifacts "internal_registry_password" "/var/run/secrets/charts/password" -}}
+  {{- else -}}
+    {{- if .Values.global.charts.username -}}
+      {{- $_ := set $agentConfig.artifacts "internal_registry_username" .Values.global.charts.username -}}
+    {{- end -}}
+    {{- if .Values.global.charts.password -}}
+      {{- $_ := set $agentConfig.artifacts "internal_registry_password" .Values.global.charts.password -}}
+    {{- end -}}
   {{- end -}}
-  {{- if or .Values.global.charts.password .Values.global.charts.existingSecret -}}
-    {{- $_ := set $agentConfig.artifacts "internal_registry_password" .Values.global.charts.password -}}
-  {{- end -}}
+  {{- /* mTLS cert/key/CA are always file references into the mounted secret. The */ -}}
+  {{- /* agent drops any path the secret does not actually contain, so a secret */ -}}
+  {{- /* holding only credentials (or only certs) works without further config. */ -}}
   {{- if or .Values.global.charts.clientCert .Values.global.charts.existingSecret -}}
-    {{- $_ := set $agentConfig.artifacts "internal_repo_client_cert_file" (printf "/var/run/secrets/charts/tls.crt") -}}
+    {{- $_ := set $agentConfig.artifacts "internal_repo_client_cert_file" "/var/run/secrets/charts/tls.crt" -}}
   {{- end -}}
   {{- if or .Values.global.charts.clientKey .Values.global.charts.existingSecret -}}
-    {{- $_ := set $agentConfig.artifacts "internal_repo_client_key_file" (printf "/var/run/secrets/charts/tls.key") -}}
+    {{- $_ := set $agentConfig.artifacts "internal_repo_client_key_file" "/var/run/secrets/charts/tls.key" -}}
   {{- end -}}
   {{- if or .Values.global.charts.customCA .Values.global.charts.existingSecret -}}
-    {{- $_ := set $agentConfig.artifacts "internal_repo_ca_file" (printf "/var/run/secrets/charts/ca.crt") -}}
+    {{- $_ := set $agentConfig.artifacts "internal_repo_ca_file" "/var/run/secrets/charts/ca.crt" -}}
   {{- end -}}
 {{- end -}}
 {{- /* Default ingress TLS secret from the gateway TLS settings when not explicitly set */ -}}

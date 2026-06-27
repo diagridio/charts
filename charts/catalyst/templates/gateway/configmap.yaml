@@ -88,11 +88,34 @@ data:
                 validation_context:
                   trusted_ca:
                     filename: /var/run/secrets/diagrid.io/trust/ca.crt
-                tls_certificates:
-                  certificate_chain:
-                    filename: /var/run/secrets/diagrid.io/tls/tls.crt
-                  private_key:
-                    filename: /var/run/secrets/diagrid.io/tls/tls.key
-                  watched_directory:
-                    path: /var/run/secrets/diagrid.io/tls
+                # Deliver the controlplane mTLS client cert via filesystem SDS.
+                # watched_directory only fires a hot-reload when the cert is
+                # delivered through SDS (path_config_source); it is silently
+                # ignored on an inline tls_certificates block and on a
+                # static_resources.secrets entry. The SDS resource below (mounted
+                # from this ConfigMap) carries the watched_directory that triggers
+                # on the identity-injector's atomic `tls` symlink swap.
+                tls_certificate_sds_secret_configs:
+                  - name: controlplane_cert
+                    sds_config:
+                      path_config_source:
+                        path: /etc/envoy/controlplane-cert-sds.yaml
+                      resource_api_version: V3
           {{- end }}
+  {{- if .Values.gateway.controlplane.xds.mtls.enabled }}
+  controlplane-cert-sds.yaml: |
+    resources:
+      - "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.Secret
+        name: controlplane_cert
+        tls_certificate:
+          certificate_chain:
+            filename: /var/run/secrets/diagrid.io/tls/tls.crt
+          private_key:
+            filename: /var/run/secrets/diagrid.io/tls/tls.key
+          # watched_directory takes effect here only because this Secret is
+          # delivered via SDS. Watch the dir where the identity-injector renames
+          # the `tls` symlink (the cert's grandparent dir); that rename is an
+          # inotify MOVED_TO that triggers an atomic cert+key reload, no restart.
+          watched_directory:
+            path: /var/run/secrets/diagrid.io
+  {{- end }}

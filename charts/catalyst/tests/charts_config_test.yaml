@@ -85,7 +85,7 @@ tests:
             name: charts-secret
             secret:
               secretName: RELEASE-NAME-charts
-              defaultMode: 0400
+              defaultMode: 420
         template: agent/deployment.yaml
       - contains:
           path: spec.template.spec.containers[0].volumeMounts
@@ -106,7 +106,7 @@ tests:
             name: charts-secret
             secret:
               secretName: my-existing-charts-secret
-              defaultMode: 0400
+              defaultMode: 420
         template: agent/deployment.yaml
 
   - it: should configure agent configmap with charts registry URL
@@ -132,6 +132,44 @@ tests:
       - matchRegex:
           path: data["config.yaml"]
           pattern: "internal_registry_password: test-password"
+        template: agent/configmap.yaml
+
+  - it: should reference mounted secret file paths for credentials when existingSecret is set
+    set:
+      join_token: "test-token"
+      global.charts.existingSecret: "charts-secret"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "internal_registry_username: /var/run/secrets/charts/username"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "internal_registry_password: /var/run/secrets/charts/password"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "internal_repo_client_cert_file: /var/run/secrets/charts/tls.crt"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "internal_repo_ca_file: /var/run/secrets/charts/ca.crt"
+        template: agent/configmap.yaml
+
+  - it: should prefer existingSecret mounted paths over inline credentials
+    set:
+      join_token: "test-token"
+      global.charts.existingSecret: "charts-secret"
+      global.charts.username: "inline-user"
+      global.charts.password: "inline-pass"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "internal_registry_username: /var/run/secrets/charts/username"
+        template: agent/configmap.yaml
+      - notMatchRegex:
+          path: data["config.yaml"]
+          pattern: "inline-user"
         template: agent/configmap.yaml
 
   - it: should configure agent configmap with certificate file paths

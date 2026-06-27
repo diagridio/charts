@@ -178,11 +178,10 @@ This helper:
 {{- define "catalyst.image" -}}
 {{- $registry := .image.registry -}}
 {{- $repository := .image.repository -}}
-{{- $tag := .image.tag -}}
+{{- $tag := include "catalyst.imageTag" (dict "image" .image) -}}
 {{- if and .consolidated .consolidated.enabled -}}
   {{- $repository = .consolidated.repository -}}
   {{- $registry = .consolidated.registry -}}
-  {{- $tag = .image.tag -}}
 {{- end -}}
 {{- if .global.registry -}}
   {{- $registry = .global.registry -}}
@@ -195,6 +194,19 @@ This helper:
 {{- else -}}
 {{- printf "%s:%s" $repository $tag -}}
 {{- end -}}
+{{- end -}}
+
+{{/*
+Resolve the image tag for a component. This is the single source of truth for
+"which tag was this component deployed with", so a component can be told its own
+version at runtime (e.g. via an env var) and have it match the image it actually
+runs from — "catalyst.image" resolves its tag the same way. The consolidated-image
+path does not change the tag (only the registry and repository differ), so the
+component's own image tag is always correct.
+Usage: include "catalyst.imageTag" (dict "image" .Values.component.image)
+*/}}
+{{- define "catalyst.imageTag" -}}
+{{- .image.tag -}}
 {{- end -}}
 
 {{/*

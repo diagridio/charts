@@ -47,6 +47,16 @@ spec:
                 fieldPath: metadata.namespace
           - name: CONFIG_FILE_DIR
             value: /etc/cra-agent
+          {{- /* Report the deployed image tag as the agent version. Release */}}
+          {{- /* artifacts are built once with an RC version baked into the */}}
+          {{- /* binary, then promoted to stable by retagging the same image, */}}
+          {{- /* so the baked-in version is stale. This overrides it at runtime */}}
+          {{- /* with the tag actually deployed (see catalyst.imageTag). */}}
+          {{- $agentImageTag := include "catalyst.imageTag" (dict "image" .Values.agent.image) }}
+          {{- if $agentImageTag }}
+          - name: CRA_VERSION
+            value: {{ $agentImageTag | quote }}
+          {{- end }}
           {{- if (and $gomemlimit (ne $gomemlimit "0")) }}
           - name: GOMEMLIMIT
             value: {{ $gomemlimit }}
@@ -162,6 +172,19 @@ spec:
               port: probes
             failureThreshold: 3
             periodSeconds: 10
+            initialDelaySeconds: 60
+          # /ready reports healthy only once the agent can manage projects (the
+          # project manager is running and this replica has joined partition
+          # membership). Gating rolling updates on this keeps restarts gap-free:
+          # Kubernetes won't retire an old replica until the new one can take
+          # over its share of projects. A readiness failure never restarts the
+          # pod (that's liveness) — it only withholds Ready until boot finishes.
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: probes
+            failureThreshold: 3
+            periodSeconds: 5
             initialDelaySeconds: 5
           ports:
           - name: metrics
@@ -208,12 +231,21 @@ spec:
       - name: charts-secret
         secret:
           secretName: {{ include "agent.chartsSecretName" . }}
-          defaultMode: 0400
+          defaultMode: 420
       {{- end }}
       {{- include "inject.patch" (dict "patch" .Values.agent.patch.volumes "indent" 6) }}
       nodeSelector:
         {{- include "catalyst.nodeSelector" (dict "shared" .Values.shared.scheduling "component" .Values.agent "componentMerge" .Values.agent.merge) | nindent 8 }}
+      {{- /* Use a configured affinity (shared, agent, or agent.merge) if any is
+             set; otherwise fall back to the chart's default agent anti-affinity.
+             This makes a user-supplied affinity REPLACE the default outright
+             rather than deep-merging with a default baked into values.yaml. */}}
+      {{- if or .Values.shared.scheduling.affinity .Values.agent.affinity .Values.agent.merge.affinity }}
       affinity:
         {{- include "catalyst.affinity" (dict "shared" .Values.shared.scheduling "component" .Values.agent "componentMerge" .Values.agent.merge) | nindent 8 }}
+      {{- else }}
+      affinity:
+        {{- include "agent.defaultAffinity" . | nindent 8 }}
+      {{- end }}
       tolerations:
         {{- include "catalyst.tolerations" (dict "shared" .Values.shared.scheduling "component" .Values.agent "componentMerge" .Values.agent.merge) | nindent 8 }}
