@@ -5,7 +5,7 @@
 # Tags are read from charts/catalyst/values.yaml (already mutated for the
 # release by `make update-catalyst-tags`, `update-catalyst-chart-version`,
 # and `update-catalyst-registry`) and the internal Dapr fork tag from
-# services/catalyst/agent/pkg/config/dapr.go. The registry/repository portions
+# deploy/config/dapr/versions.yaml (fork.dapr). The registry/repository portions
 # of each image reference are preserved as-is — only the tag (after the last
 # `:` in each backticked cell) is rewritten.
 #
@@ -37,46 +37,23 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CHARTS_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 REPO_ROOT="$(cd "${CHARTS_DIR}/.." && pwd)"
 
+# shellcheck source=/dev/null
+source "${REPO_ROOT}/deploy/config/dapr/lib.sh"
+
 VALUES="${CHARTS_DIR}/charts/catalyst/values.yaml"
 README="${CHARTS_DIR}/charts/catalyst/README.md"
-DAPR_GO="${REPO_ROOT}/services/catalyst/agent/pkg/config/dapr.go"
 
-for f in "${VALUES}" "${README}" "${DAPR_GO}"; do
+for f in "${VALUES}" "${README}"; do
     if [[ ! -f "${f}" ]]; then
         echo "ERROR: required file not found: ${f}" >&2
         exit 1
     fi
 done
 
-command -v yq >/dev/null 2>&1 || { echo "ERROR: yq is required" >&2; exit 1; }
-
 # ----- Resolve tags -----------------------------------------------------------
 
-yq_get() {
-    local path="$1"
-    local out
-    out="$(yq -r "${path}" "${VALUES}")"
-    if [[ -z "${out}" || "${out}" == "null" ]]; then
-        echo "ERROR: empty/missing value at ${path} in ${VALUES}" >&2
-        exit 1
-    fi
-    printf '%s' "${out}"
-}
-
-# Internal Dapr fork tag — match parser in services/catalyst/scripts/check-dapr-version-sync.sh.
-read_dapr_default_image_tag() {
-    awk '
-        /DefaultInternalDaprConfig[[:space:]]*=/ { in_block = 1 }
-        in_block && /DefaultImageTag:/ {
-            match($0, /"[^"]+"/)
-            if (RSTART > 0) {
-                print substr($0, RSTART + 1, RLENGTH - 2)
-                exit
-            }
-        }
-        in_block && /^}/ { exit }
-    ' "${DAPR_GO}"
-}
+# Read a required tag from values.yaml (delegates to the shared read-or-die helper).
+yq_get() { yq_scalar "${VALUES}" "$1"; }
 
 ALPINE_TAG="$(yq_get '.cleanup.image.tag')"
 ENVOY_TAG="$(yq_get '.gateway.envoy.image.tag')"
@@ -88,11 +65,8 @@ IDENTITY_INJECTOR_TAG="$(yq_get '.gateway.identityInjector.image.tag')"
 SIDECAR_TAG="$(yq_get '.agent.config.sidecar.image_tag')"
 OTEL_TAG="$(yq_get '.agent.config.otel.image_tag')"
 
-DAPR_TAG="$(read_dapr_default_image_tag)"
-if [[ -z "${DAPR_TAG}" ]]; then
-    echo "ERROR: failed to read DefaultInternalDaprConfig.DefaultImageTag from ${DAPR_GO}" >&2
-    exit 1
-fi
+# Internal Dapr fork tag — the single source of truth (deploy/config/dapr/versions.yaml).
+DAPR_TAG="$(dapr_version '.fork.dapr')"
 
 # ----- Apply replacements -----------------------------------------------------
 
@@ -133,7 +107,7 @@ replace_tag "Catalyst Management"           "${MANAGEMENT_TAG}"
 replace_tag "Gateway Control Plane"         "${GATEWAY_CP_TAG}"
 replace_tag "Gateway Identity Injector"     "${IDENTITY_INJECTOR_TAG}"
 
-echo "Updated ${README#${REPO_ROOT}/} from ${VALUES#${REPO_ROOT}/} and ${DAPR_GO#${REPO_ROOT}/}"
+echo "Updated ${README#${REPO_ROOT}/} from ${VALUES#${REPO_ROOT}/} and ${DAPR_VERSIONS_FILE#${REPO_ROOT}/}"
 echo "  Alpine k8s                    ${ALPINE_TAG}"
 echo "  Envoy Proxy                   ${ENVOY_TAG}"
 echo "  Catalyst                      ${AGENT_TAG}"
