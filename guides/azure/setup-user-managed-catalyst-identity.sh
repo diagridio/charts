@@ -211,15 +211,7 @@ if [[ -n "${CATALYST_SERVICEBUS}" ]]; then
 fi
 
 echo '--- User-Assigned Managed Identity ready ---'
-echo 'Merge the following to your Catalyst chart values under agent.config:'
+echo 'Run the following Diagrid CLI command in order to necessary labels/annotations to the AppID:'
 echo ''
-echo ' agent:'
-echo '   config:'
-echo '     sidecar:'
-echo '       service_account_annotations:'
-echo '         - key: "azure.workload.identity/client-id"'
-echo "           value: \"$USER_ASSIGNED_CLIENT_ID\""
-echo '       pod_labels:'
-echo '         - key: "azure.workload.identity/use"'
-echo '           value: "true"'
-
+echo " diagrid appid update ${CATALYST_APP} --project ${CATALYST_PROJECT} --label azure.workload.identity/use=true --annotation azure.workload.identity/client-id=\"$USER_ASSIGNED_CLIENT_ID\""
+echo ''
