@@ -613,7 +613,7 @@ agent:
 
   resources:
     limits:
-      memory: 1200Mi
+      memory: 2Gi
     requests:
       cpu: 40m
       memory: 500Mi
