@@ -62,7 +62,11 @@ metadata:
   name: dapr-trust-bundle
   namespace: cert-manager
 spec:
-  commonName: ""
+  # The issuer's subject must be non-empty. Workload leaf SVIDs take their
+  # Issuer DN from this cert's subject, and consumers that identify a
+  # certificate by issuer + serial (e.g. AWS IAM Roles Anywhere) reject a
+  # leaf whose issuer DN is empty ("Unable to form certificate ID").
+  commonName: dapr-sentry
   uris:
     - "spiffe://prj-root.trust.diagrid.io/ns/root-dapr-system/dapr-sentry"
   isCA: true
