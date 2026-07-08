@@ -377,6 +377,11 @@ agent:
       affinity: {}
       # default to disable API validation because ingress could be not configured by users
       skip_api_validation: true
+      # use_public_identity is an escape hatch that makes sidecars in this
+      # region surface their public (Diagrid/controlplane) Sentry identity
+      # instead of the in-region one, matching the default behavior of
+      # Diagrid's public region.
+      use_public_identity: false
       # image_registry is the registry for the sidecar image.
       # If global.image.registry is set, it will be used instead.
       image_registry: us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public
