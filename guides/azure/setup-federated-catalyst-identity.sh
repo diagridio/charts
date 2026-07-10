@@ -60,11 +60,6 @@ CATALYST_APP="${CATALYST_APP:-app1}"
 # credential(s) (below). Override to share or rename the app.
 APP_DISPLAY_NAME="${APP_DISPLAY_NAME:-}"
 
-# The Catalyst region's OIDC issuer URL (e.g. https://oidc.<env>.diagrid.dev).
-# This is an environment-level value, not part of the SPIFFE ID; ask your
-# Diagrid administrator if you are unsure.
-ISSUER="${ISSUER:-}"
-
 # Optional: when set, grant the identity data-plane access to these resources.
 # RESOURCE_GROUP is required only with --cosmosdb / --servicebus, whose lookups
 # are resource-group scoped (Key Vault and storage resolve by name alone).
@@ -90,11 +85,13 @@ subject(s) are read straight from the appid's status (.status.spiffeIds, falling
 back to .status.spiffeId); a sidecar may run on more than one region host, so a
 credential is federated for each.
 
+The OIDC issuer is resolved automatically from the project's region (via the
+diagrid CLI), so it does not need to be supplied.
+
 Options:
   --project NAME           Catalyst project name        (default: ${CATALYST_PROJECT})
   --app NAME               AppID name                   (default: ${CATALYST_APP})
   --app-display-name NAME  Azure AD app display name    (default: catalyst-<project>)
-  --issuer URL             Catalyst region OIDC issuer URL                              (required)
   --keyvault NAME          Grant 'Key Vault Secrets User' on this Key Vault             (optional)
   --storage-account NAME   Grant 'Storage Blob Data Contributor' on this account        (optional)
   --cosmosdb NAME          Grant 'Cosmos DB Built-in Data Contributor' on this account  (optional)
@@ -103,7 +100,7 @@ Options:
   -h, --help               Show this help and exit
 
 Each option may also be supplied via an env var of the same name, e.g.:
-  ISSUER=https://oidc.staging.diagrid.dev ./$(basename "$0")
+  CATALYST_PROJECT=prj1 ./$(basename "$0")
 EOF
 }
 
@@ -112,7 +109,6 @@ while [[ $# -gt 0 ]]; do
         --project) CATALYST_PROJECT="$2"; shift 2 ;;
         --app) CATALYST_APP="$2"; shift 2 ;;
         --app-display-name) APP_DISPLAY_NAME="$2"; shift 2 ;;
-        --issuer) ISSUER="$2"; shift 2 ;;
         --keyvault) CATALYST_KEYVAULT="$2"; shift 2 ;;
         --storage-account) CATALYST_STORAGE_ACCOUNT="$2"; shift 2 ;;
         --cosmosdb) CATALYST_COSMOSDB="$2"; shift 2 ;;
@@ -125,12 +121,6 @@ done
 
 # Scope the app registration to the project unless an explicit name was given.
 APP_DISPLAY_NAME="${APP_DISPLAY_NAME:-catalyst-${CATALYST_PROJECT}}"
-
-if [[ -z "${ISSUER}" ]]; then
-    echo "ERROR: --issuer (or ISSUER) is required." >&2
-    usage >&2
-    exit 1
-fi
 
 if [[ ( -n "${CATALYST_COSMOSDB}" || -n "${CATALYST_SERVICEBUS}" ) && -z "${RESOURCE_GROUP}" ]]; then
     echo "ERROR: --resource-group (or RESOURCE_GROUP) is required with --cosmosdb / --servicebus." >&2
@@ -163,7 +153,20 @@ if [[ ${#SPIFFE_IDS[@]} -eq 0 ]]; then
 fi
 log "Found ${#SPIFFE_IDS[@]} SPIFFE identity(ies):"
 for sid in "${SPIFFE_IDS[@]}"; do log "  ${sid}"; done
-log "OIDC issuer: ${ISSUER}"
+
+# Resolve the region's OIDC issuer from the control plane: the project pins the
+# region (.spec.region), and the region publishes its issuer (.status.endpoints.oidc).
+REGION_ID="$(diagrid project get "${CATALYST_PROJECT}" --output yaml | yq '.spec.region')"
+if [[ -z "${REGION_ID}" || "${REGION_ID}" == "null" ]]; then
+    echo "ERROR: project '${CATALYST_PROJECT}' has no region assigned." >&2
+    exit 1
+fi
+ISSUER="$(diagrid region get "${REGION_ID}" --output yaml | yq '.status.endpoints.oidc')"
+if [[ -z "${ISSUER}" || "${ISSUER}" == "null" ]]; then
+    echo "ERROR: region '${REGION_ID}' has no OIDC issuer (.status.endpoints.oidc) yet." >&2
+    exit 1
+fi
+log "Region '${REGION_ID}' OIDC issuer: ${ISSUER}"
 
 SUBSCRIPTION="$(az account show --query id --output tsv)"
 TENANT_ID="$(az account show --query tenantId --output tsv)"

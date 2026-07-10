@@ -389,7 +389,7 @@ agent:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       image_name: "{{ ternary .Values.global.consolidated_image.repository \"sidecar\" .Values.global.consolidated_image.enabled }}"
       # image_tag is the sidecar image version
-      image_tag: "1.72.0"
+      image_tag: "1.74.0"
       resources:
         limits:
           cpu: 300m
@@ -427,6 +427,39 @@ agent:
       #   - key: mycompany.com/team
       #     value: payments
       pod_labels: []
+      # Additional CA certificates to add to EVERY sidecar's system TLS trust for
+      # ALL outbound connections (MCP servers, external HTTP endpoints, service
+      # invocation, bindings, ...). Use this when sidecars must reach upstreams
+      # that terminate TLS with a private or self-signed CA. These CAs are ADDED
+      # to the container's public root pool (via SSL_CERT_DIR), so public-CA
+      # upstreams keep working. Applied region-wide to all sidecars the agent
+      # provisions. Leave both sources below empty to trust only public roots.
+      #
+      # The two sources combine (all listed CAs are trusted when both are set).
+      trusted_ca:
+        # certs — inline PEM certificates. Suitable for small bundles.
+        #   certs:
+        #     - |
+        #       -----BEGIN CERTIFICATE-----
+        #       ...
+        #       -----END CERTIFICATE-----
+        certs: []
+        # existing_config_map — RECOMMENDED for anything but the smallest
+        # bundles. References a Kubernetes ConfigMap whose data holds the CA
+        # bundle; keeps the (potentially large, multi-line) PEM out of these Helm
+        # values and lets you manage/rotate the CA as a first-class ConfigMap. CA
+        # certificates are public data, so a ConfigMap (not a Secret) is the
+        # natural home. The agent reads it at deploy time and mounts its contents
+        # into each sidecar.
+        existing_config_map:
+          # name of the ConfigMap. Empty disables this source.
+          name: ""
+          # namespace of the ConfigMap. Empty = the control plane namespace
+          # (where the agent runs).
+          namespace: ""
+          # key selects the ConfigMap data key holding the PEM bundle. Empty
+          # defaults to "ca.crt".
+          key: ""
     otel:
       enabled: true
       # Scheduling overrides for the metrics (Deployment) and logs (DaemonSet)
@@ -441,7 +474,7 @@ agent:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       image_name: "{{ ternary .Values.global.consolidated_image.repository \"catalyst-otel-collector\" .Values.global.consolidated_image.enabled }}"
       # image_tag is the otel collector image version
-      image_tag: "1.72.0"
+      image_tag: "1.74.0"
       image_pull_policy: "Always"
       metrics_endpoint: https://catalyst-metrics.r1.diagrid.io/api/v1/push
       loki_endpoint: https://catalyst-logs.r1.diagrid.io/loki/api/v1/push
@@ -497,7 +530,7 @@ agent:
           registry: us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public
           # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
           name: "{{ ternary .Values.global.consolidated_image.repository \"private-sentry\" .Values.global.consolidated_image.enabled }}"
-          tag: "1.72.0"
+          tag: "1.74.0"
         jwt:
           enabled: true
           # managed means agent automatically does key rotation and JWKS updates.
@@ -566,6 +599,13 @@ agent:
               # workflow genuinely needs outbound (pip install, git
               # clone, …) and audit the egress posture explicitly.
               allow_public_internet: false
+    # Report the region's public OIDC documents to the control plane
+    # fetched through the region ingress (real wildcard cert,
+    # so no insecure_skip_verify needed).
+    oidc:
+      collector:
+        enabled: true
+        insecure_skip_verify: false
   metrics:
     port: 9090
   # replicaCount controls how many agent replicas run for this host. With more
@@ -583,7 +623,7 @@ agent:
     # Example: "diagrid/cra-agent" or "cra-agent"
     repository: cra-agent
     # tag is the image tag/version to use
-    tag: "1.72.0"
+    tag: "1.74.0"
     # pullPolicy is the image pull policy for this specific image.
     # If empty, uses global.image.pullPolicy.
     # Valid values: Always, IfNotPresent, Never
@@ -676,7 +716,7 @@ gateway:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       repository: identity-injector
       # tag is the image tag/version to use
-      tag: "1.72.0"
+      tag: "1.74.0"
       # pullPolicy is the image pull policy for this specific image.
       # If empty, uses global.image.pullPolicy.
       pullPolicy: ""
@@ -789,7 +829,7 @@ gateway:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       repository: catalyst-gateway
       # tag is the image tag/version to use
-      tag: "1.72.0"
+      tag: "1.74.0"
       # pullPolicy is the image pull policy for this specific image.
       # If empty, uses global.image.pullPolicy.
       pullPolicy: ""
@@ -896,7 +936,7 @@ management:
     # Deprecated: This field supports template evaluation for backwards compatibility.
     repository: "{{ ternary .Values.global.consolidated_image.repository \"catalyst-management\" .Values.global.consolidated_image.enabled }}"
     # tag is the image tag/version to use
-    tag: "1.72.0"
+    tag: "1.74.0"
     # pullPolicy is the image pull policy for this specific image.
     # If empty, uses global.image.pullPolicy.
     pullPolicy: ""

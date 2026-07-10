@@ -148,20 +148,20 @@ By default, this is the full list of images that are installed in your cluster:
 |-----------|--------------|-------------|
 | **Alpine k8s** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy/alpine/k8s:1.36.0` | Utility image used by Helm install and cleanup hooks |
 | **Envoy Proxy** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy/envoyproxy/envoy:distroless-v1.38.0` | Envoy proxy for gateway |
-| **Catalyst** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.72.0` | Consolidated Catalyst services image |
+| **Catalyst** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.74.0` | Consolidated Catalyst services image |
 | **Piko** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/diagrid-piko:v1.0.1` | Piko reverse tunneling service |
 | **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.18.2-rc.2-catalyst.1` | Catalyst Dapr control plane services |
-| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.72.0` | Catalyst dapr server |
-| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.72.0` | OTel collector for telemetry |
+| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.74.0` | Catalyst dapr server |
+| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.74.0` | OTel collector for telemetry |
 
 Alternatively, separate images can be used:
 
 | Component | Default Image | Description |
 |-----------|--------------|-------------|
-| **Catalyst Agent** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/cra-agent:1.72.0` | Catalyst agent service |
-| **Catalyst Management** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-management:1.72.0` | Catalyst management service |
-| **Gateway Control Plane** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-gateway:1.72.0` | Gateway control plane service |
-| **Gateway Identity Injector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/identity-injector:1.72.0` | Identity injection service |
+| **Catalyst Agent** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/cra-agent:1.74.0` | Catalyst agent service |
+| **Catalyst Management** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-management:1.74.0` | Catalyst management service |
+| **Gateway Control Plane** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-gateway:1.74.0` | Gateway control plane service |
+| **Gateway Identity Injector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/identity-injector:1.74.0` | Identity injection service |
 
 Dependencies:
 
@@ -177,8 +177,8 @@ The Agent provisions these at runtime:
 
 | Component | Default Image | Description |
 |-----------|--------------|-------------|
-| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/sidecar:1.72.0` | Catalyst dapr server |
-| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-otel-collector:1.72.0` | OTel collector for telemetry |
+| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/sidecar:1.74.0` | Catalyst dapr server |
+| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-otel-collector:1.74.0` | OTel collector for telemetry |
 | **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.18.2-rc.2-catalyst.1` | Catalyst Dapr control plane services |
 
 #### Optional Images
@@ -387,6 +387,47 @@ gateway:
 ```
 
 For step-by-step instructions covering self-signed (dev), bring-your-own certificates, cert-manager integration, private CA trust for sidecars, and rotation, see the [Gateway TLS guide](../../guides/gateway-tls/README.md).
+
+### Sidecar Outbound TLS Trust
+
+The `gateway.tls` settings above cover TLS *into* the region. To let the Dapr sidecars trust upstreams they connect *out* to — MCP servers, external HTTP endpoints, service invocation, bindings — that terminate TLS with a **private or self-signed CA**, add the CA to the sidecars' trust via `agent.config.sidecar`.
+
+These CAs are **added** to the public root bundle baked into the sidecar image (via `SSL_CERT_DIR`), so public-CA upstreams keep working. The trust applies region-wide to every sidecar the agent provisions.
+
+There are two sources, which combine (all listed CAs are trusted when both are set):
+
+**Recommended — reference a Kubernetes ConfigMap** (keeps the PEM out of your Helm values and lets you manage/rotate the CA as a first-class ConfigMap; CA certificates are public data, so a ConfigMap is the natural home):
+
+```yaml
+agent:
+  config:
+    sidecar:
+      trusted_ca:
+        existing_config_map:
+          # ConfigMap holding the CA bundle. Read by the agent at deploy time
+          # and mounted into every sidecar.
+          name: my-private-ca
+          # Optional. Empty = the control plane namespace (where the agent runs).
+          namespace: ""
+          # Optional. ConfigMap data key holding the PEM. Empty defaults to "ca.crt".
+          key: ""
+```
+
+**Inline PEM** (suitable for small bundles):
+
+```yaml
+agent:
+  config:
+    sidecar:
+      trusted_ca:
+        certs:
+          - |
+            -----BEGIN CERTIFICATE-----
+            ...
+            -----END CERTIFICATE-----
+```
+
+Leave both sources empty to trust only public roots (the default).
 
 ### Managed Domain
 
