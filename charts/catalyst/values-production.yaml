@@ -13,6 +13,32 @@
 # Rationale: ../../guides/production/README.md
 
 # -----------------------------------------------------------------------------
+# Data backends
+# -----------------------------------------------------------------------------
+# External PostgreSQL is the recommended state store for production — use a
+# managed service (Amazon RDS, Cloud SQL, Azure Database for PostgreSQL). See
+# ../../guides/production/README.md#managed-infrastructure.
+#
+# Provide connection details via a Kubernetes secret rather than inline
+# plaintext: create a secret with keys `host`, `port`, `username`, `password`
+# (and optionally `proxy_host`) and reference it from your per-environment
+# values file:
+#
+#   global:
+#     postgresql:
+#       external:
+#         existing_secret_name: catalyst-postgres
+#         existing_secret_namespace: catalyst
+#
+# The Postgres-backed scheduler (the chart default) reuses this same external
+# Postgres and auto-creates a `sched` database.
+global:
+  postgresql:
+    create: false
+    external:
+      auth_type: connectionString
+
+# -----------------------------------------------------------------------------
 # Agent
 # -----------------------------------------------------------------------------
 # Drop Kubernetes resource `limits` on Go components. Memory limits cause
@@ -33,24 +59,7 @@ agent:
       memory: 500Mi
 
   config:
-    project:
-      # External PostgreSQL is the recommended state store for production —
-      # use a managed service (Amazon RDS, Cloud SQL, Azure Database for
-      # PostgreSQL). See ../../guides/production/README.md#managed-infrastructure.
-      #
-      # Provide connection details via a Kubernetes secret rather than inline
-      # plaintext: create a secret with keys `host`, `port`, `username`,
-      # `password` (and optionally `proxy_host`) and reference it below from
-      # your per-environment values file:
-      #
-      #   external_postgresql:
-      #     existing_secret_name: catalyst-postgres
-      #     existing_secret_namespace: catalyst
-      default_managed_state_store_type: postgresql-shared-external
-      external_postgresql:
-        enabled: true
-        auth_type: connectionString
-
+    # State store backend is configured via global.postgresql above.
     # Sidecar (Dapr runtime) tuning — these values are passed through to the
     # per-AppID `cra` subchart that the agent provisions for every app.
     sidecar:

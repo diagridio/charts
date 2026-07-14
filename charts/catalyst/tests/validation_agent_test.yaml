@@ -24,21 +24,29 @@ tests:
       - failedTemplate:
           errorMessage: "global.secrets.aws.region is required when global.secrets.provider is aws.secretmanager!"
 
-  - it: should fail agent configmap when default_managed_state_store_type is empty
+  - it: should fail when Postgres is disabled but the managed-postgresql scheduler is used
     set:
       join_token: "test-token"
-      agent.config.project.default_managed_state_store_type: ""
+      global.postgresql.disabled: true
     asserts:
       - failedTemplate:
-          errorMessage: "agent.config.project.default_managed_state_store_type is required!"
+          errorMessage: "A Postgres scheduler that reuses the managed state store (scheduler.backend_type: postgresql, postgresql.use_global: true) is incompatible with global.postgresql.disabled: true. Either enable Postgres (global.postgresql.disabled: false), use a dedicated external scheduler DB (postgresql.use_global: false), or switch to scheduler.backend_type: etcd."
 
-  - it: should fail agent configmap when default_managed_pubsub_type is empty
+  - it: should fail when a dedicated external scheduler DB has no connections
     set:
       join_token: "test-token"
-      agent.config.project.default_managed_pubsub_type: ""
+      agent.config.internal_dapr.scheduler.postgresql.use_global: false
     asserts:
       - failedTemplate:
-          errorMessage: "agent.config.project.default_managed_pubsub_type is required!"
+          errorMessage: "scheduler.backend_type: postgresql with postgresql.use_global: false needs at least one entry in scheduler.postgresql.connections."
+
+  - it: should fail when external Postgres state store has no connection (legacy passthrough)
+    set:
+      join_token: "test-token"
+      agent.config.project.default_managed_state_store_type: "postgresql-shared-external"
+    asserts:
+      - failedTemplate:
+          errorMessage: "An external Postgres state store (global.postgresql.create: false, or default_managed_state_store_type: postgresql-shared-external) requires external_postgresql.enabled: true with a connection. Set global.postgresql.external.existing_secret_name (preferred) or the inline connection_string_* fields."
 
   - it: should fail agent configmap when placement.max_project_count is zero
     set:

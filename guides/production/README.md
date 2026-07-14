@@ -43,28 +43,43 @@ in-cluster shortcuts in our examples provide.
   [Cluster Requirements](../../charts/catalyst/README.md#cluster-requirements)
   section lists prerequisites; any current managed offering meets them.
 - **Managed PostgreSQL** — Amazon RDS, Cloud SQL, or Azure Database for
-  PostgreSQL. Catalyst uses PostgreSQL for workflow state. The overlay
-  already defaults the chart to external PostgreSQL
-  (`default_managed_state_store_type: postgresql-shared-external`,
-  `external_postgresql.enabled: true`,
-  `external_postgresql.auth_type: connectionString`) — you only need to
-  supply the connection details from your environment values.
+  PostgreSQL. Catalyst uses PostgreSQL for the state store, the Dapr scheduler,
+  and workflow state. The overlay already defaults the chart to external
+  PostgreSQL (`global.postgresql.create: false`,
+  `global.postgresql.external.auth_type: connectionString`) — you only need to
+  supply the connection details from your environment values. The Postgres-backed
+  scheduler (the chart default) reuses this same external Postgres.
+
+  > [!IMPORTANT]
+  > The Postgres-backed scheduler uses PostgreSQL **logical replication**, so the
+  > external database must be configured with `wal_level = logical`. Managed offerings
+  > ship this **disabled** by default — enable it before deploying, or the
+  > `dapr-scheduler-server` pods crash with `logical decoding requires "wal_level" >= "logical"`:
+  > - **Amazon RDS / Aurora** — set `rds.logical_replication = 1` in a custom DB
+  >   parameter/cluster-parameter group and reboot the instance.
+  > - **Cloud SQL** — set the `cloudsql.logical_decoding` flag to `on` (restarts the instance).
+  > - **Azure Database for PostgreSQL (Flexible Server)** — set the `wal_level` server
+  >   parameter to `logical` (restarts the server).
+  >
+  > If you instead point the scheduler at a **dedicated** database
+  > (`agent.config.internal_dapr.scheduler.postgresql.use_global: false`), enable
+  > `wal_level = logical` on that database rather than the state-store one. Only the
+  > scheduler's database needs logical replication; the state store does not.
 
   Use a Kubernetes secret rather than inline plaintext credentials. Create
   a secret with keys `host`, `port`, `username`, `password` (and optionally
   `proxy_host`), then reference it:
 
   ```yaml
-  agent:
-    config:
-      project:
-        external_postgresql:
-          existing_secret_name: catalyst-postgres
-          existing_secret_namespace: catalyst
+  global:
+    postgresql:
+      external:
+        existing_secret_name: catalyst-postgres
+        existing_secret_namespace: catalyst
   ```
 
-  AWS Aurora users can switch `auth_type: awsiam` and configure
-  `aws_auth.*` instead of password-based credentials.
+  AWS Aurora users can switch `global.postgresql.external.auth_type: awsiam` and
+  configure `aws_auth.*` instead of password-based credentials.
 
   Running PostgreSQL inside the same cluster as Catalyst is fine for
   evaluation but is not a posture we recommend for production. See the

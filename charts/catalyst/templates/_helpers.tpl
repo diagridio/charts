@@ -383,4 +383,148 @@ Both services require sentry and correct secrets provider configuration.
             {{- fail "global.secrets.aws.region is required when global.secrets.provider is aws.secretmanager!" -}}
         {{- end -}}
     {{- end -}}
+    {{- include "catalyst.validateInfraValues" . -}}
+{{- end -}}
+
+{{/*
+catalyst.resolvedInfra — single source of truth translating the user-facing
+global.postgresql / global.kafka / scheduler value surface into the canonical
+agent config vocabulary (project.default_managed_*_type, external/selfhosted
+sub-configs, internal_dapr.scheduler.backend_type + backend sub-configs).
+
+Both the agent and management ConfigMaps consume this so they can never drift:
+Helm renders each template independently, so a `set` mutation in one is invisible
+to the other — the shared, side-effect-free helper is the only safe way to share
+derived state.
+
+Precedence (see charts/charts/catalyst/README.md and the branch handoff):
+  Rule A — legacy passthrough wins. If the user explicitly set an underlying
+  canonical field (a non-empty default_managed_*_type, external_*.enabled, or a
+  *legacy* scheduler backend_type of managed-postgresql/external-postgresql), it
+  is honored verbatim and the global.* derivation is skipped.
+  Rule B — otherwise derive from the friendlier global.* surface. This depends on
+  the shipped legacy defaults being blanked in values.yaml so "non-empty" reliably
+  means "user set it".
+
+Output (rendered as YAML; callers do `include ... | fromYaml`):
+  stateStore: { type, selfhosted{}, external{} }
+  scheduler:  { backend_type, managed_postgresql{}, external_postgresql{} }
+  pubsub:     { type, selfhosted{}, external{} }
+Empty sub-config dicts are falsy in Helm, so callers gate on them with `if`.
+*/}}
+{{- define "catalyst.resolvedInfra" -}}
+{{- /* Read via nested-value accessors (not dig on .Values): the root .Values is
+       chartutil.Values, which dig cannot type-assert; nested values are plain maps. */ -}}
+{{- $global := .Values.global | default dict -}}
+{{- $agent := .Values.agent | default dict -}}
+{{- $ac := $agent.config | default dict -}}
+{{- $project := $ac.project | default dict -}}
+{{- $sched := dig "internal_dapr" "scheduler" dict $ac -}}
+{{- $gpg := dig "postgresql" dict $global -}}
+{{- $gkafka := dig "kafka" dict $global -}}
+{{- /* ---------- State store ---------- */ -}}
+{{- $ssType := "" -}}
+{{- $ssSelfhosted := dict -}}
+{{- $ssExternal := dict -}}
+{{- $legacySSType := $project.default_managed_state_store_type | default "" -}}
+{{- $legacyExtPg := dig "external_postgresql" dict $project -}}
+{{- if or (ne $legacySSType "") (dig "enabled" false $legacyExtPg) -}}
+  {{- $ssType = $legacySSType -}}
+  {{- $ssSelfhosted = dig "selfhosted_postgresql" dict $project -}}
+  {{- $ssExternal = $legacyExtPg -}}
+{{- else if dig "disabled" false $gpg -}}
+  {{- $ssType = "postgresql-shared-disabled" -}}
+{{- else if dig "create" true $gpg -}}
+  {{- $ssType = "postgresql-shared-selfhosted" -}}
+  {{- $ssSelfhosted = dig "selfhosted" dict $gpg -}}
+{{- else -}}
+  {{- $ssType = "postgresql-shared-external" -}}
+  {{- $ssExternal = deepCopy (dig "external" dict $gpg) -}}
+  {{- $_ := set $ssExternal "enabled" true -}}
+{{- end -}}
+{{- /* ---------- Scheduler ---------- */ -}}
+{{- $schedBackend := $sched.backend_type | default "" -}}
+{{- $outBackend := "" -}}
+{{- $outManaged := dict -}}
+{{- $outExternal := dict -}}
+{{- if eq $schedBackend "postgresql" -}}
+  {{- $pgsched := dig "postgresql" dict $sched -}}
+  {{- if dig "use_global" true $pgsched -}}
+    {{- $outBackend = "managed-postgresql" -}}
+    {{- $outManaged = dict "max_conns_per_instance" (dig "max_conns_per_instance" 5 $pgsched) -}}
+  {{- else -}}
+    {{- $outBackend = "external-postgresql" -}}
+    {{- $outExternal = dict "max_conns_per_instance" (dig "max_conns_per_instance" 5 $pgsched) "connections" (dig "connections" list $pgsched) -}}
+  {{- end -}}
+{{- else -}}
+  {{- /* etcd, legacy managed-/external-postgresql, or empty (disabled): passthrough */ -}}
+  {{- $outBackend = $schedBackend -}}
+  {{- $outManaged = dig "managed_postgresql" dict $sched -}}
+  {{- $outExternal = dig "external_postgresql" dict $sched -}}
+{{- end -}}
+{{- /* ---------- Pubsub / Kafka ---------- */ -}}
+{{- $psType := "" -}}
+{{- $psSelfhosted := dict -}}
+{{- $psExternal := dict -}}
+{{- $legacyPsType := $project.default_managed_pubsub_type | default "" -}}
+{{- $legacyExtKafka := dig "external_kafka" dict $project -}}
+{{- if or (ne $legacyPsType "") (dig "enabled" false $legacyExtKafka) -}}
+  {{- $psType = $legacyPsType -}}
+  {{- $psSelfhosted = dig "selfhosted_kafka" dict $project -}}
+  {{- $psExternal = $legacyExtKafka -}}
+{{- else if dig "disabled" true $gkafka -}}
+  {{- $psType = "kafka-shared-disabled" -}}
+{{- else if dig "create" false $gkafka -}}
+  {{- $psType = "kafka-shared-selfhosted" -}}
+  {{- $psSelfhosted = dig "selfhosted" dict $gkafka -}}
+{{- else -}}
+  {{- $psType = "kafka-shared-external" -}}
+  {{- $psExternal = deepCopy (dig "external" dict $gkafka) -}}
+  {{- $_ := set $psExternal "enabled" true -}}
+{{- end -}}
+{{- $out := dict
+    "stateStore" (dict "type" $ssType "selfhosted" $ssSelfhosted "external" $ssExternal)
+    "scheduler" (dict "backend_type" $outBackend "managed_postgresql" $outManaged "external_postgresql" $outExternal)
+    "pubsub" (dict "type" $psType "selfhosted" $psSelfhosted "external" $psExternal)
+-}}
+{{- $out | toYaml -}}
+{{- end -}}
+
+{{/*
+catalyst.validateInfraValues — fail rendering with a clear message for illegal
+Postgres/Kafka/scheduler combinations, mirroring the agent's own runtime
+validation (services/catalyst/agent/pkg/config/config.go and project/config.go)
+so operators get the error at `helm template` time rather than a CrashLoop later.
+*/}}
+{{- define "catalyst.validateInfraValues" -}}
+{{- $r := include "catalyst.resolvedInfra" . | fromYaml -}}
+{{- /* A managed-postgresql scheduler reuses the managed state store; it cannot
+       run when the state store is disabled (mirrors config.go). */ -}}
+{{- if and (eq $r.scheduler.backend_type "managed-postgresql") (eq $r.stateStore.type "postgresql-shared-disabled") -}}
+  {{- fail "A Postgres scheduler that reuses the managed state store (scheduler.backend_type: postgresql, postgresql.use_global: true) is incompatible with global.postgresql.disabled: true. Either enable Postgres (global.postgresql.disabled: false), use a dedicated external scheduler DB (postgresql.use_global: false), or switch to scheduler.backend_type: etcd." -}}
+{{- end -}}
+{{- /* External state store must be enabled (mirrors config.go:279). The deeper
+       connection validation (host/secret/aws_auth) stays with the agent, as it
+       does today. When derived from global.postgresql.create: false the resolver
+       always sets enabled: true; this only trips a legacy passthrough that set
+       default_managed_state_store_type: postgresql-shared-external without
+       external_postgresql.enabled. */ -}}
+{{- if eq $r.stateStore.type "postgresql-shared-external" -}}
+  {{- if not (dig "enabled" false $r.stateStore.external) -}}
+    {{- fail "An external Postgres state store (global.postgresql.create: false, or default_managed_state_store_type: postgresql-shared-external) requires external_postgresql.enabled: true with a connection. Set global.postgresql.external.existing_secret_name (preferred) or the inline connection_string_* fields." -}}
+  {{- end -}}
+{{- end -}}
+{{- /* A dedicated external scheduler DB needs at least one connection. */ -}}
+{{- if eq $r.scheduler.backend_type "external-postgresql" -}}
+  {{- if not (dig "connections" list $r.scheduler.external_postgresql) -}}
+    {{- fail "scheduler.backend_type: postgresql with postgresql.use_global: false needs at least one entry in scheduler.postgresql.connections." -}}
+  {{- end -}}
+{{- end -}}
+{{- /* External Kafka must be enabled (mirrors config.go:275). Broker-level
+       validation stays with the agent. */ -}}
+{{- if eq $r.pubsub.type "kafka-shared-external" -}}
+  {{- if not (dig "enabled" false $r.pubsub.external) -}}
+    {{- fail "An external Kafka (global.kafka.create: false, or default_managed_pubsub_type: kafka-shared-external) requires external_kafka.enabled: true with brokers configured under global.kafka.external." -}}
+  {{- end -}}
+{{- end -}}
 {{- end -}}

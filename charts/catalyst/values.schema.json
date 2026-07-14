@@ -331,6 +331,102 @@
                             "description": "Image pull policy for consolidated image"
                         }
                     }
+                },
+                "postgresql": {
+                    "type": "object",
+                    "description": "Managed PostgreSQL data backend. Backs the managed state store, the workflow state, and (by default) the Dapr scheduler. Translated at render time into agent.config.project.* and the scheduler config. Backwards compatibility: an explicit legacy agent.config.project.default_managed_state_store_type (or external_postgresql.enabled) is honored verbatim and this block is ignored.",
+                    "properties": {
+                        "create": {
+                            "type": "boolean",
+                            "default": true,
+                            "description": "true -> Catalyst provisions a self-hosted (Bitnami) PostgreSQL in-cluster. false -> connect to an external PostgreSQL you provide (see .external)."
+                        },
+                        "disabled": {
+                            "type": "boolean",
+                            "default": false,
+                            "description": "true fully turns off the managed PostgreSQL state store, overriding create. When disabled, switch the scheduler off PostgreSQL via agent.config.internal_dapr.scheduler.backend_type."
+                        },
+                        "selfhosted": {
+                            "type": "object",
+                            "description": "Tuning for the self-hosted PostgreSQL (only used when create: true, disabled: false). Maps to agent.config.project.selfhosted_postgresql. Leave empty ({}) for defaults; override subkeys such as persistence_storage_size."
+                        },
+                        "external": {
+                            "type": "object",
+                            "description": "Connection details for an external PostgreSQL (only used when create: false, disabled: false). Maps to agent.config.project.external_postgresql. Prefer existing_secret_name over inline credentials.",
+                            "properties": {
+                                "auth_type": {
+                                    "type": "string",
+                                    "enum": [
+                                        "connectionString",
+                                        "awsiam"
+                                    ],
+                                    "default": "connectionString",
+                                    "description": "Authentication mode for the external PostgreSQL."
+                                },
+                                "existing_secret_name": {
+                                    "type": "string",
+                                    "default": "",
+                                    "description": "Name of a Kubernetes secret with keys host, port, username, password (and optionally proxy_host). Strongly preferred over inline credentials."
+                                },
+                                "existing_secret_namespace": {
+                                    "type": "string",
+                                    "default": "",
+                                    "description": "Namespace of existing_secret_name."
+                                },
+                                "connection_string_host": {
+                                    "type": "string",
+                                    "description": "Inline host (avoid in production; prefer existing_secret_name)."
+                                },
+                                "connection_string_port": {
+                                    "type": "integer",
+                                    "default": 5432,
+                                    "description": "Inline port."
+                                },
+                                "connection_string_username": {
+                                    "type": "string",
+                                    "description": "Inline username."
+                                },
+                                "connection_string_password": {
+                                    "type": "string",
+                                    "description": "Inline password."
+                                },
+                                "disable_tls": {
+                                    "type": "boolean",
+                                    "default": false,
+                                    "description": "Disable TLS to the external PostgreSQL."
+                                },
+                                "max_conns": {
+                                    "type": "integer",
+                                    "default": 2,
+                                    "description": "Maximum connections to the external PostgreSQL."
+                                }
+                            }
+                        }
+                    }
+                },
+                "kafka": {
+                    "type": "object",
+                    "description": "Managed Kafka data backend for the managed pub/sub. Disabled by default (Catalyst pub/sub is opt-in). Mirrors the postgresql surface. Translated at render time into agent.config.project.*. Backwards compatibility: an explicit legacy agent.config.project.default_managed_pubsub_type (or external_kafka.enabled) is honored verbatim and this block is ignored.",
+                    "properties": {
+                        "create": {
+                            "type": "boolean",
+                            "default": false,
+                            "description": "true -> self-hosted Kafka provisioned by Catalyst. false -> external Kafka you provide (see .external)."
+                        },
+                        "disabled": {
+                            "type": "boolean",
+                            "default": true,
+                            "description": "true turns managed Kafka pub/sub off entirely (the default), overriding create."
+                        },
+                        "selfhosted": {
+                            "type": "object",
+                            "description": "Tuning for self-hosted Kafka (only used when create: true, disabled: false). Maps to agent.config.project.selfhosted_kafka. Leave empty ({}) for defaults; override subkeys such as persistence_storage_size, replica_count."
+                        },
+                        "external": {
+                            "type": "object",
+                            "description": "Connection details for external Kafka (only used when create: false, disabled: false). Maps to agent.config.project.external_kafka (set brokers, auth_type, sasl_*, etc.)."
+                        }
+                    }
                 }
             }
         },

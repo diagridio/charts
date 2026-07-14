@@ -29,9 +29,12 @@
        external_postgresql.enabled, in that precedence order.
 
        An explicit management.config.region_postgresql, if set, always wins. */ -}}
-{{- $agent := .Values.agent | default dict -}}
-{{- $stateStoreType := dig "config" "project" "default_managed_state_store_type" "" $agent -}}
-{{- $extPg := dig "config" "project" "external_postgresql" dict $agent -}}
+{{- /* Consume the shared resolver so this derivation sees the SAME resolved
+       state store the agent ConfigMap emits (the friendly global.postgresql
+       surface, or a legacy passthrough), never the raw .Values. */ -}}
+{{- $resolved := include "catalyst.resolvedInfra" . | fromYaml -}}
+{{- $ss := $resolved.stateStore -}}
+{{- $extPg := $ss.external | default dict -}}
 {{- if not (hasKey $configMap "region_postgresql") -}}
   {{- /* Self-hosted path (e.g. onebox), checked first to match the agent's
          preference. Rather than hardcoding the agent's Bitnami coordinates here,
@@ -39,10 +42,10 @@
          host/port/username/secret/password-key in code from the shared
          conventions (services/catalyst/pkg/sharedpostgresql), the same source
          the agent uses. This keeps the two from drifting. */ -}}
-  {{- if eq $stateStoreType "postgresql-shared-selfhosted" -}}
+  {{- if eq $ss.type "postgresql-shared-selfhosted" -}}
     {{- $_ := set $configMap "region_postgresql" (dict
         "enabled" true
-        "managed_state_store_type" $stateStoreType
+        "managed_state_store_type" $ss.type
       ) -}}
   {{- /* External path: the agent uses project.external_postgresql whenever it is
          enabled. Its existing-secret carries the full connection tuple (keys:
@@ -52,13 +55,13 @@
          management.config.region_postgresql override instead. The region
          database name is a fixed invariant owned by the agent
          (mcpstore.RegionDatabaseName), so it is not set here. */ -}}
-  {{- else if and $extPg.enabled $extPg.existing_secret_name -}}
+  {{- else if and (dig "enabled" false $extPg) (dig "existing_secret_name" "" $extPg) -}}
     {{- $_ := set $configMap "region_postgresql" (dict
         "enabled" true
-        "disable_tls" (default false $extPg.disable_tls)
-        "max_conns" (default 2 $extPg.max_conns)
+        "disable_tls" (dig "disable_tls" false $extPg)
+        "max_conns" (dig "max_conns" 2 $extPg)
         "existing_secret_name" $extPg.existing_secret_name
-        "existing_secret_namespace" (default .Release.Namespace $extPg.existing_secret_namespace)
+        "existing_secret_namespace" (default .Release.Namespace (dig "existing_secret_namespace" "" $extPg))
       ) -}}
   {{- end -}}
 {{- end -}}

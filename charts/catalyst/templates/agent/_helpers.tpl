@@ -88,13 +88,12 @@ Validate values
     {{- if not .Values.global.control_plane_http_url -}}
         {{- fail "global.control_plane_http_url is required when join_token is provided!" -}}
     {{- end -}}
+    {{- /* validateGlobalValues also runs data-backend validation (Postgres/Kafka/
+           scheduler) via catalyst.validateInfraValues. The legacy required-field
+           checks for default_managed_state_store_type / default_managed_pubsub_type
+           were dropped: those fields are now intentionally blank by default and the
+           backend is derived from the global.postgresql / global.kafka surface. */ -}}
     {{- include "catalyst.validateGlobalValues" . -}}
-    {{- if not .Values.agent.config.project.default_managed_state_store_type -}}
-        {{- fail "agent.config.project.default_managed_state_store_type is required!" -}}
-    {{- end -}}
-    {{- if not .Values.agent.config.project.default_managed_pubsub_type -}}
-        {{- fail "agent.config.project.default_managed_pubsub_type is required!" -}}
-    {{- end -}}
     {{- if not .Values.agent.config.placement -}}
         {{- fail "agent.config.placement is required!" -}}
     {{- end -}}

@@ -1,0 +1,190 @@
+suite: Test Data Backend Resolution (Postgres/Kafka/scheduler)
+templates:
+  - agent/configmap.yaml
+  - management/configmap.yaml
+
+tests:
+  # ---------------------------------------------------------------------------
+  # Defaults: self-hosted Postgres state store, managed-postgresql scheduler,
+  # Kafka disabled. This is the shipped behavioural default.
+  # ---------------------------------------------------------------------------
+  - it: default renders self-hosted Postgres state store + managed-postgresql scheduler + kafka disabled
+    set:
+      join_token: "test-token"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "default_managed_state_store_type: postgresql-shared-selfhosted"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "default_managed_pubsub_type: kafka-shared-disabled"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "backend_type: managed-postgresql"
+        template: agent/configmap.yaml
+      # The Helm-only surface keys must never leak into the emitted config.
+      - notMatchRegex:
+          path: data["config.yaml"]
+          pattern: "use_global"
+        template: agent/configmap.yaml
+      - notMatchRegex:
+          path: data["config.yaml"]
+          pattern: "backend_type: postgresql\\b"
+        template: agent/configmap.yaml
+
+  - it: default management derives self-hosted region_postgresql
+    set:
+      join_token: "test-token"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "managed_state_store_type: postgresql-shared-selfhosted"
+        template: management/configmap.yaml
+
+  # ---------------------------------------------------------------------------
+  # External Postgres via global.postgresql.create: false
+  # ---------------------------------------------------------------------------
+  - it: create=false selects an external Postgres state store
+    set:
+      join_token: "test-token"
+      global.postgresql.create: false
+      global.postgresql.external.existing_secret_name: catalyst-postgres
+      global.postgresql.external.existing_secret_namespace: catalyst
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "default_managed_state_store_type: postgresql-shared-external"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "existing_secret_name: catalyst-postgres"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "region_postgresql:"
+        template: management/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "existing_secret_name: catalyst-postgres"
+        template: management/configmap.yaml
+
+  # ---------------------------------------------------------------------------
+  # Disabled Postgres + etcd scheduler (documented opt-out)
+  # ---------------------------------------------------------------------------
+  - it: disabled Postgres with etcd scheduler renders disabled state store + etcd
+    set:
+      join_token: "test-token"
+      global.postgresql.disabled: true
+      agent.config.internal_dapr.scheduler.backend_type: etcd
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "default_managed_state_store_type: postgresql-shared-disabled"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "backend_type: etcd"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "storage_size: 8Gi"
+        template: agent/configmap.yaml
+
+  # ---------------------------------------------------------------------------
+  # etcd scheduler on top of the default self-hosted Postgres
+  # ---------------------------------------------------------------------------
+  - it: etcd scheduler keeps the default self-hosted Postgres state store
+    set:
+      join_token: "test-token"
+      agent.config.internal_dapr.scheduler.backend_type: etcd
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "backend_type: etcd"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "default_managed_state_store_type: postgresql-shared-selfhosted"
+        template: agent/configmap.yaml
+
+  # ---------------------------------------------------------------------------
+  # Dedicated external scheduler DB (use_global: false)
+  # ---------------------------------------------------------------------------
+  - it: use_global=false renders an external-postgresql scheduler with connections
+    set:
+      join_token: "test-token"
+      agent.config.internal_dapr.scheduler.postgresql.use_global: false
+      agent.config.internal_dapr.scheduler.postgresql.connections:
+        - host: sched-db
+          port: 5432
+          username: u
+          password: p
+          database: sched
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "backend_type: external-postgresql"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "host: sched-db"
+        template: agent/configmap.yaml
+
+  # ---------------------------------------------------------------------------
+  # Kafka variants
+  # ---------------------------------------------------------------------------
+  - it: kafka create=true renders self-hosted kafka
+    set:
+      join_token: "test-token"
+      global.kafka.disabled: false
+      global.kafka.create: true
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "default_managed_pubsub_type: kafka-shared-selfhosted"
+        template: agent/configmap.yaml
+
+  - it: kafka create=false renders external kafka with brokers
+    set:
+      join_token: "test-token"
+      global.kafka.disabled: false
+      global.kafka.create: false
+      global.kafka.external.enabled: true
+      global.kafka.external.brokers: "broker:9092"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "default_managed_pubsub_type: kafka-shared-external"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "brokers: broker:9092"
+        template: agent/configmap.yaml
+
+  # ---------------------------------------------------------------------------
+  # Backwards-compat: legacy canonical fields are honored verbatim and the
+  # global.* surface is ignored (mirrors current staging/prod overlays).
+  # ---------------------------------------------------------------------------
+  - it: legacy managed-postgresql scheduler + external state store passthrough
+    set:
+      join_token: "test-token"
+      agent.config.internal_dapr.scheduler.backend_type: managed-postgresql
+      agent.config.project.default_managed_state_store_type: postgresql-shared-external
+      agent.config.project.external_postgresql.enabled: true
+      agent.config.project.external_postgresql.auth_type: connectionString
+      agent.config.project.default_managed_pubsub_type: kafka-shared-selfhosted
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "backend_type: managed-postgresql"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "default_managed_state_store_type: postgresql-shared-external"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "default_managed_pubsub_type: kafka-shared-selfhosted"
+        template: agent/configmap.yaml

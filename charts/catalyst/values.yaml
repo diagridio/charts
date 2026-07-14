@@ -207,6 +207,76 @@ global:
           - ALL
       seccompProfile:
         type: RuntimeDefault
+  #----------------------------------------------------------------------------
+  # Managed data backends: Postgres + Kafka
+  #
+  # These two blocks are the friendly, unified surface for the shared data
+  # backends Catalyst provisions per region. The chart translates them into the
+  # agent's canonical config (agent.config.project.* and
+  # agent.config.internal_dapr.scheduler.*) at render time — you do not set those
+  # low-level fields yourself. See the "Data backends" section in README.md.
+  #
+  # Postgres backs the managed state store, the Dapr scheduler (default), and
+  # workflows. By DEFAULT Catalyst runs a self-hosted Postgres for you.
+  #
+  # Backwards compatibility: if you still set the legacy
+  # agent.config.project.default_managed_state_store_type (or
+  # external_postgresql.enabled), that legacy value is honored verbatim and the
+  # block below is ignored — so existing overlays keep working unchanged.
+  postgresql:
+    # create: true  -> Catalyst provisions a self-hosted Postgres (Bitnami
+    #                  StatefulSet + PVC) and uses it for the state store.
+    # create: false -> connect to an external Postgres you provide (see .external).
+    create: true
+    # disabled: true fully turns off the managed Postgres state store (and any
+    # Postgres-backed scheduler/workflows). It OVERRIDES `create`. When disabled,
+    # switch the scheduler to etcd (see agent.config.internal_dapr.scheduler).
+    disabled: false
+    # Tuning for the self-hosted Postgres (only used when create: true,
+    # disabled: false). Maps to agent.config.project.selfhosted_postgresql.
+    # Leave empty ({}) to accept the agent defaults; override any subkey:
+    #   persistence_storage_size: "10Gi"
+    #   replica_count: 0
+    #   resources: {}
+    selfhosted: {}
+    # Connection details for an external Postgres (only used when create: false,
+    # disabled: false). Maps to agent.config.project.external_postgresql.
+    # Prefer existing_secret_name over inline credentials.
+    external:
+      # auth_type: connectionString | awsiam
+      auth_type: connectionString
+      # existing_secret_name references a Kubernetes secret with keys host, port,
+      # username, password (and optionally proxy_host). Strongly preferred.
+      existing_secret_name: ""
+      existing_secret_namespace: ""
+      # Inline alternative to existing_secret_name (avoid in production):
+      # connection_string_host: ""
+      # connection_string_port: 5432
+      # connection_string_username: ""
+      # connection_string_password: ""
+      disable_tls: false
+      max_conns: 2
+  # Kafka backs the managed pub/sub. By DEFAULT it is disabled (Catalyst pub/sub
+  # is opt-in). Mirrors the Postgres surface for a consistent experience.
+  #
+  # Backwards compatibility: a legacy
+  # agent.config.project.default_managed_pubsub_type (or external_kafka.enabled)
+  # is honored verbatim and this block is ignored.
+  kafka:
+    # create: true  -> self-hosted Kafka provisioned by Catalyst.
+    # create: false -> external Kafka you provide (see .external).
+    create: false
+    # disabled: true turns managed Kafka pub/sub off entirely (the default).
+    # OVERRIDES `create`.
+    disabled: true
+    # Tuning for self-hosted Kafka (only when create: true, disabled: false).
+    # Maps to agent.config.project.selfhosted_kafka. Leave empty ({}) for
+    # defaults; override any subkey (persistence_storage_size, replica_count).
+    selfhosted: {}
+    # Connection details for external Kafka (only when create: false,
+    # disabled: false). Maps to agent.config.project.external_kafka
+    # (set brokers, auth_type, sasl_*, etc.).
+    external: {}
 #------------------------------------------------------------------------------
 # Shared Scheduling Defaults
 #
@@ -355,8 +425,16 @@ agent:
       #         - port: 9090
       #           protocol: TCP
       allowed_ingress: []
-      default_managed_pubsub_type: kafka-shared-disabled
-      default_managed_state_store_type: postgresql-shared-disabled
+      # Legacy canonical backend selectors. These are intentionally BLANK so the
+      # chart can tell "user set it" from "shipped default" and drive the backend
+      # from the friendly global.postgresql / global.kafka surface instead.
+      # Set either of these (or external_postgresql.enabled / external_kafka.enabled)
+      # to opt out of the global.* surface and pin the backend directly — the
+      # value is then honored verbatim. Valid state store values:
+      # postgresql-shared-{selfhosted,external,disabled}; valid pubsub values:
+      # kafka-shared-{selfhosted,external,disabled}.
+      default_managed_pubsub_type: ""
+      default_managed_state_store_type: ""
       default_workflow: namespace
       # sidecar_operations_worker_pool_max_appids_percentage configures a worker pool for operations that deploy appids
       # sidecar operations worker pool capacity will be equal to placement.max_appid_count
@@ -389,7 +467,7 @@ agent:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       image_name: "{{ ternary .Values.global.consolidated_image.repository \"sidecar\" .Values.global.consolidated_image.enabled }}"
       # image_tag is the sidecar image version
-      image_tag: "1.75.0"
+      image_tag: "1.76.0"
       resources:
         limits:
           cpu: 300m
@@ -474,7 +552,7 @@ agent:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       image_name: "{{ ternary .Values.global.consolidated_image.repository \"catalyst-otel-collector\" .Values.global.consolidated_image.enabled }}"
       # image_tag is the otel collector image version
-      image_tag: "1.75.0"
+      image_tag: "1.76.0"
       image_pull_policy: "Always"
       metrics_endpoint: https://catalyst-metrics.r1.diagrid.io/api/v1/push
       loki_endpoint: https://catalyst-logs.r1.diagrid.io/loki/api/v1/push
@@ -523,6 +601,30 @@ agent:
         requests:
           memory: 130Mi
       scheduler:
+        # backend_type selects where the Dapr scheduler persists its state.
+        # Friendly 2-value surface:
+        #   postgresql (DEFAULT) -> Postgres-backed scheduler. See .postgresql below.
+        #   etcd                 -> etcd on a PVC. Requires storage_size.
+        # (You may also pin a legacy value directly — managed-postgresql or
+        #  external-postgresql — which is honored verbatim.)
+        # Set to "" to disable the scheduler backend entirely.
+        backend_type: postgresql
+        postgresql:
+          # use_global: true  -> reuse global.postgresql (the managed state store
+          #                      Postgres); the agent auto-creates a `sched` DB.
+          #                      Maps to backend_type: managed-postgresql.
+          #                      Requires global.postgresql.disabled: false.
+          # use_global: false -> a dedicated external Postgres just for the
+          #                      scheduler. Provide connections[] below. Maps to
+          #                      backend_type: external-postgresql.
+          use_global: true
+          max_conns_per_instance: 5
+          # connections is required when use_global: false. Each entry is either
+          # { host, port, username, password, database, disable_ssl_mode } or
+          # { existing_secret_name, existing_secret_namespace }.
+          # Maps to scheduler.external_postgresql.connections[].
+          connections: []
+        # etcd tuning (only used when backend_type: etcd).
         # storage_class: ""
         storage_size: 8Gi
       sentry:
@@ -530,7 +632,7 @@ agent:
           registry: us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public
           # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
           name: "{{ ternary .Values.global.consolidated_image.repository \"private-sentry\" .Values.global.consolidated_image.enabled }}"
-          tag: "1.75.0"
+          tag: "1.76.0"
         jwt:
           enabled: true
           # managed means agent automatically does key rotation and JWKS updates.
@@ -623,7 +725,7 @@ agent:
     # Example: "diagrid/cra-agent" or "cra-agent"
     repository: cra-agent
     # tag is the image tag/version to use
-    tag: "1.75.0"
+    tag: "1.76.0"
     # pullPolicy is the image pull policy for this specific image.
     # If empty, uses global.image.pullPolicy.
     # Valid values: Always, IfNotPresent, Never
@@ -716,7 +818,7 @@ gateway:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       repository: identity-injector
       # tag is the image tag/version to use
-      tag: "1.75.0"
+      tag: "1.76.0"
       # pullPolicy is the image pull policy for this specific image.
       # If empty, uses global.image.pullPolicy.
       pullPolicy: ""
@@ -829,7 +931,7 @@ gateway:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       repository: catalyst-gateway
       # tag is the image tag/version to use
-      tag: "1.75.0"
+      tag: "1.76.0"
       # pullPolicy is the image pull policy for this specific image.
       # If empty, uses global.image.pullPolicy.
       pullPolicy: ""
@@ -936,7 +1038,7 @@ management:
     # Deprecated: This field supports template evaluation for backwards compatibility.
     repository: "{{ ternary .Values.global.consolidated_image.repository \"catalyst-management\" .Values.global.consolidated_image.enabled }}"
     # tag is the image tag/version to use
-    tag: "1.75.0"
+    tag: "1.76.0"
     # pullPolicy is the image pull policy for this specific image.
     # If empty, uses global.image.pullPolicy.
     pullPolicy: ""

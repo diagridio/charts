@@ -148,20 +148,20 @@ By default, this is the full list of images that are installed in your cluster:
 |-----------|--------------|-------------|
 | **Alpine k8s** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy/alpine/k8s:1.36.0` | Utility image used by Helm install and cleanup hooks |
 | **Envoy Proxy** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy/envoyproxy/envoy:distroless-v1.38.0` | Envoy proxy for gateway |
-| **Catalyst** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.75.0` | Consolidated Catalyst services image |
+| **Catalyst** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.76.0` | Consolidated Catalyst services image |
 | **Piko** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/diagrid-piko:v1.0.1` | Piko reverse tunneling service |
 | **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.18.2-rc.2-catalyst.1` | Catalyst Dapr control plane services |
-| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.75.0` | Catalyst dapr server |
-| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.75.0` | OTel collector for telemetry |
+| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.76.0` | Catalyst dapr server |
+| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.76.0` | OTel collector for telemetry |
 
 Alternatively, separate images can be used:
 
 | Component | Default Image | Description |
 |-----------|--------------|-------------|
-| **Catalyst Agent** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/cra-agent:1.75.0` | Catalyst agent service |
-| **Catalyst Management** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-management:1.75.0` | Catalyst management service |
-| **Gateway Control Plane** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-gateway:1.75.0` | Gateway control plane service |
-| **Gateway Identity Injector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/identity-injector:1.75.0` | Identity injection service |
+| **Catalyst Agent** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/cra-agent:1.76.0` | Catalyst agent service |
+| **Catalyst Management** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-management:1.76.0` | Catalyst management service |
+| **Gateway Control Plane** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-gateway:1.76.0` | Gateway control plane service |
+| **Gateway Identity Injector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/identity-injector:1.76.0` | Identity injection service |
 
 Dependencies:
 
@@ -177,8 +177,8 @@ The Agent provisions these at runtime:
 
 | Component | Default Image | Description |
 |-----------|--------------|-------------|
-| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/sidecar:1.75.0` | Catalyst dapr server |
-| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-otel-collector:1.75.0` | OTel collector for telemetry |
+| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/sidecar:1.76.0` | Catalyst dapr server |
+| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-otel-collector:1.76.0` | OTel collector for telemetry |
 | **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.18.2-rc.2-catalyst.1` | Catalyst Dapr control plane services |
 
 #### Optional Images
@@ -447,33 +447,152 @@ When managed domain is enabled, you can omit the `gateway.tls` block from your H
 
 > **Note:** managed domains add a runtime dependency on the controlplane's DNS and certificate-issuance infrastructure. If you require strict isolation from external services, stick with a bring-your-own domain and certificate.
 
-### Workflows
+### Data backends (PostgreSQL, Kafka)
 
-Catalyst uses an external PostgreSQL database to store workflow state and provide rich visualizations. To enable this feature, configure the connection details as follows:
+Catalyst relies on two data backends shared across a region:
+
+- **PostgreSQL** — backs workflows state and visualizations, AI Agents metadata, managed state components and the Dapr **scheduler** (jobs,
+  reminders, cron). Catalyst defaults to automatic self-hosted deployment of PostgreSQL. It is a core part of Catalyst and all the features mentioned previously depend on the database being available. PostgreSQL is also crucial for the performance of workflows.
+- **Kafka** — backs managed pub/sub. Catalyst defaults to no deployment, disallowing managed pub/sub brokers to be available on project creation.
+
+#### Backwards compatibility and upgrades
+
+Helm values for existing installations are honored to keep backwards compatibility for the configuration of the data backends.
+
+The following helm values are **deprecated** but still supported to avoid service disruption.
+- `agent.config.project.default_managed_state_store_type`
+- `agent.config.project.default_managed_pubsub_type`
+
+We advise to update helm values for existing installations to the new configuration options documented below.
+
+> **Default behaviour change (breaking on upgrade):** Catalyst now uses a **Postgres-backed scheduler**
+> by default. Previously the scheduler used an etcd backend.
+> By default, on upgrade the scheduler will move from etcd to PostgreSQL.
+> **There is no automatic state migration** — existing scheduler jobs/reminders
+> held in etcd are not copied to PostgreSQL. If you must keep etcd, opt out explicitly using the values below.
+> However we suggest to update scheduler to use the PostgreSQL backend due to its improved performance and reliability.
+
+#### PostgreSQL
 
 ```yaml
-agent:
-  config:
-    project:
-      default_managed_state_store_type: postgresql-shared-external
-      external_postgresql:
-        enabled: true
-        auth_type: connectionString
-        namespace: postgres
-        connection_string_host: postgres-postgresql.postgres.svc.cluster.local
-        connection_string_port: 5432
-        connection_string_username: postgres
-        connection_string_password: postgres
-        connection_string_database: catalyst
+global:
+  postgresql:
+    # create: true  -> Catalyst provisions a self-hosted PostgreSQL (default)
+    # create: false -> connect to an external PostgreSQL you provide (see .external)
+    create: true
+    # disabled: true fully turns off the managed PostgreSQL state store (and any
+    # Postgres-backed scheduler/workflows). OVERRIDES create.
+    disabled: false
 ```
 
-If you wish to disable this feature, you must set:
+To use an **external** PostgreSQL (recommended for production), provide the
+connection via a Kubernetes secret with keys `host`, `port`, `username`,
+`password` (and optionally `proxy_host`):
+
+```yaml
+global:
+  postgresql:
+    create: false
+    external:
+      auth_type: connectionString
+      existing_secret_name: catalyst-postgres
+      existing_secret_namespace: catalyst
+      disable_tls: false
+      max_conns: 2
+```
+
+#### Scheduler
+
+The Dapr scheduler persists per-project scheduler state — scheduled jobs, actor
+reminders, and workflow triggers. It supports two backends:
+
+| `backend_type` | Where state lives | When to use |
+|---|---|---|
+| `postgresql` (**default**) | A PostgreSQL database | Almost all cases. Reuses the `global.postgresql` Helm value by default (`use_global: true`). |
+| `etcd` | An etcd instance on a PVC | Opt out of PostgreSQL entirely (see below). |
+
+> [!IMPORTANT]
+> The PostgreSQL scheduler uses **logical replication**, so any **external** database
+> backing it must be configured with `wal_level = logical`. The chart's self-hosted
+> PostgreSQL (`global.postgresql.create: true`) sets this automatically. Managed offerings ship it disabled: Amazon RDS/Aurora
+> `rds.logical_replication = 1` (reboot), Cloud SQL `cloudsql.logical_decoding = on`,
+> Azure Flexible Server `wal_level = logical`.
+
+**PostgreSQL scheduler**
+
+With the default `use_global: true`, the scheduler reuses the global PostgreSQL (`global.postgresql`).
+This is the recommended choice for almost all deployments. 
+Configure PostgreSQL once (under `global.postgresql`) and the scheduler uses the same database.
 
 ```yaml
 agent:
   config:
-    project:
-      default_managed_state_store_type: postgresql-shared-disabled
+    internal_dapr:
+      scheduler:
+        backend_type: postgresql   # default 
+        postgresql:
+          use_global: true         # reuse global.postgresql (recommended)
+          max_conns_per_instance: 5
+```
+
+> **Requires PostgreSQL to be enabled.** `use_global: true` reuses
+> `global.postgresql`, so it cannot be combined with `global.postgresql.disabled: true`.
+> If you disable the managed PostgreSQL, switch the scheduler to `etcd` (see below)
+> — otherwise rendering fails with a validation error.
+
+**Dedicated scheduler database(s)** — *advanced*
+
+For advanced scenarios where you want the scheduler to use a dedicated
+database (or spread across multiple databases) separate from the global
+PostgreSQL, set `use_global: false` and provide the connection(s) yourself. Each
+entry in `connections` is one scheduler database — supply several to shard the
+scheduler across databases.
+
+```yaml
+agent:
+  config:
+    internal_dapr:
+      scheduler:
+        backend_type: postgresql
+        postgresql:
+          use_global: false
+          max_conns_per_instance: 5
+          connections:
+            # Inline credentials:
+            - host: scheduler-db.example.com
+              port: 5432
+              username: scheduler
+              password: <password>
+              database: sched
+              disable_ssl_mode: false
+            # ...or reference a Kubernetes secret instead of inline credentials:
+            - existing_secret_name: scheduler-db-conn
+              existing_secret_namespace: db-namespace
+```
+
+**ETCD Scheduler**
+Opt out of the PosgreSQL scheduler by using in-cluster ETCD with an embedded PVC-backed database. This is not recommended for high-scale, production scenarios.
+```yaml
+agent:
+  config:
+    internal_dapr:
+      scheduler:
+        backend_type: etcd
+        storage_size: 8Gi
+```
+
+#### Kafka
+
+Managed pub/sub is disabled by default:
+
+```yaml
+global:
+  kafka:
+    # create: true -> self-hosted Kafka; create: false -> external (see .external)
+    create: false
+    # disabled: true turns managed Kafka off entirely (default). OVERRIDES create.
+    disabled: true
+    external: {}   # brokers, auth_type, sasl_* when create: false
 ```
 
 ### OpenTelemetry Collector (Optional)

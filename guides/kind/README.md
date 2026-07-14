@@ -40,18 +40,40 @@ export JOIN_TOKEN=$(diagrid region create kind-region --ingress "https://*.127.0
 
 If you want to use the [Dapr Workflow API](https://docs.dapr.io/developing-applications/building-blocks/workflow/workflow-overview/), install [PostgreSQL](https://www.postgresql.org/):
 
+> [!IMPORTANT]
+> Catalyst defaults the Dapr scheduler to a **Postgres backend**, and the scheduler uses
+> PostgreSQL **logical replication**. A bring-your-own PostgreSQL must therefore be started
+> with `wal_level = logical` and the related replication settings below — otherwise the
+> `dapr-scheduler-server` pods crash with `logical decoding requires "wal_level" >= "logical"`.
+> (This tuning is only needed for external PostgreSQL; the chart's self-hosted managed
+> PostgreSQL, `global.postgresql.create: true`, already sets it for you.)
+
 ```bash
 # Add Bitnami chart repository
 helm repo add bitnami https://charts.bitnami.com/bitnami
 helm repo update
 
+# PostgreSQL values: enable logical replication so the Dapr Postgres scheduler works
+cat > postgres-values.yaml << EOF
+auth:
+  postgresPassword: postgres
+  database: catalyst
+image:
+  repository: bitnamilegacy/postgresql
+primary:
+  extendedConfiguration: |
+    wal_level = logical
+    shared_preload_libraries = 'pgoutput'
+    max_replication_slots = 50
+    max_wal_senders = 50
+    wal_log_hints = on
+EOF
+
 # Install PostgreSQL
 helm install postgres bitnami/postgresql \
-  --set auth.postgresPassword=postgres \
-  --set auth.database=catalyst \
-  --set image.repository=bitnamilegacy/postgresql \
   --create-namespace \
-  --namespace postgres
+  --namespace postgres \
+  -f postgres-values.yaml
 ```
 
 ## Step 4: Create self-signed certificate 🔐
@@ -152,32 +174,37 @@ Import-Certificate -FilePath "ca.pem" -CertStoreLocation Cert:\LocalMachine\Root
 Create a Helm values file for the Catalyst installation:
 
 ```bash
-# If you installed PostresSQL
+# If you installed PostgreSQL (external, provided by you)
+# NOTE: the Bitnami PostgreSQL installed above does not serve TLS, so we set
+# disable_tls: true. Omit it (default false) only when your Postgres serves TLS.
 cat > catalyst-values.yaml << EOF
-agent:
-  config:
-    project:
-      default_managed_state_store_type: postgresql-shared-external
-      external_postgresql:
-        enabled: true
-        auth_type: connectionString
-        namespace: postgres
-        connection_string_host: postgres-postgresql.postgres.svc.cluster.local
-        connection_string_port: 5432
-        connection_string_username: postgres
-        connection_string_password: postgres
-        connection_string_database: catalyst
+global:
+  postgresql:
+    create: false
+    external:
+      auth_type: connectionString
+      connection_string_host: postgres-postgresql.postgres.svc.cluster.local
+      connection_string_port: 5432
+      connection_string_username: postgres
+      connection_string_password: postgres
+      disable_tls: true
 gateway:
   tls:
     enabled: true
 EOF
 
-# If you did not install PostgreSQL
+# If you did not install PostgreSQL: turn Postgres off and run the scheduler on
+# etcd (a managed-postgresql scheduler cannot run without a Postgres).
 cat > catalyst-values.yaml << EOF
+global:
+  postgresql:
+    disabled: true
 agent:
   config:
-    project:
-      default_managed_state_store_type: postgresql-shared-disabled
+    internal_dapr:
+      scheduler:
+        backend_type: etcd
+        storage_size: 8Gi
 gateway:
   tls:
     enabled: true
@@ -196,7 +223,7 @@ helm install catalyst oci://public.ecr.aws/diagrid/catalyst \
      --set join_token="${JOIN_TOKEN}" \
      --set-file gateway.tls.cert=server.pem \
      --set-file gateway.tls.key=server-key.pem \
-     --version 1.75.0
+     --version 1.76.0
 ```
 
 ## Step 5: Verify the Installation ✅

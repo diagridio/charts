@@ -11,6 +11,38 @@
 {{- if and $agentConfig.host.ingress.service.name (not $agentConfig.host.ingress.service.namespace) -}}
   {{- $_ := set $agentConfig.host.ingress.service "namespace" .Release.Namespace -}}
 {{- end -}}
+{{- /* Resolve the managed data backends (Postgres state store, Dapr scheduler,
+       Kafka pubsub) from the friendly global.postgresql / global.kafka /
+       scheduler surface into the agent's canonical config fields. The shared
+       catalyst.resolvedInfra helper (../_helpers.tpl) applies the legacy
+       passthrough precedence; both this ConfigMap and the management ConfigMap
+       consume it so the two cannot drift. */ -}}
+{{- $resolved := include "catalyst.resolvedInfra" . | fromYaml -}}
+{{- if not $agentConfig.project -}}{{- $_ := set $agentConfig "project" dict -}}{{- end -}}
+{{- $_ := set $agentConfig.project "default_managed_state_store_type" $resolved.stateStore.type -}}
+{{- if $resolved.stateStore.selfhosted -}}{{- $_ := set $agentConfig.project "selfhosted_postgresql" $resolved.stateStore.selfhosted -}}{{- end -}}
+{{- if $resolved.stateStore.external -}}{{- $_ := set $agentConfig.project "external_postgresql" $resolved.stateStore.external -}}{{- end -}}
+{{- $_ := set $agentConfig.project "default_managed_pubsub_type" $resolved.pubsub.type -}}
+{{- if $resolved.pubsub.selfhosted -}}{{- $_ := set $agentConfig.project "selfhosted_kafka" $resolved.pubsub.selfhosted -}}{{- end -}}
+{{- if $resolved.pubsub.external -}}{{- $_ := set $agentConfig.project "external_kafka" $resolved.pubsub.external -}}{{- end -}}
+{{- /* Scheduler: translate backend_type (+ postgresql.use_global) into the agent's
+       backend_type + managed_postgresql/external_postgresql, and drop the
+       Helm-only `postgresql` key so it never leaks into the agent config. */ -}}
+{{- if not $agentConfig.internal_dapr -}}{{- $_ := set $agentConfig "internal_dapr" dict -}}{{- end -}}
+{{- if not $agentConfig.internal_dapr.scheduler -}}{{- $_ := set $agentConfig.internal_dapr "scheduler" dict -}}{{- end -}}
+{{- $scheduler := $agentConfig.internal_dapr.scheduler -}}
+{{- $_ := unset $scheduler "postgresql" -}}
+{{- $_ := set $scheduler "backend_type" $resolved.scheduler.backend_type -}}
+{{- if $resolved.scheduler.managed_postgresql -}}
+  {{- $_ := set $scheduler "managed_postgresql" $resolved.scheduler.managed_postgresql -}}
+{{- else -}}
+  {{- $_ := unset $scheduler "managed_postgresql" -}}
+{{- end -}}
+{{- if $resolved.scheduler.external_postgresql -}}
+  {{- $_ := set $scheduler "external_postgresql" $resolved.scheduler.external_postgresql -}}
+{{- else -}}
+  {{- $_ := unset $scheduler "external_postgresql" -}}
+{{- end -}}
 {{- /* Propagate top-level shared.scheduling so the agent applies it to every
        workload it provisions (sidecars, per-project Dapr, per-project OTel).
        Two conversions happen here to dodge viper gotchas in the agent:
