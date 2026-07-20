@@ -277,6 +277,30 @@ global:
     # disabled: false). Maps to agent.config.project.external_kafka
     # (set brokers, auth_type, sasl_*, etc.).
     external: {}
+  # Redis is a standalone shared backing service the agent provisions in-cluster
+  # or connects to externally.
+  #
+  # High availability is driven by selfhosted.replica_count: 0 (default) gives a
+  # standalone node; any value >= 1 gives a replication topology with Redis
+  # Sentinel (automatic failover).
+  redis:
+    # create: true  -> self-hosted Bitnami Redis provisioned by Catalyst.
+    # create: false -> external Redis you provide (see .external).
+    create: false
+    # disabled: true turns the managed Redis off entirely (the default).
+    # OVERRIDES create.
+    disabled: true
+    # Tuning for self-hosted Redis (only when create: true, disabled: false).
+    # Maps to agent.config.project.selfhosted_redis. Leave empty ({}) for
+    # defaults; override subkeys:
+    #   persistence_storage_size: "1Gi"
+    #   replica_count: 0   # >=1 enables replication + Sentinel (HA)
+    #   resources: {}
+    selfhosted: {}
+    # Connection details for external Redis (only when create: false,
+    # disabled: false). Maps to agent.config.project.external_redis
+    # (host, port, password / existing_secret_name, etc.).
+    external: {}
 #------------------------------------------------------------------------------
 # Shared Scheduling Defaults
 #
@@ -1494,3 +1518,36 @@ cleanup:
     tag: "1.36.0"
     # pullPolicy is the image pull policy
     pullPolicy: IfNotPresent
+#------------------------------------------------------------------------------
+# System-Namespace NetworkPolicies
+#------------------------------------------------------------------------------
+# Default-deny + explicit-allow NetworkPolicies for the release namespace and
+# the internal Dapr namespace, for clusters with a default-deny mandate.
+# Requires a NetworkPolicy-enforcing CNI (Calico, Cilium, Azure NPM, ...);
+# without one the policies are inert. Project namespaces are always covered by
+# agent-generated policies regardless of this flag.
+networkPolicies:
+  # enabled installs the system-namespace policies
+  enabled: false
+  # apiserver egress. NetworkPolicy is evaluated after kube-proxy DNAT, so the
+  # kubernetes.default ClusterIP never matches — the policy must allow the real
+  # apiserver endpoint, from: kubectl get endpoints kubernetes -n default
+  apiserver:
+    # endpointCIDR is the apiserver endpoint, e.g. "10.224.0.4/32". When empty,
+    # falls back to all private (RFC1918) ranges pinned to ports 443 and 6443.
+    endpointCIDR: ""
+    # port is the apiserver endpoint port (only used with endpointCIDR)
+    port: 443
+  # postgres.namespace adds an egress allow on 5432 to the namespace hosting
+  # PostgreSQL (the agent initializes the scheduler and managed-state-store
+  # databases there). Empty omits the rule (e.g. postgres reached via public
+  # endpoint, or no postgres-backed features in use).
+  postgres:
+    namespace: ""
+  # extraEgress appends namespace-wide egress allows for install-specific
+  # private destinations (VNet databases, private endpoints, ...). Each entry:
+  #   - cidr: 10.100.0.0/24
+  #     ports:            # optional; omit to allow all ports
+  #       - port: 5432
+  #         protocol: TCP # optional, defaults to TCP
+  extraEgress: []

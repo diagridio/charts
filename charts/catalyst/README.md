@@ -45,6 +45,45 @@ cleanup:
 
 Catalyst should be installed in a dedicated Kubernetes cluster. It manages global resources and dynamically provisions workloads, which may conflict with other applications in a shared cluster. If you must install into a shared cluster, you must ensure the cluster-wide permissions described in the [RBAC section](#permissions-rbac) are acceptable for your setup or consider using a cluster virtualization solution like [vcluster](https://github.com/loft-sh/vcluster).
 
+### Network Policies
+
+Catalyst always generates NetworkPolicies for **project namespaces** (deny-all plus explicit allows, created by the agent at provisioning time). The **system namespaces** — the release namespace and the internal Dapr namespace — ship without policies by default. On clusters with a default-deny security mandate, enable the chart-managed set:
+
+```yaml
+networkPolicies:
+  enabled: true
+```
+
+This installs deny-all policies for both system namespaces plus the explicit allows Catalyst needs: intra-namespace traffic, project-sidecar access to piko/management and the Dapr control plane, public ingress to the gateway, and egress to DNS, the Kubernetes API server, the Diagrid control plane (public internet except private ranges — standard NetworkPolicy cannot match hostnames), and project namespaces.
+
+These policies only take effect on clusters whose CNI enforces NetworkPolicy (Calico, Cilium, Azure NPM, ...). Without one they are silently inert — the agent logs a warning at startup when no enforcing CNI is detected.
+
+Install-specific values:
+
+```yaml
+networkPolicies:
+  enabled: true
+  # NetworkPolicy is evaluated after kube-proxy DNAT, so API server traffic is
+  # matched against the real endpoint (kubectl get endpoints kubernetes -n default),
+  # never the kubernetes.default ClusterIP. Unset, the policy falls back to
+  # allowing all private ranges on ports 443 and 6443.
+  apiserver:
+    endpointCIDR: "10.224.0.4/32"
+    port: 443
+  # Allows agent egress to an in-cluster PostgreSQL on 5432 (scheduler and
+  # managed state store databases). Omit when not using postgres-backed features.
+  postgres:
+    namespace: "postgres"
+  # Extra egress allows for private destinations (VNet databases, private
+  # endpoints) that the internet-egress policy's private-range excepts block.
+  extraEgress:
+    - cidr: 10.100.0.0/24
+      ports:
+        - port: 5432
+```
+
+If the PostgreSQL namespace is itself default-deny, its ingress allows are yours to manage: both the release namespace (agent) and every project namespace (sidecars connect directly for managed state stores) need ingress on 5432.
+
 ### Permissions (RBAC)
 
 Catalyst is a self-managing infrastructure platform: not a static set of workloads, the Catalyst **agent** acts as an in-cluster provisioner that creates and manages a Dapr control plane, dapr sidecars, dapr CRDs, and optionally supporting infrastructure (Kafka, PostgreSQL, Redis, vcluster, sandboxes) **on demand** as you create Catalyst projects and resources. Because the exact resource set and target namespaces are decided at runtime, not at install time, the agent is granted a **cluster-scoped** role. The management and gateway components are scoped more narrowly.
@@ -447,13 +486,14 @@ When managed domain is enabled, you can omit the `gateway.tls` block from your H
 
 > **Note:** managed domains add a runtime dependency on the controlplane's DNS and certificate-issuance infrastructure. If you require strict isolation from external services, stick with a bring-your-own domain and certificate.
 
-### Data backends (PostgreSQL, Kafka)
+### Data backends (PostgreSQL, Kafka, Redis)
 
-Catalyst relies on two data backends shared across a region:
+Catalyst relies on data backends shared across a region:
 
 - **PostgreSQL** — backs workflows state and visualizations, AI Agents metadata, managed state components and the Dapr **scheduler** (jobs,
   reminders, cron). Catalyst defaults to automatic self-hosted deployment of PostgreSQL. It is a core part of Catalyst and all the features mentioned previously depend on the database being available. PostgreSQL is also crucial for the performance of workflows.
 - **Kafka** — backs managed pub/sub. Catalyst defaults to no deployment, disallowing managed pub/sub brokers to be available on project creation.
+- **Redis** — a standalone shared Redis. Disabled by default; provisioned self-hosted in-cluster or connected externally, with optional high availability. Each of the three backends is configured independently and provisioned the same way (self-hosted vs external).
 
 #### Backwards compatibility and upgrades
 
@@ -501,6 +541,40 @@ global:
       max_conns: 2
 ```
 
+##### Logical replication requirements (external PostgreSQL)
+
+Catalyst uses PostgreSQL **logical replication** (the Postgres-backed scheduler
+streams changes via logical decoding). Catalyst's self-hosted PostgreSQL
+(`global.postgresql.create: true`) is configured for this automatically. An
+**external** database needs two things:
+
+1. **`wal_level = logical`** on the server (requires a restart):
+
+   ```sql
+   ALTER SYSTEM SET wal_level = logical;
+   ```
+
+   Managed offerings ship it disabled — enable their equivalent instead:
+
+   | Provider | Setting |
+   |---|---|
+   | Amazon RDS / Aurora | `rds.logical_replication = 1` in the DB parameter group (reboot required) |
+   | Google Cloud SQL | `cloudsql.logical_decoding = on` flag |
+   | Azure Database for PostgreSQL (Flexible Server) | `wal_level = logical` server parameter (restart required) |
+
+2. **Replication permission** for the user Catalyst connects with:
+
+   ```sql
+   ALTER ROLE <username> WITH REPLICATION;
+   ```
+
+   On Amazon RDS/Aurora the `REPLICATION` attribute cannot be granted directly —
+   use the built-in role instead:
+
+   ```sql
+   GRANT rds_replication TO <username>;
+   ```
+
 #### Scheduler
 
 The Dapr scheduler persists per-project scheduler state — scheduled jobs, actor
@@ -512,11 +586,10 @@ reminders, and workflow triggers. It supports two backends:
 | `etcd` | An etcd instance on a PVC | Opt out of PostgreSQL entirely (see below). |
 
 > [!IMPORTANT]
-> The PostgreSQL scheduler uses **logical replication**, so any **external** database
-> backing it must be configured with `wal_level = logical`. The chart's self-hosted
-> PostgreSQL (`global.postgresql.create: true`) sets this automatically. Managed offerings ship it disabled: Amazon RDS/Aurora
-> `rds.logical_replication = 1` (reboot), Cloud SQL `cloudsql.logical_decoding = on`,
-> Azure Flexible Server `wal_level = logical`.
+> The PostgreSQL scheduler uses **logical replication** — the database backing it
+> (global or dedicated) must meet the
+> [logical replication requirements](#external-postgresql-logical-replication-requirements)
+> above: `wal_level = logical` plus replication permission for the connecting user.
 
 **PostgreSQL scheduler**
 
@@ -594,6 +667,69 @@ global:
     disabled: true
     external: {}   # brokers, auth_type, sasl_* when create: false
 ```
+
+#### Redis
+
+A standalone shared Redis used for caching and key value storage.
+This chart version ships it as **opt-in — disabled by default** provisioned in-cluster or connected
+externally, and enabled per environment:
+
+```yaml
+global:
+  redis:
+    # create: true -> self-hosted Redis; create: false -> external (see .external)
+    create: false
+    # disabled: true turns the managed Redis off entirely (default). OVERRIDES create.
+    disabled: true
+    selfhosted: {}   # persistence_storage_size, replica_count, resources
+    external: {}     # host, port, password / existing_secret_name when create: false
+```
+
+**High availability** is driven by `selfhosted.replica_count`:
+
+| `replica_count` | Topology |
+|---|---|
+| `0` (default) | `standalone` — single node, no failover. |
+| `>= 1` | `replication` + **Redis Sentinel** — master + N replicas with automatic failover. |
+
+```yaml
+global:
+  redis:
+    create: true
+    disabled: false
+    selfhosted:
+      replica_count: 3            # >=1 enables replication + Sentinel (HA)
+      persistence_storage_size: 5Gi
+```
+
+To connect to an **external** Redis instead, provide the connection inline or via
+an existing Kubernetes secret:
+
+```yaml
+global:
+  redis:
+    create: false
+    disabled: false
+    external:
+      # Inline connection:
+      host: redis.example.com
+      port: 6379
+      disable_tls: false
+      # ...or reference an existing secret instead of the inline fields:
+      existing_secret_name: catalyst-redis
+      existing_secret_namespace: catalyst
+```
+
+When `existing_secret_name` is set, the referenced secret must contain the
+following keys (the inline `host`/`port`/`username`/`password` fields are then
+ignored):
+
+| Key | Required | Description |
+|-----|----------|-------------|
+| `host` | yes | Redis hostname (without port). |
+| `port` | yes | Redis port (e.g. `6379`). |
+| `password` | no | Auth password; omit for an unauthenticated Redis. |
+| `username` | no | ACL username; omit to use the default user. |
 
 ### OpenTelemetry
 

@@ -25,6 +25,13 @@
 {{- $_ := set $agentConfig.project "default_managed_pubsub_type" $resolved.pubsub.type -}}
 {{- if $resolved.pubsub.selfhosted -}}{{- $_ := set $agentConfig.project "selfhosted_kafka" $resolved.pubsub.selfhosted -}}{{- end -}}
 {{- if $resolved.pubsub.external -}}{{- $_ := set $agentConfig.project "external_kafka" $resolved.pubsub.external -}}{{- end -}}
+{{- /* Managed Redis. Emit default_managed_redis_type
+       ONLY when Redis is enabled. The agent treats an absent field as disabled. */ -}}
+{{- if ne $resolved.redis.type "redis-shared-disabled" -}}
+  {{- $_ := set $agentConfig.project "default_managed_redis_type" $resolved.redis.type -}}
+  {{- if $resolved.redis.selfhosted -}}{{- $_ := set $agentConfig.project "selfhosted_redis" $resolved.redis.selfhosted -}}{{- end -}}
+  {{- if $resolved.redis.external -}}{{- $_ := set $agentConfig.project "external_redis" $resolved.redis.external -}}{{- end -}}
+{{- end -}}
 {{- /* Scheduler: translate backend_type (+ postgresql.use_global) into the agent's
        backend_type + managed_postgresql/external_postgresql, and drop the
        Helm-only `postgresql` key so it never leaks into the agent config. */ -}}

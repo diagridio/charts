@@ -427,6 +427,30 @@
                             "description": "Connection details for external Kafka (only used when create: false, disabled: false). Maps to agent.config.project.external_kafka (set brokers, auth_type, sasl_*, etc.)."
                         }
                     }
+                },
+                "redis": {
+                    "type": "object",
+                    "description": "Managed Redis backing service. Off by default. Translated at render time into agent.config.project.{default_managed_redis_type,selfhosted_redis,external_redis} — and emitted ONLY when enabled, so environments whose pinned binary predates the field are unaffected.",
+                    "properties": {
+                        "create": {
+                            "type": "boolean",
+                            "default": false,
+                            "description": "true -> self-hosted Bitnami Redis provisioned by Catalyst. false -> external Redis you provide (see .external)."
+                        },
+                        "disabled": {
+                            "type": "boolean",
+                            "default": true,
+                            "description": "true turns the managed Redis off entirely (the default), overriding create."
+                        },
+                        "selfhosted": {
+                            "type": "object",
+                            "description": "Tuning for self-hosted Redis (only used when create: true, disabled: false). Maps to agent.config.project.selfhosted_redis. Leave empty ({}) for defaults; override subkeys persistence_storage_size, replica_count (>=1 enables replication + Sentinel HA), resources."
+                        },
+                        "external": {
+                            "type": "object",
+                            "description": "Connection details for external Redis (only used when create: false, disabled: false). Maps to agent.config.project.external_redis (host, port, password / existing_secret_name, etc.)."
+                        }
+                    }
                 }
             }
         },
@@ -978,6 +1002,84 @@
                 "patch": {
                     "type": "object",
                     "default": {}
+                }
+            }
+        },
+        "networkPolicies": {
+            "type": "object",
+            "description": "Default-deny + explicit-allow NetworkPolicies for the release namespace and the internal Dapr namespace; requires a NetworkPolicy-enforcing CNI",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Install system-namespace NetworkPolicies"
+                },
+                "apiserver": {
+                    "type": "object",
+                    "description": "Kubernetes API server egress target (post-DNAT endpoint, not the ClusterIP)",
+                    "properties": {
+                        "endpointCIDR": {
+                            "type": "string",
+                            "default": "",
+                            "description": "Apiserver endpoint CIDR (e.g. 10.224.0.4/32); empty falls back to RFC1918 ranges pinned to ports 443+6443"
+                        },
+                        "port": {
+                            "type": "integer",
+                            "default": 443,
+                            "description": "Apiserver endpoint port (only used with endpointCIDR)"
+                        }
+                    }
+                },
+                "postgres": {
+                    "type": "object",
+                    "description": "In-cluster PostgreSQL egress target",
+                    "properties": {
+                        "namespace": {
+                            "type": "string",
+                            "default": "",
+                            "description": "Namespace hosting PostgreSQL; adds an egress allow on 5432, empty omits the rule"
+                        }
+                    }
+                },
+                "extraEgress": {
+                    "type": "array",
+                    "description": "Additional namespace-wide egress allows for install-specific private destinations",
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "cidr"
+                        ],
+                        "properties": {
+                            "cidr": {
+                                "type": "string",
+                                "description": "Destination CIDR"
+                            },
+                            "ports": {
+                                "type": "array",
+                                "description": "Optional port pins; omit to allow all ports",
+                                "items": {
+                                    "type": "object",
+                                    "required": [
+                                        "port"
+                                    ],
+                                    "properties": {
+                                        "port": {
+                                            "type": "integer"
+                                        },
+                                        "protocol": {
+                                            "type": "string",
+                                            "enum": [
+                                                "TCP",
+                                                "UDP",
+                                                "SCTP"
+                                            ],
+                                            "default": "TCP"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         },

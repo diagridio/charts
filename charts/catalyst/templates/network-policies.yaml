@@ -1,0 +1,394 @@
+{{- /*
+Default-deny + explicit-allow NetworkPolicies for the Catalyst system
+namespaces: the release namespace (agent, gateway, management, piko, otel)
+and the internal Dapr namespace. Opt-in via networkPolicies.enabled — only
+useful on clusters whose CNI enforces NetworkPolicy (Calico, Cilium, ...).
+
+Project namespaces are NOT covered here: the agent generates their policies
+at provisioning time (see agent GetNetworkPolicies), always, regardless of
+this flag. This file is the system-namespace counterpart of those.
+
+Gotchas these policies encode:
+  * NetworkPolicy is evaluated after kube-proxy DNAT: traffic to the
+    kubernetes.default ClusterIP must be allowed against the real apiserver
+    endpoint IP, never the service IP.
+  * Webhook calls (dapr sidecar-injector/operator) originate FROM the API
+    server, outside the pod network — only an ipBlock can match them.
+  * Standard NetworkPolicy cannot match FQDNs, so control-plane egress is
+    "the internet, but nothing internal" (0.0.0.0/0 except private ranges).
+  * Cloud LB traffic to the gateway can arrive SNAT'd from node (private)
+    IPs, so the gateway ingress allow must not except RFC1918.
+*/}}
+{{- define "catalyst.netpol.privateRanges" -}}
+- ipBlock:
+    cidr: 10.0.0.0/8
+- ipBlock:
+    cidr: 172.16.0.0/12
+- ipBlock:
+    cidr: 192.168.0.0/16
+{{- end }}
+{{- define "catalyst.netpol.apiserverEgress" -}}
+{{- if .Values.networkPolicies.apiserver.endpointCIDR }}
+- to:
+  - ipBlock:
+      cidr: {{ .Values.networkPolicies.apiserver.endpointCIDR }}
+  ports:
+  - port: {{ .Values.networkPolicies.apiserver.port }}
+    protocol: TCP
+{{- else }}
+{{- /* endpoint unknown: whole private range pinned to the common apiserver
+       ports. Tighten via networkPolicies.apiserver.endpointCIDR, taken from
+       `kubectl get endpoints kubernetes -n default`. */}}
+- to:
+  {{- include "catalyst.netpol.privateRanges" . | nindent 2 }}
+  ports:
+  - port: 443
+    protocol: TCP
+  - port: 6443
+    protocol: TCP
+{{- end }}
+{{- end }}
+{{- if .Values.networkPolicies.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-all
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+# everything inside the release namespace may talk to everything inside it
+# (gateway->piko, gateway xDS, agent->management, otel scrapes, ...)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-internal
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress:
+  - from:
+    - podSelector: {}
+  egress:
+  - to:
+    - podSelector: {}
+---
+# sidecars in project namespaces dial piko (tunnel upstream) — mirror of the
+# agent-generated allow-egress-piko policy on the project side
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-from-projects-piko
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Values.piko.pikoName }}
+  policyTypes: [Ingress]
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          cra.diagrid.io/project-namespace: "true"
+---
+# sidecars in project namespaces call management — mirror of the generated
+# allow-egress-management policy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-from-projects-management
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: management
+  policyTypes: [Ingress]
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          cra.diagrid.io/project-namespace: "true"
+---
+# gateway envoy is the public entry point behind the cloud LB. Deliberately no
+# RFC1918 except-list: LB traffic can arrive SNAT'd from node (private) IPs.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-gateway
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: gateway-envoy
+  policyTypes: [Ingress]
+  ingress:
+  - from:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+---
+# the release namespace initiates into project namespaces (mirror of the
+# generated allow-system-ingress "floor" that admits it into every project ns)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-to-projects
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          cra.diagrid.io/project-namespace: "true"
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-dns
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - { port: 53, protocol: UDP }
+    - { port: 53, protocol: TCP }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-apiserver
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+  {{- include "catalyst.netpol.apiserverEgress" . | nindent 2 }}
+---
+# control plane, sentry, trust anchors, NATS, tunnel upstream, metrics/logs
+# push — all public endpoints reached by DNS name. "The internet, but nothing
+# internal": the excepts carve internal reachability back out so anything
+# in-cluster/in-VNet must get its own explicit allow.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-internet
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8       # RFC1918 — pod/service CIDRs and cloud VNet subnets
+        - 172.16.0.0/12    # RFC1918
+        - 192.168.0.0/16   # RFC1918
+        - 169.254.0.0/16   # link-local, incl. cloud metadata/IMDS endpoints
+---
+# internal Dapr control plane (agent installs it at runtime)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-internal-dapr
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: {{ .Values.cleanup.namespaces.dapr }}
+{{- if .Values.networkPolicies.postgres.namespace }}
+---
+# the agent creates/initializes the scheduler and managed-state-store
+# databases. Only the egress side: if the postgres namespace is itself
+# default-deny, its ingress allows are the operator's to manage (sidecars in
+# project namespaces also connect directly).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-postgres
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: {{ .Values.networkPolicies.postgres.namespace }}
+    ports:
+    - { port: 5432, protocol: TCP }
+{{- end }}
+{{- range $i, $rule := .Values.networkPolicies.extraEgress }}
+---
+# install-specific extra egress (networkPolicies.extraEgress[{{ $i }}])
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-extra-{{ $i }}
+  namespace: {{ $.Release.Namespace }}
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+  - to:
+    - ipBlock:
+        cidr: {{ $rule.cidr }}
+    {{- with $rule.ports }}
+    ports:
+    {{- range . }}
+    - port: {{ .port }}
+      protocol: {{ .protocol | default "TCP" }}
+    {{- end }}
+    {{- end }}
+{{- end }}
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# Internal Dapr namespace. The agent installs Dapr there at runtime, but the
+# namespace must exist now for the policies below to apply — pre-create it.
+# The lookup guard skips the manifest when the namespace already exists (on
+# established installs the agent created it, and helm refuses to adopt
+# resources it doesn't own). resource-policy: keep stops helm from deleting
+# it out from under the runtime install on uninstall or on upgrades that drop
+# it from the release; the cleanup post-delete hook owns its teardown.
+# ─────────────────────────────────────────────────────────────────────────────
+{{- if not (lookup "v1" "Namespace" "" .Values.cleanup.namespaces.dapr) }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.cleanup.namespaces.dapr }}
+  annotations:
+    helm.sh/resource-policy: keep
+---
+{{- end }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-all
+  namespace: {{ .Values.cleanup.namespaces.dapr }}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+# placement raft, scheduler etcd peers, operator<->injector, intra-ns scrapes
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-internal
+  namespace: {{ .Values.cleanup.namespaces.dapr }}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+  ingress:
+  - from:
+    - podSelector: {}
+  egress:
+  - to:
+    - podSelector: {}
+---
+# daprd sidecars dial sentry (certs), operator (component streams), placement
+# (actors), scheduler (jobs/workflows) — mirror of the generated
+# allow-dapr-root-access egress in every project namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-from-projects
+  namespace: {{ .Values.cleanup.namespaces.dapr }}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          cra.diagrid.io/project-namespace: "true"
+---
+# gateway identity-injector fetches certs from sentry; otel collectors in the
+# release namespace scrape control-plane metrics
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-from-{{ .Release.Namespace }}
+  namespace: {{ .Values.cleanup.namespaces.dapr }}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: {{ .Release.Namespace }}
+---
+# the sidecar-injector (mutating webhook) and operator (conversion/validating
+# webhooks) are called BY the API server; that traffic originates outside the
+# pod network (konnectivity agents, hostNetwork apiservers, node IPs) so only
+# an ipBlock can match it — scoped to just the webhook-serving components
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-webhooks
+  namespace: {{ .Values.cleanup.namespaces.dapr }}
+spec:
+  podSelector:
+    matchExpressions:
+    - key: app
+      operator: In
+      values: [dapr-sidecar-injector, dapr-operator]
+  policyTypes: [Ingress]
+  ingress:
+  - from:
+    {{- include "catalyst.netpol.privateRanges" . | nindent 4 }}
+---
+# operator/injector/sentry watch Kubernetes resources; DNS for service lookups
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-dns-apiserver
+  namespace: {{ .Values.cleanup.namespaces.dapr }}
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - { port: 53, protocol: UDP }
+    - { port: 53, protocol: TCP }
+  {{- include "catalyst.netpol.apiserverEgress" . | nindent 2 }}
+---
+# the control plane initiates connections into project namespaces — the
+# generated project policies explicitly admit ingress from the Dapr namespace,
+# so mirror that here as egress
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-to-projects
+  namespace: {{ .Values.cleanup.namespaces.dapr }}
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          cra.diagrid.io/project-namespace: "true"
+{{- end }}

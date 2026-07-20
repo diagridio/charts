@@ -188,3 +188,68 @@ tests:
           path: data["config.yaml"]
           pattern: "default_managed_pubsub_type: kafka-shared-selfhosted"
         template: agent/configmap.yaml
+
+  # ---------------------------------------------------------------------------
+  # Managed Redis
+  # ---------------------------------------------------------------------------
+  - it: redis is disabled by default and default_managed_redis_type is not emitted
+    set:
+      join_token: "test-token"
+    asserts:
+      - notMatchRegex:
+          path: data["config.yaml"]
+          pattern: "default_managed_redis_type"
+        template: agent/configmap.yaml
+
+  - it: redis create=true renders self-hosted redis + selfhosted passthrough
+    set:
+      join_token: "test-token"
+      global.redis.disabled: false
+      global.redis.create: true
+      global.redis.selfhosted.replica_count: 3
+      global.redis.selfhosted.persistence_storage_size: 5Gi
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "default_managed_redis_type: redis-shared-selfhosted"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "replica_count: 3"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "persistence_storage_size: 5Gi"
+        template: agent/configmap.yaml
+
+  - it: redis create=false renders external redis with connection + enabled
+    set:
+      join_token: "test-token"
+      global.redis.disabled: false
+      global.redis.create: false
+      global.redis.external.host: redis.example.com
+      global.redis.external.port: 6379
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "default_managed_redis_type: redis-shared-external"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "host: redis.example.com"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "enabled: true"
+        template: agent/configmap.yaml
+
+  - it: redis disabled override keeps the field not emitted even if create is set
+    set:
+      join_token: "test-token"
+      global.redis.create: true
+      global.redis.disabled: true
+    asserts:
+      - notMatchRegex:
+          path: data["config.yaml"]
+          pattern: "default_managed_redis_type"
+        template: agent/configmap.yaml

@@ -482,10 +482,29 @@ Empty sub-config dicts are falsy in Helm, so callers gate on them with `if`.
   {{- $psExternal = deepCopy (dig "external" dict $gkafka) -}}
   {{- $_ := set $psExternal "enabled" true -}}
 {{- end -}}
+{{- /* ---------- Redis (managed shared backing service) ---------- */ -}}
+{{- /* Defaults to disabled (opt-in),
+       so existing overlays without global.redis resolve to redis-shared-disabled
+       and the agent ConfigMap emits nothing (see agent/configmap.yaml). */ -}}
+{{- $gredis := dig "redis" dict $global -}}
+{{- $rType := "redis-shared-disabled" -}}
+{{- $rSelfhosted := dict -}}
+{{- $rExternal := dict -}}
+{{- if dig "disabled" true $gredis -}}
+  {{- $rType = "redis-shared-disabled" -}}
+{{- else if dig "create" false $gredis -}}
+  {{- $rType = "redis-shared-selfhosted" -}}
+  {{- $rSelfhosted = dig "selfhosted" dict $gredis -}}
+{{- else -}}
+  {{- $rType = "redis-shared-external" -}}
+  {{- $rExternal = deepCopy (dig "external" dict $gredis) -}}
+  {{- $_ := set $rExternal "enabled" true -}}
+{{- end -}}
 {{- $out := dict
     "stateStore" (dict "type" $ssType "selfhosted" $ssSelfhosted "external" $ssExternal)
     "scheduler" (dict "backend_type" $outBackend "managed_postgresql" $outManaged "external_postgresql" $outExternal)
     "pubsub" (dict "type" $psType "selfhosted" $psSelfhosted "external" $psExternal)
+    "redis" (dict "type" $rType "selfhosted" $rSelfhosted "external" $rExternal)
 -}}
 {{- $out | toYaml -}}
 {{- end -}}
@@ -525,6 +544,13 @@ so operators get the error at `helm template` time rather than a CrashLoop later
 {{- if eq $r.pubsub.type "kafka-shared-external" -}}
   {{- if not (dig "enabled" false $r.pubsub.external) -}}
     {{- fail "An external Kafka (global.kafka.create: false, or default_managed_pubsub_type: kafka-shared-external) requires external_kafka.enabled: true with brokers configured under global.kafka.external." -}}
+  {{- end -}}
+{{- end -}}
+{{- /* External Redis must have a connection host. Deeper validation stays with
+       the agent. Only trips when global.redis.create: false, disabled: false. */ -}}
+{{- if eq $r.redis.type "redis-shared-external" -}}
+  {{- if not (dig "host" "" $r.redis.external) -}}
+    {{- fail "An external Redis (global.redis.create: false, disabled: false) requires a connection host. Set global.redis.external.host (and port), or global.redis.external.existing_secret_name." -}}
   {{- end -}}
 {{- end -}}
 {{- end -}}
