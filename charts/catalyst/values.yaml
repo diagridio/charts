@@ -562,6 +562,36 @@ agent:
       internal_cortex_endpoint: ""
       internal_cortex_org_id: common
       loki_enabled: true
+      # metrics_private_export forwards a subset of collected metrics to a
+      # private, customer-owned OTLP endpoint, in addition to the Diagrid Cortex
+      # path (metrics_endpoint above). Private-region only; inert unless enabled.
+      metrics_private_export:
+        enabled: false
+        # endpoint is the private OTLP/HTTP metrics destination (full URL).
+        endpoint: ""
+        # tls_insecure skips TLS verification for the private endpoint.
+        tls_insecure: false
+        # include selects which metrics are forwarded, matched per match_type.
+        include: []
+        # match_type controls how include entries match: "strict" (exact names,
+        # default) or "regexp" (RE2 patterns).
+        match_type: strict
+        # strip_labels drops the listed labels from forwarded metrics; the
+        # Diagrid Cortex export keeps all labels.
+        strip_labels: []
+        # transform is an optional list of rules to rename forwarded metrics
+        # and/or their labels. Each entry: include (metric name or RE2 pattern),
+        # match_type ("strict" default / "regexp"), action ("update" default /
+        # "insert"), new_name (rename the metric; regexp captures via the
+        # collector's $${n} syntax), and operations (label renames — each
+        # {action, label, new_label}; only "update_label" is supported and is
+        # assumed when action is omitted).
+        transform: []
+        # credential_secret_name is a Kubernetes Secret holding the bearer token
+        # for the private endpoint; empty means no Authorization header.
+        # credential_secret_key is the key within it (default "token").
+        credential_secret_name: ""
+        credential_secret_key: token
       logs_resources:
         limits:
           memory: 750Mi

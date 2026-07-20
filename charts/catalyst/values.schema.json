@@ -483,7 +483,133 @@
                 },
                 "config": {
                     "type": "object",
-                    "description": "Agent configuration written to ConfigMap"
+                    "description": "Agent configuration written to ConfigMap",
+                    "properties": {
+                        "otel": {
+                            "type": "object",
+                            "properties": {
+                                "metrics_private_export": {
+                                    "type": "object",
+                                    "description": "Forward a subset of collected metrics to a private, customer-owned OTLP endpoint, in addition to the Diagrid Cortex path. Private-region only; inert unless enabled.",
+                                    "properties": {
+                                        "enabled": {
+                                            "type": "boolean",
+                                            "default": false,
+                                            "description": "Enables forwarding to the private endpoint."
+                                        },
+                                        "endpoint": {
+                                            "type": "string",
+                                            "description": "Private OTLP/HTTP metrics destination (full URL)."
+                                        },
+                                        "tls_insecure": {
+                                            "type": "boolean",
+                                            "default": false,
+                                            "description": "Skips TLS verification for the private endpoint."
+                                        },
+                                        "include": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            },
+                                            "description": "Metric names (or RE2 patterns when match_type is regexp) to forward."
+                                        },
+                                        "match_type": {
+                                            "type": "string",
+                                            "enum": [
+                                                "strict",
+                                                "regexp"
+                                            ],
+                                            "default": "strict",
+                                            "description": "How include entries are matched: exact names (strict) or RE2 patterns (regexp)."
+                                        },
+                                        "strip_labels": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            },
+                                            "description": "Labels to drop from forwarded metrics; the Diagrid Cortex export is unaffected."
+                                        },
+                                        "transform": {
+                                            "type": "array",
+                                            "description": "Rules to rename forwarded metrics and/or their labels; applied only to the private export. Each entry renames the metric (new_name) and/or labels (operations).",
+                                            "items": {
+                                                "type": "object",
+                                                "required": [
+                                                    "include"
+                                                ],
+                                                "properties": {
+                                                    "include": {
+                                                        "type": "string",
+                                                        "description": "Metric name, or RE2 pattern when match_type is regexp, to transform."
+                                                    },
+                                                    "match_type": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "strict",
+                                                            "regexp"
+                                                        ],
+                                                        "default": "strict",
+                                                        "description": "How include matches: exact name (strict) or RE2 pattern (regexp)."
+                                                    },
+                                                    "action": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "update",
+                                                            "insert"
+                                                        ],
+                                                        "default": "update",
+                                                        "description": "update renames in place; insert emits a renamed copy alongside the original."
+                                                    },
+                                                    "new_name": {
+                                                        "type": "string",
+                                                        "description": "Resulting metric name. With match_type regexp it may reference capture groups using the collector's $${n} syntax."
+                                                    },
+                                                    "operations": {
+                                                        "type": "array",
+                                                        "description": "Label operations. Only update_label (rename a label) is supported today.",
+                                                        "items": {
+                                                            "type": "object",
+                                                            "required": [
+                                                                "label",
+                                                                "new_label"
+                                                            ],
+                                                            "properties": {
+                                                                "action": {
+                                                                    "type": "string",
+                                                                    "enum": [
+                                                                        "update_label"
+                                                                    ],
+                                                                    "default": "update_label",
+                                                                    "description": "Operation action; only update_label is supported and is assumed when omitted."
+                                                                },
+                                                                "label": {
+                                                                    "type": "string",
+                                                                    "description": "Existing label name to rename."
+                                                                },
+                                                                "new_label": {
+                                                                    "type": "string",
+                                                                    "description": "New label name."
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        "credential_secret_name": {
+                                            "type": "string",
+                                            "description": "Name of a Kubernetes Secret holding the bearer token for the private endpoint. Empty means no Authorization header."
+                                        },
+                                        "credential_secret_key": {
+                                            "type": "string",
+                                            "default": "token",
+                                            "description": "Key within credential_secret_name that holds the token."
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 },
                 "metrics": {
                     "type": "object",

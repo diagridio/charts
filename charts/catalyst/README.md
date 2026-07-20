@@ -150,7 +150,7 @@ By default, this is the full list of images that are installed in your cluster:
 | **Envoy Proxy** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy/envoyproxy/envoy:distroless-v1.38.0` | Envoy proxy for gateway |
 | **Catalyst** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.77.0` | Consolidated Catalyst services image |
 | **Piko** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/diagrid-piko:v1.0.1` | Piko reverse tunneling service |
-| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.18.2-rc.2-catalyst.1` | Catalyst Dapr control plane services |
+| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.19.0-20260715-catalyst.1` | Catalyst Dapr control plane services |
 | **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.77.0` | Catalyst dapr server |
 | **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.77.0` | OTel collector for telemetry |
 
@@ -179,7 +179,7 @@ The Agent provisions these at runtime:
 |-----------|--------------|-------------|
 | **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/sidecar:1.77.0` | Catalyst dapr server |
 | **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-otel-collector:1.77.0` | OTel collector for telemetry |
-| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.18.2-rc.2-catalyst.1` | Catalyst Dapr control plane services |
+| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.19.0-20260715-catalyst.1` | Catalyst Dapr control plane services |
 
 #### Optional Images
 
@@ -595,9 +595,72 @@ global:
     external: {}   # brokers, auth_type, sasl_* when create: false
 ```
 
-### OpenTelemetry Collector (Optional)
+### OpenTelemetry
 
-Catalyst includes optional OpenTelemetry Collector addons for collecting and exporting telemetry. See the [official documentation](https://opentelemetry.io/docs/collector/configuration/) for configuration details.
+#### Agent Metrics Export
+
+A **private** region can forward the metrics collected by the catalyst agent to an external, customer-owned OTLP/HTTP endpoint to facilitate integration with existing montoring and alerting system.
+
+These metrics include [dapr runtime metrics](https://github.com/dapr/dapr/blob/master/docs/development/dapr-metrics.md#dapr-runtime-metrics) (`dapr_*`) and catalyst metrics (`metrics_*`).
+
+You can rename metrics and their labels before exporting them using the `transform` block, a subset of the collector's [metricstransform processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/metricstransformprocessor). Each entry selects metrics with `include` (and `match_type`) and either renames the metric via `new_name` or renames labels via `operations`. Only the `update_label` operation is supported today (assumed when `action` is omitted). Notice that `include` and `strip_labels` apply to the original metric and label names, before any transformation is applied.
+
+Configure it under `agent.config.otel.metrics_private_export`:
+
+```yaml
+agent:
+  config:
+    otel:
+      metrics_private_export:
+        enabled: true
+        # Private OTLP/HTTP metrics destination (full URL).
+        endpoint: https://otlp.customer.example.com/v1/metrics
+        tls_insecure: false
+        # Which metrics to forward, matched per match_type.
+        include:
+          - dapr_runtime_workflow_execution_count
+          - dapr_runtime_workflow_activity_execution_count
+          - metrics_workflow_workers_connected
+        # "strict" (exact names, default) or "regexp" (RE2 patterns).
+        match_type: strict
+        # Labels to drop before forwarding (the Diagrid export keeps all labels).
+        strip_labels:
+          - diagridio_org_id
+        # rename metrics and/or their labels before exporting
+        transform:
+          # rename every catalyst metric: metrics_* -> catalyst_*
+          - include: ^metrics_(.*)$
+            match_type: regexp
+            action: update
+            new_name: catalyst_$${1}
+          # rename a label on a specific metric
+          - include: catalyst_conversation_tokens_total
+            operations:
+              - action: update_label
+                label: app_id
+                new_label: application_id
+        # Bearer token, referenced from an existing Kubernetes Secret.
+        credential_secret_name: my-otlp-token
+        credential_secret_key: token
+```
+
+| Key | Description |
+|-----|-------------|
+| `enabled` | Turns the private export on. |
+| `endpoint` | Private OTLP/HTTP metrics destination URL. |
+| `tls_insecure` | Skips TLS verification for the endpoint. |
+| `include` | Metrics to be forwared by name of regexp patterns depending on `match_type` |
+| `match_type` | `strict` (exact names, default) or `regexp` (RE2 patterns). |
+| `strip_labels` | Labels to be removed from the forwarded metrics. |
+| `transform` | Rules to rename metrics (`new_name`) and/or labels (`operations`, `update_label` only). Each entry: `include`, `match_type`, `action` (`update`/`insert`), `new_name`, `operations` (`label`, `new_label`). |
+| `credential_secret_name` | Name of an existing Kubernetes Secret in the collector namespace holding the bearer token. Leave empty for an endpoint that needs no auth. |
+| `credential_secret_key` | Key within that Secret (default `token`). |
+
+#### Collector addons
+
+Catalyst includes optional OpenTelemetry Collector addons for collecting and exporting telemetry. This gives total control of the telemetry to be collected and their destination.
+
+See the [official documentation](https://opentelemetry.io/docs/collector/configuration/) for configuration details.
 
 To emit traces from Dapr apps into the collector (or any other OTLP backend), see the [tracing guide](../../guides/tracing/README.md) — tracing is enabled per App ID via the Diagrid CLI, not through chart values.
 
