@@ -48,11 +48,21 @@
         "managed_state_store_type" $ss.type
       ) -}}
   {{- /* External path: the agent uses project.external_postgresql whenever it is
-         enabled. Its existing-secret carries the full connection tuple (keys:
-         host, port, username, password), which management reuses. When external
-         Postgres is enabled but configured inline (no existing_secret_name),
-         credentials can't be auto-derived here — set an explicit
-         management.config.region_postgresql override instead. The region
+         enabled, and management reuses the same region master credentials to
+         connect to db_region. Two credential shapes are supported, mirroring the
+         agent (services/catalyst/agent/pkg/config/postgresql):
+
+           1. existing_secret_name — the secret carries the full connection tuple
+              (keys: host, port, username, password); management reads it at
+              startup (region.Config.ResolveSecret).
+           2. inline connectionString — connection_string_host/port/username/
+              password set directly on the values; we map them onto the region
+              config's host/port/username/password, so no secret is required.
+
+         disable_tls/max_conns are propagated from the same external block so
+         management's connection settings track the agent's exactly. AWS IAM auth
+         (no static password) can't be auto-derived — set an explicit
+         management.config.region_postgresql override in that case. The region
          database name is a fixed invariant owned by the agent
          (mcpstore.RegionDatabaseName), so it is not set here. */ -}}
   {{- else if and (dig "enabled" false $extPg) (dig "existing_secret_name" "" $extPg) -}}
@@ -62,6 +72,16 @@
         "max_conns" (dig "max_conns" 2 $extPg)
         "existing_secret_name" $extPg.existing_secret_name
         "existing_secret_namespace" (default .Release.Namespace (dig "existing_secret_namespace" "" $extPg))
+      ) -}}
+  {{- else if and (dig "enabled" false $extPg) (dig "connection_string_host" "" $extPg) (dig "connection_string_password" "" $extPg) -}}
+    {{- $_ := set $configMap "region_postgresql" (dict
+        "enabled" true
+        "disable_tls" (dig "disable_tls" false $extPg)
+        "max_conns" (dig "max_conns" 2 $extPg)
+        "host" $extPg.connection_string_host
+        "port" (dig "connection_string_port" 5432 $extPg)
+        "username" (dig "connection_string_username" "" $extPg)
+        "password" $extPg.connection_string_password
       ) -}}
   {{- end -}}
 {{- end -}}

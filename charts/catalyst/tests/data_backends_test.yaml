@@ -71,6 +71,122 @@ tests:
         template: management/configmap.yaml
 
   # ---------------------------------------------------------------------------
+  # Inline external Postgres (connectionString, no existing_secret_name):
+  # management must still derive region_postgresql from the inline connection
+  # fields so the MCP capability store is available. Regression test for the
+  # bug where inline creds produced no region_postgresql block.
+  # ---------------------------------------------------------------------------
+  - it: inline external Postgres derives management region_postgresql from connection_string_* fields
+    set:
+      join_token: "test-token"
+      agent.config.project.default_managed_state_store_type: postgresql-shared-external
+      agent.config.project.external_postgresql.enabled: true
+      agent.config.project.external_postgresql.auth_type: connectionString
+      agent.config.project.external_postgresql.connection_string_host: postgres-postgresql.postgres.svc.cluster.local
+      agent.config.project.external_postgresql.connection_string_port: 5432
+      agent.config.project.external_postgresql.connection_string_username: postgres
+      agent.config.project.external_postgresql.connection_string_password: postgres
+      agent.config.project.external_postgresql.disable_tls: true
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "region_postgresql:"
+        template: management/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "enabled: true"
+        template: management/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "host: postgres-postgresql.postgres.svc.cluster.local"
+        template: management/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "username: postgres"
+        template: management/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "password: postgres"
+        template: management/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "disable_tls: true"
+        template: management/configmap.yaml
+      # Inline creds must not be mistaken for a secret reference.
+      - notMatchRegex:
+          path: data["config.yaml"]
+          pattern: "existing_secret_name"
+        template: management/configmap.yaml
+
+  # ---------------------------------------------------------------------------
+  # Inline external Postgres with AWS IAM auth (no static password): management
+  # cannot derive credentials (no password to connect with), so it must NOT emit
+  # a region_postgresql block — otherwise it would fail region.Config.Validate
+  # at boot. This case falls through to an explicit override. Guards the
+  # connection_string_password gate on the inline branch above.
+  # ---------------------------------------------------------------------------
+  - it: inline external Postgres with awsiam auth does not derive management region_postgresql
+    set:
+      join_token: "test-token"
+      agent.config.project.default_managed_state_store_type: postgresql-shared-external
+      agent.config.project.external_postgresql.enabled: true
+      agent.config.project.external_postgresql.auth_type: awsiam
+      agent.config.project.external_postgresql.connection_string_host: mydb.rds.amazonaws.com
+      agent.config.project.external_postgresql.connection_string_port: 5432
+      agent.config.project.external_postgresql.connection_string_username: iamuser
+    asserts:
+      - notMatchRegex:
+          path: data["config.yaml"]
+          pattern: "region_postgresql"
+        template: management/configmap.yaml
+
+  # ---------------------------------------------------------------------------
+  # Explicit management.config.region_postgresql override always wins over the
+  # auto-derivation (hasKey short-circuit), even when a self-hosted state store
+  # would otherwise be derived.
+  # ---------------------------------------------------------------------------
+  - it: explicit management region_postgresql override wins over auto-derivation
+    set:
+      join_token: "test-token"
+      agent.config.project.default_managed_state_store_type: postgresql-shared-selfhosted
+      management.config.region_postgresql.enabled: true
+      management.config.region_postgresql.host: override-host
+      management.config.region_postgresql.port: 6543
+      management.config.region_postgresql.username: overrideuser
+      management.config.region_postgresql.password: overridepass
+      management.config.region_postgresql.disable_tls: true
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "host: override-host"
+        template: management/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "port: 6543"
+        template: management/configmap.yaml
+      # The derived self-hosted marker must NOT appear — the override replaces it.
+      - notMatchRegex:
+          path: data["config.yaml"]
+          pattern: "managed_state_store_type: postgresql-shared-selfhosted"
+        template: management/configmap.yaml
+
+  # ---------------------------------------------------------------------------
+  # Disabled Postgres: no managed backend, so management emits no
+  # region_postgresql block and the MCP capability store is simply unavailable
+  # (management runs degraded rather than failing to boot).
+  # ---------------------------------------------------------------------------
+  - it: disabled Postgres emits no management region_postgresql
+    set:
+      join_token: "test-token"
+      global.postgresql.disabled: true
+      agent.config.internal_dapr.scheduler.backend_type: etcd
+    asserts:
+      - notMatchRegex:
+          path: data["config.yaml"]
+          pattern: "region_postgresql"
+        template: management/configmap.yaml
+
+  # ---------------------------------------------------------------------------
   # Disabled Postgres + etcd scheduler (documented opt-out)
   # ---------------------------------------------------------------------------
   - it: disabled Postgres with etcd scheduler renders disabled state store + etcd

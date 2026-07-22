@@ -189,7 +189,7 @@ By default, this is the full list of images that are installed in your cluster:
 | **Envoy Proxy** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy/envoyproxy/envoy:distroless-v1.38.0` | Envoy proxy for gateway |
 | **Catalyst** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.77.0` | Consolidated Catalyst services image |
 | **Piko** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/diagrid-piko:v1.0.1` | Piko reverse tunneling service |
-| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.19.0-20260715-catalyst.1` | Catalyst Dapr control plane services |
+| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.19.0-20260720-catalyst.1` | Catalyst Dapr control plane services |
 | **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.77.0` | Catalyst dapr server |
 | **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.77.0` | OTel collector for telemetry |
 
@@ -218,7 +218,7 @@ The Agent provisions these at runtime:
 |-----------|--------------|-------------|
 | **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/sidecar:1.77.0` | Catalyst dapr server |
 | **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-otel-collector:1.77.0` | OTel collector for telemetry |
-| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.19.0-20260715-catalyst.1` | Catalyst Dapr control plane services |
+| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.19.0-20260720-catalyst.1` | Catalyst Dapr control plane services |
 
 #### Optional Images
 
