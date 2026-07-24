@@ -588,7 +588,7 @@ reminders, and workflow triggers. It supports two backends:
 > [!IMPORTANT]
 > The PostgreSQL scheduler uses **logical replication** — the database backing it
 > (global or dedicated) must meet the
-> [logical replication requirements](#external-postgresql-logical-replication-requirements)
+> [logical replication requirements](#logical-replication-requirements-external-postgresql)
 > above: `wal_level = logical` plus replication permission for the connecting user.
 
 **PostgreSQL scheduler**
