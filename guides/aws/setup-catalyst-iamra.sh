@@ -3,11 +3,11 @@
 # setup-catalyst-iamra.sh
 #
 # Bootstraps the AWS side of Catalyst's IAM Roles Anywhere integration:
-#   1. Resolves the App ID's SPIFFE ID, the project's Catalyst region, and that
+#   1. Resolves the app's SPIFFE ID, the project's Catalyst region, and that
 #      region's trust (CA) endpoint via the `diagrid` CLI.
 #   2. Registers the region's Diagrid CA as a Roles Anywhere Trust Anchor.
 #   3. Creates an IAM role whose trust policy lets IAM Roles Anywhere assume it
-#      ONLY for that App ID's exact SPIFFE ID (URI SAN).
+#      ONLY for that app's exact SPIFFE ID (URI SAN).
 #   4. Creates a Roles Anywhere profile pointing at that role.
 #
 # It STOPS after creating the profile. It does NOT create the Catalyst component
@@ -21,16 +21,16 @@ set -euo pipefail
 AWS_PROFILE=""        # optional; falls back to the ambient AWS env/credentials
 REGION="us-east-1"    # AWS region for the trust anchor (not the Catalyst region)
 PROJECT=""            # required
-APPID=""              # required
+APP=""                # required
 SHOW_EXAMPLE=false    # print the end-to-end DynamoDB wiring example at the end
 
 usage() {
   cat <<'EOF'
-Usage: setup-catalyst-iamra.sh --project NAME --appid NAME [options]
+Usage: setup-catalyst-iamra.sh --project NAME --app NAME [options]
 
 Required:
-  --project NAME      Catalyst project the App ID belongs to
-  --appid NAME        Catalyst App ID to bind the IAM role to
+  --project NAME      Catalyst project the app belongs to
+  --app NAME          Catalyst app to bind the IAM role to
 
 Options:
   --aws-profile NAME  AWS CLI profile (default: ambient AWS env/credentials)
@@ -46,7 +46,7 @@ while [[ $# -gt 0 ]]; do
     --aws-profile) AWS_PROFILE="$2"; shift 2 ;;
     --region)      REGION="$2"; shift 2 ;;
     --project)     PROJECT="$2"; shift 2 ;;
-    --appid)       APPID="$2"; shift 2 ;;
+    --app|--appid) APP="$2"; shift 2 ;;  # --appid kept as a compatible alias
     --show-example) SHOW_EXAMPLE=true; shift ;;
     -h|--help)     usage; exit 0 ;;
     *) echo "unknown argument: $1" >&2; usage >&2; exit 2 ;;
@@ -54,7 +54,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ -n "$PROJECT" ]] || { echo "error: --project is required" >&2; exit 2; }
-[[ -n "$APPID" ]]   || { echo "error: --appid is required" >&2; exit 2; }
+[[ -n "$APP" ]]     || { echo "error: --app is required" >&2; exit 2; }
 
 for bin in aws jq curl diagrid; do
   command -v "$bin" >/dev/null 2>&1 || { echo "error: '$bin' not found on PATH" >&2; exit 1; }
@@ -69,11 +69,13 @@ TMPDIR="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR"' EXIT
 
 # ---- 1. resolve identifiers via diagrid ------------------------------------
-echo "==> Resolving SPIFFE ID for App ID '${APPID}' in project '${PROJECT}'"
-SPIFFE_ID="$(diagrid appid get "$APPID" --project "$PROJECT" -o json | jq -r '.status.spiffeId // empty')"
+echo "==> Resolving SPIFFE ID for app '${APP}' in project '${PROJECT}'"
+# `diagrid app get` does not expose the SPIFFE ID; the legacy `appid` resource
+# is the only place `.status.spiffeId` is surfaced today.
+SPIFFE_ID="$(diagrid appid get "$APP" --project "$PROJECT" -o json | jq -r '.status.spiffeId // empty')"
 if [[ -z "$SPIFFE_ID" ]]; then
-  echo "error: could not resolve a SPIFFE ID for App ID '${APPID}'." >&2
-  echo "       Is it placed/ready? Try: diagrid appid get ${APPID} --project ${PROJECT}" >&2
+  echo "error: could not resolve a SPIFFE ID for app '${APP}'." >&2
+  echo "       Is it placed/ready? Try: diagrid appid get ${APP} --project ${PROJECT}" >&2
   exit 1
 fi
 echo "    SPIFFE ID: ${SPIFFE_ID}"
@@ -101,7 +103,7 @@ WILDCARD_DOMAIN="${HOST#\*.}"
 # Region CA (trust) endpoint, mirroring the control plane's well-known name.
 CA_URL="${SCHEME}://trust.${WILDCARD_DOMAIN}:${PORT}"
 TA_NAME="catalyst-${CATALYST_REGION}"
-ROLE_NAME="catalyst-${CATALYST_REGION}-${PROJECT}-${APPID}"
+ROLE_NAME="catalyst-${CATALYST_REGION}-${PROJECT}-${APP}"
 echo "    CA endpoint: ${CA_URL}"
 echo "    Trust anchor name: ${TA_NAME}"
 echo "    IAM role name: ${ROLE_NAME}"
@@ -167,7 +169,7 @@ if "${AWS[@]}" iam get-role --role-name "$ROLE_NAME" >/dev/null 2>&1; then
 else
   "${AWS[@]}" iam create-role \
     --role-name "$ROLE_NAME" \
-    --description "Catalyst IAM Roles Anywhere role for App ID ${APPID}" \
+    --description "Catalyst IAM Roles Anywhere role for app ${APP}" \
     --assume-role-policy-document "file://$TMPDIR/role-trust.json" >/dev/null
   echo "    Created role"
 fi
@@ -266,7 +268,7 @@ diagrid component create dynamodb \\
   --metadata assumeRoleArn=${ROLE_ARN} \\
   --metadata trustAnchorArn=${TA_ARN} \\
   --metadata trustProfileArn=${PROFILE_ARN} \\
-  --scopes ${APPID} \\
+  --scopes ${APP} \\
   --wait
 ==============================================================================
 EOF
