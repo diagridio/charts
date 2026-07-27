@@ -116,11 +116,19 @@ variable "bastion_use_most_recent_ami" {
   default     = false
 }
 
-# Variable for the specific AMI name when not using most recent
+# Variable for the specific AMI name when not using most recent.
+# NOTE: Amazon deregisters old AL2023 AMIs over time, which makes `terraform plan`
+# fail with "Your query returned no results". When that happens, update this
+# default to a currently available AMI:
+#   aws ec2 describe-images --owners amazon \
+#     --filters "Name=name,Values=al2023-ami-2023.*-kernel-6.*-x86_64" \
+#     --query 'reverse(sort_by(Images,&CreationDate))[0].Name' --output text
+# or override it without editing this file:
+#   TF_VAR_bastion_specific_ami_name=<ami-name> make plan
 variable "bastion_specific_ami_name" {
   description = "Specific AMI name to use when use_most_recent_ami is false"
   type        = string
-  default     = "al2023-ami-2023.8.20250908.0-kernel-6.1-x86_64"
+  default     = "al2023-ami-2023.12.20260724.0-kernel-6.1-x86_64"
 }
 
 variable "ebs_csi_addon_version" {
