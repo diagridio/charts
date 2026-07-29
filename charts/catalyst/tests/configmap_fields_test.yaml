@@ -88,6 +88,98 @@ tests:
         template: management/configmap.yaml
 
   # -------------------------------------------------------------------------
+  # Per-service feature flags
+  #
+  # agent.config.featureflags and management.config.featureflags are merged over
+  # global.featureflags rather than discarded by it, and reach only their own
+  # service. Keeping a management-only flag out of the agent ConfigMap matters
+  # because the agent Deployment carries a checksum/cra-agent-config annotation,
+  # so any change to that ConfigMap restarts the agent.
+  # -------------------------------------------------------------------------
+  - it: should propagate management.config.featureflags to management configmap
+    set:
+      join_token: "test-token"
+      management.config.featureflags.management.workflow_active_metrics: true
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "workflow_active_metrics: true"
+        template: management/configmap.yaml
+
+  - it: should not leak management.config.featureflags into the agent configmap
+    set:
+      join_token: "test-token"
+      management.config.featureflags.management.workflow_active_metrics: true
+    asserts:
+      - notMatchRegex:
+          path: data["config.yaml"]
+          pattern: "workflow_active_metrics"
+        template: agent/configmap.yaml
+
+  - it: should propagate agent.config.featureflags to agent configmap
+    set:
+      join_token: "test-token"
+      agent.config.featureflags.sidecar.graceful_config_reload: false
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "graceful_config_reload: false"
+        template: agent/configmap.yaml
+
+  - it: should not leak agent.config.featureflags into the management configmap
+    set:
+      join_token: "test-token"
+      agent.config.featureflags.sidecar.graceful_config_reload: false
+    asserts:
+      - notMatchRegex:
+          path: data["config.yaml"]
+          pattern: "graceful_config_reload"
+        template: management/configmap.yaml
+
+  - it: should let management.config.featureflags win over global on key collision
+    set:
+      join_token: "test-token"
+      global.featureflags.management.workflow_active_metrics: false
+      management.config.featureflags.management.workflow_active_metrics: true
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "workflow_active_metrics: true"
+        template: management/configmap.yaml
+
+  # Regression guard: the merge must not drop legacy unscoped keys from
+  # global.featureflags. A flat key carries no namespace, so filtering
+  # global.featureflags by scope would silently reset it to its built-in default
+  # (true for workflow_graph_processing_ha) on existing installs.
+  - it: should keep legacy unscoped global flags alongside per-service flags
+    set:
+      join_token: "test-token"
+      global.featureflags.workflow_graph_processing_ha: false
+      management.config.featureflags.management.workflow_active_metrics: true
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "workflow_graph_processing_ha: false"
+        template: management/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "workflow_active_metrics: true"
+        template: management/configmap.yaml
+
+  - it: should render empty feature flags when neither surface is set
+    set:
+      join_token: "test-token"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "featureflags: \\{\\}"
+        template: management/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "featureflags: \\{\\}"
+        template: agent/configmap.yaml
+
+  # -------------------------------------------------------------------------
   # Sentry
   # -------------------------------------------------------------------------
   - it: should propagate sentry fields to agent configmap

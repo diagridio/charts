@@ -145,7 +145,9 @@ global:
     # "api://AzureADTokenExchange" for Microsoft Entra ID Workload Identity
     # Federation. Empty by default (no extra audiences). See the README.
     jwt_audiences: []
-  # Global feature flags
+  # Chart-wide feature flags, delivered to BOTH the agent and management
+  # ConfigMaps.  To scope a flag to one component, set agent.config.featureflags or
+  # management.config.featureflags instead
   featureflags: {}
   # Consolidated image allows you to use a single image for
   # all Catalyst components instead of individual images.
@@ -704,6 +706,9 @@ agent:
       burst: 10
     denylist:
       enabled: false
+    # Feature flags for the agent. Merged over global.featureflags and wins on key collision,
+    # use this to override a chart-wide flag for the agent alone.
+    # e.g. featureflags: {sidecar: {graceful_config_reload: false}}
     featureflags: {}
     # Sandbox feature configuration.
     sandbox:
@@ -1056,6 +1061,9 @@ management:
       enabled: false
     profiling:
       enabled: false
+    # Feature flags for the management service only. Merged over global.featureflags
+    # and wins on key collision.
+    # e.g. featureflags: {management: {workflow_active_metrics: true}}
     featureflags: {}
     # Reverse tunnel to the Piko server, enabling browser/control-plane
     # access to management without a direct inbound route.

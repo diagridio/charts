@@ -100,7 +100,13 @@
 {{- if and (eq .Values.global.secrets.provider "postgresql") (not .Values.global.secrets.postgresql.existingSecret) -}}
   {{- $_ := set $agentConfig "secrets_postgresql" .Values.global.secrets.postgresql -}}
 {{- end -}}
-{{- $_ := set $agentConfig "featureflags" .Values.global.featureflags -}}
+{{- /* Merge the per-service feature-flag surface over the chart-wide one, with
+       agent.config.featureflags winning on key collision. global.featureflags is
+       delivered whole because flat (unscoped) flag keys are still honored as a
+       fallback and cannot be routed by the chart — see the longer note in
+       templates/management/configmap.yaml. deepCopy guards against merge mutating
+       .Values for later templates. */ -}}
+{{- $_ := set $agentConfig "featureflags" (merge (deepCopy (.Values.agent.config.featureflags | default dict)) (.Values.global.featureflags | default dict)) -}}
 {{- /* Apply global registry override to nested image configurations */ -}}
 {{- if .Values.global.image.registry -}}
   {{- $_ := set $agentConfig.sidecar "image_registry" .Values.global.image.registry -}}

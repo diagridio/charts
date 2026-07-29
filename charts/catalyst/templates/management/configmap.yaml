@@ -12,7 +12,28 @@
 {{- if and (eq .Values.global.secrets.provider "postgresql") (not .Values.global.secrets.postgresql.existingSecret) -}}
   {{- $_ := set $configMap "secrets_postgresql" .Values.global.secrets.postgresql -}}
 {{- end -}}
-{{- $_ := set $configMap "featureflags" .Values.global.featureflags -}}
+{{- /* Feature flags come from two surfaces, merged rather than replaced.
+
+       global.featureflags is chart-wide and MUST be delivered whole to both the
+       agent and management ConfigMaps. Flag names are namespaced per consumer in
+       code (featureflags.sidecar.* read by the agent, featureflags.management.*
+       read by management), but the pre-split flat namespace (featureflags.<flag>)
+       is still honored as a fallback — see ReconcileLegacy in
+       services/catalyst/pkg/config/featureflags/provider.go. A flat key carries
+       no scope, so the chart cannot tell which service owns it; routing would
+       require duplicating the Go-side flag->scope tables here, which would drift.
+       Instead each service is handed the whole map and picks out the names it
+       owns, ignoring the rest.
+
+       management.config.featureflags is the per-service surface and wins on key
+       collision, matching the "more specific overrides" convention documented for
+       shared.scheduling in values.yaml. It accepts either shape: scoped
+       (management.workflow_active_metrics) resolves at top precedence, flat
+       (workflow_active_metrics) resolves via the legacy fallback.
+
+       deepCopy is required because merge mutates its first argument, which would
+       otherwise corrupt .Values for every template rendered after this one. */ -}}
+{{- $_ := set $configMap "featureflags" (merge (deepCopy (.Values.management.config.featureflags | default dict)) (.Values.global.featureflags | default dict)) -}}
 {{- /* Derive connect-only access to the shared region database (db_region) from
        the agent's managed Postgres credentials, so no separate management value
        is required: the agent provisions db_region with these same region master
