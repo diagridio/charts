@@ -3,7 +3,7 @@ name: catalyst
 icon: https://storage.googleapis.com/bkt-n-assets-common-us-central1/Diagrid_Logos/Diagrid.png
 description: Helm chart for Diagrid Catalyst
 type: application
-version: '1.80.0'
+version: '1.81.0'
 appVersion: '0.0.1'
 home: https://catalyst.diagrid.io
 dependencies:
@@ -21,3 +21,11 @@ dependencies:
     repository: "https://open-telemetry.github.io/opentelemetry-helm-charts"
     condition: opentelemetry-daemonset.enabled
     alias: opentelemetry-daemonset
+  # metrics-server - provides the metrics.k8s.io API the region CPU-usage
+  # collector reads pod usage from. Optional and off by default: private-region
+  # operators enable it (metrics-server.enabled=true) on clusters that do not
+  # already run one.
+  - name: metrics-server
+    version: "~3.12.x"
+    repository: "https://kubernetes-sigs.github.io/metrics-server/"
+    condition: metrics-server.enabled

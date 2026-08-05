@@ -43,6 +43,13 @@ spec:
   secretName: internal-ca
   privateKey:
     algorithm: ECDSA
+  # cert-manager would otherwise default this root to 90 days. This is the
+  # certificate consumers register as a trust anchor — AWS IAM Roles Anywhere,
+  # for one, stores a copy of it — so give it a long lifetime. The Sentry
+  # intermediate below rotates yearly underneath it without invalidating those
+  # anchors.
+  duration: 87600h  # 10 years
+  renewBefore: 720h # renew 30 days before
   issuerRef:
     name: selfsigned
     kind: ClusterIssuer

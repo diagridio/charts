@@ -1251,6 +1251,16 @@
                 }
             }
         },
+        "metrics-server": {
+            "type": "object",
+            "description": "Optional metrics-server subchart, providing the metrics.k8s.io API the region CPU-usage collector reads from. Off by default; enable on private-region clusters that do not already run a metrics-server. Additional keys pass through to the upstream kubernetes-sigs metrics-server chart.",
+            "properties": {
+                "enabled": {
+                    "type": "boolean",
+                    "default": false
+                }
+            }
+        },
         "cleanup": {
             "type": "object",
             "description": "Post-delete cleanup hook configuration",

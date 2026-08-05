@@ -1,0 +1,19 @@
+suite: Test optional metrics-server subchart
+templates:
+  - charts/metrics-server/templates/deployment.yaml
+
+tests:
+  # The metrics-server subchart is gated by `condition: metrics-server.enabled`
+  # (Chart.yaml), default false in values.yaml. helm-unittest cannot assert on a
+  # disabled subchart's templates (they are not rendered, so the reference errors
+  # as "not selected"), so the gate is verified positively: the metrics-server
+  # Deployment renders only in the enabled case below.
+  - it: should render the metrics-server deployment when enabled
+    set:
+      join_token: "test-token"
+      metrics-server.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: Deployment

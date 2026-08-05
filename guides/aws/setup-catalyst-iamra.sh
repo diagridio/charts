@@ -3,17 +3,24 @@
 # setup-catalyst-iamra.sh
 #
 # Bootstraps the AWS side of Catalyst's IAM Roles Anywhere integration:
-#   1. Resolves the app's SPIFFE ID, the project's Catalyst region, and that
-#      region's trust (CA) endpoint via the `diagrid` CLI.
-#   2. Registers the region's Diagrid CA as a Roles Anywhere Trust Anchor.
+#   1. Resolves the app's SPIFFE ID and the project's Catalyst region via the
+#      `diagrid` CLI.
+#   2. Registers the CA that signs the app's X.509 SVID as a Roles Anywhere
+#      Trust Anchor.
 #   3. Creates an IAM role whose trust policy lets IAM Roles Anywhere assume it
 #      ONLY for that app's exact SPIFFE ID (URI SAN).
 #   4. Creates a Roles Anywhere profile pointing at that role.
 #
+# This is for self-hosted (private) regions only. Their sidecars present the
+# identity issued by the in-region (data plane) Dapr Sentry, so the trust anchor
+# is the region's own CA — read straight off the Region resource
+# (`.status.trustAnchors`), with no call to the region's gateway, which may not
+# be reachable from here at all.
+#
 # It STOPS after creating the profile. It does NOT create the Catalyst component
 # — that command is printed at the end so you can wire it up by hand.
 #
-# Requirements: aws, jq, curl, and the diagrid CLI (logged in).
+# Requirements: aws, jq, and the diagrid CLI (logged in).
 
 set -euo pipefail
 
@@ -56,7 +63,7 @@ done
 [[ -n "$PROJECT" ]] || { echo "error: --project is required" >&2; exit 2; }
 [[ -n "$APP" ]]     || { echo "error: --app is required" >&2; exit 2; }
 
-for bin in aws jq curl diagrid; do
+for bin in aws jq diagrid; do
   command -v "$bin" >/dev/null 2>&1 || { echo "error: '$bin' not found on PATH" >&2; exit 1; }
 done
 
@@ -70,12 +77,13 @@ trap 'rm -rf "$TMPDIR"' EXIT
 
 # ---- 1. resolve identifiers via diagrid ------------------------------------
 echo "==> Resolving SPIFFE ID for app '${APP}' in project '${PROJECT}'"
-# `diagrid app get` does not expose the SPIFFE ID; the legacy `appid` resource
-# is the only place `.status.spiffeId` is surfaced today.
-SPIFFE_ID="$(diagrid appid get "$APP" --project "$PROJECT" -o json | jq -r '.status.spiffeId // empty')"
+# An App is a projection of a backing App ID, which is what carries the SPIFFE
+# ID. `diagrid app get` embeds it under status.appIds.
+SPIFFE_ID="$(diagrid app get "$APP" --project "$PROJECT" -o json \
+  | jq -r '.status.appIds[0].status.spiffeId // empty')"
 if [[ -z "$SPIFFE_ID" ]]; then
   echo "error: could not resolve a SPIFFE ID for app '${APP}'." >&2
-  echo "       Is it placed/ready? Try: diagrid appid get ${APP} --project ${PROJECT}" >&2
+  echo "       Is it placed/ready? Try: diagrid app get ${APP} --project ${PROJECT}" >&2
   exit 1
 fi
 echo "    SPIFFE ID: ${SPIFFE_ID}"
@@ -85,65 +93,100 @@ CATALYST_REGION="$(diagrid project get "$PROJECT" -o json | jq -r '.spec.region 
 [[ -n "$CATALYST_REGION" ]] || { echo "error: project '${PROJECT}' has no region in its spec" >&2; exit 1; }
 echo "    Catalyst region: ${CATALYST_REGION}"
 
-echo "==> Resolving trust endpoint from region '${CATALYST_REGION}'"
-INGRESS="$(diagrid region get "$CATALYST_REGION" -o json | jq -r '.spec.ingress // empty')"
-[[ -n "$INGRESS" ]] || { echo "error: region '${CATALYST_REGION}' has no ingress" >&2; exit 1; }
+echo "==> Reading the region CA from region '${CATALYST_REGION}'"
+REGION_JSON="$(diagrid region get "$CATALYST_REGION" -o json)"
+REGION_TYPE="$(jq -r '.spec.type // empty' <<<"$REGION_JSON")"
+[[ -n "$REGION_TYPE" ]] || { echo "error: region '${CATALYST_REGION}' has no type in its spec" >&2; exit 1; }
 
-# Ingress is "https://*.<wildcard-domain>:<port>" — derive scheme/domain/port.
-SCHEME="${INGRESS%%://*}"
-HOSTPORT="${INGRESS#*://}"; HOSTPORT="${HOSTPORT%%/*}"
-if [[ "$HOSTPORT" == *:* ]]; then
-  HOST="${HOSTPORT%:*}"; PORT="${HOSTPORT##*:}"
-else
-  HOST="$HOSTPORT"; PORT=""
+# Self-hosted regions are private, which is all this guide covers. A dedicated
+# region is private under the hood and the flow below would work unchanged — its
+# sidecars use the same in-region Dapr Sentry CA — but Diagrid operates those.
+# Only the public SaaS region signs app identities with a different CA (the
+# control plane Sentry's), where this trust anchor would not validate them.
+if [[ "$REGION_TYPE" != "private" ]]; then
+  echo "error: region '${CATALYST_REGION}' is of type '${REGION_TYPE}'." >&2
+  echo "       This script covers self-hosted (private) regions only." >&2
+  exit 1
 fi
-WILDCARD_DOMAIN="${HOST#\*.}"
-[[ -n "$PORT" ]] || { [[ "$SCHEME" == "https" ]] && PORT=443 || PORT=80; }
 
-# Region CA (trust) endpoint, mirroring the control plane's well-known name.
-CA_URL="${SCHEME}://trust.${WILDCARD_DOMAIN}:${PORT}"
+# The region host submits its Dapr Sentry CA bundle when it joins and the control
+# plane publishes it back inline on the Region status, so read it from there
+# rather than fetching the region gateway's trust endpoint — a private region's
+# ingress is often not reachable from where this runs.
+CA_PEM="$TMPDIR/diagrid-ca.pem"
+jq -r '.status.trustAnchors // empty' <<<"$REGION_JSON" > "$CA_PEM"
+if [[ ! -s "$CA_PEM" ]]; then
+  echo "error: region '${CATALYST_REGION}' publishes no .status.trustAnchors." >&2
+  echo "       Only regions that joined with a CA carry it. Check the region host" >&2
+  echo "       has finished joining: diagrid region get ${CATALYST_REGION}" >&2
+  exit 1
+fi
+
 TA_NAME="catalyst-${CATALYST_REGION}"
 ROLE_NAME="catalyst-${CATALYST_REGION}-${PROJECT}-${APP}"
-echo "    CA endpoint: ${CA_URL}"
+echo "    CA source: .status.trustAnchors (in-region Dapr Sentry CA)"
 echo "    Trust anchor name: ${TA_NAME}"
 echo "    IAM role name: ${ROLE_NAME}"
 
-# ---- 2. trust anchor (idempotent by name) ----------------------------------
-echo "==> Trust anchor '${TA_NAME}' in ${REGION}"
-TA_ARN="$("${AWS[@]}" rolesanywhere list-trust-anchors --region "$REGION" \
-  --query "trustAnchors[?name=='${TA_NAME}'].trustAnchorArn | [0]" --output text 2>/dev/null || true)"
-
-if [[ -z "$TA_ARN" || "$TA_ARN" == "None" ]]; then
-  echo "    Fetching CA bundle from ${CA_URL}"
-  curl -fsS "$CA_URL" -o "$TMPDIR/diagrid-ca.pem"
-
-  # AWS IAM Roles Anywhere only accepts RSA or ECDSA trust anchors. Fail fast
-  # with a clear message instead of AWS's opaque "Unsupported key type" when the
-  # region's CA is Ed25519 (private/dedicated regions) rather than RSA/ECDSA
-  # (public SaaS, e.g. pem.trust.diagrid.io).
-  if command -v openssl >/dev/null 2>&1; then
-    KEY_ALG="$(openssl x509 -in "$TMPDIR/diagrid-ca.pem" -noout -text 2>/dev/null \
+# AWS IAM Roles Anywhere only accepts RSA or ECDSA trust anchors. Fail fast with
+# a clear message instead of AWS's opaque "Unsupported key type": Dapr Sentry's
+# built-in self-signed CA is Ed25519, so the region has to be given an ECDSA
+# Dapr CA before its identities can be used with Roles Anywhere.
+if command -v openssl >/dev/null 2>&1; then
+  # `openssl x509` reads only the first certificate, and .status.trustAnchors is a
+  # bundle that may carry more than one root, so split it and check every
+  # certificate — AWS validates the whole bundle.
+  awk -v d="$TMPDIR" '/-----BEGIN CERTIFICATE-----/{n++} n>0{print > (d "/ca-split-" n ".pem")}' "$CA_PEM"
+  for cert in "$TMPDIR"/ca-split-*.pem; do
+    [[ -e "$cert" ]] || { echo "    warning: no certificate found in the CA bundle; letting AWS validate" >&2; break; }
+    KEY_ALG="$(openssl x509 -in "$cert" -noout -text 2>/dev/null \
       | sed -n 's/.*Public Key Algorithm: //p' | head -1)"
     case "$KEY_ALG" in
       *rsaEncryption*|*id-ecPublicKey*) : ;;  # supported
-      "") echo "    warning: could not parse CA key type; letting AWS validate" >&2 ;;
+      "") echo "    warning: could not parse a CA key type; letting AWS validate" >&2 ;;
       *)
-        echo "error: the region CA at ${CA_URL} uses key type '${KEY_ALG}'." >&2
+        echo "error: a certificate in the region CA bundle uses key type '${KEY_ALG}'." >&2
         echo "       AWS IAM Roles Anywhere supports only RSA or ECDSA trust anchors," >&2
-        echo "       so this region's Sentry PKI cannot be used with IAM Roles Anywhere." >&2
+        echo "       and Dapr Sentry's default self-signed CA is Ed25519. Give the" >&2
+        echo "       region an ECDSA Dapr CA and re-run — deploy it with" >&2
+        echo "         diagrid region deploy ... --enable-cert-manager-pki" >&2
+        echo "       or follow charts/guides/dapr-pki/README.md." >&2
         exit 1 ;;
     esac
-  fi
+  done
+fi
 
-  jq -n --arg name "$TA_NAME" --rawfile pem "$TMPDIR/diagrid-ca.pem" \
-    '{name:$name, source:{sourceType:"CERTIFICATE_BUNDLE", sourceData:{x509CertificateData:$pem}}, enabled:true}' \
-    > "$TMPDIR/trust-anchor.json"
+# ---- 2. trust anchor (idempotent by name) ----------------------------------
+echo "==> Trust anchor '${TA_NAME}' in ${REGION}"
+TA_ID="$("${AWS[@]}" rolesanywhere list-trust-anchors --region "$REGION" \
+  --query "trustAnchors[?name=='${TA_NAME}'].trustAnchorId | [0]" --output text 2>/dev/null || true)"
+
+jq -n --arg name "$TA_NAME" --rawfile pem "$CA_PEM" \
+  '{name:$name, source:{sourceType:"CERTIFICATE_BUNDLE", sourceData:{x509CertificateData:$pem}}, enabled:true}' \
+  > "$TMPDIR/trust-anchor.json"
+
+if [[ -z "$TA_ID" || "$TA_ID" == "None" ]]; then
   TA_ARN="$("${AWS[@]}" rolesanywhere create-trust-anchor --region "$REGION" \
     --cli-input-json "file://$TMPDIR/trust-anchor.json" \
     --query 'trustAnchor.trustAnchorArn' --output text)"
   echo "    Created: ${TA_ARN}"
 else
-  echo "    Reusing existing: ${TA_ARN}"
+  # The anchor is now a customer-owned CA that rotates independently of Diagrid,
+  # so reuse-by-name is not enough: refresh the bundle when it has drifted,
+  # otherwise sessions fail after a Dapr CA rotation with no visible cause.
+  EXISTING_TA="$("${AWS[@]}" rolesanywhere get-trust-anchor --region "$REGION" \
+    --trust-anchor-id "$TA_ID" --output json)"
+  EXISTING_PEM="$(jq -r '.trustAnchor.source.sourceData.x509CertificateData // empty' <<<"$EXISTING_TA")"
+  TA_ARN="$(jq -r '.trustAnchor.trustAnchorArn' <<<"$EXISTING_TA")"
+  if [[ "$(tr -d '[:space:]' <<<"$EXISTING_PEM")" == "$(tr -d '[:space:]' < "$CA_PEM")" ]]; then
+    echo "    Reusing existing: ${TA_ARN}"
+  else
+    echo "    CA bundle changed — updating existing anchor"
+    "${AWS[@]}" rolesanywhere update-trust-anchor --region "$REGION" \
+      --trust-anchor-id "$TA_ID" \
+      --source "$(jq -c '.source' "$TMPDIR/trust-anchor.json")" >/dev/null
+    echo "    Updated: ${TA_ARN}"
+  fi
 fi
 
 # ---- 3. IAM role + trust policy (idempotent by name) -----------------------

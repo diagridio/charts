@@ -54,6 +54,21 @@ rules:
   resources: ["pods/log"]
   verbs: ["get"]
 
+{{- if dig "region_usage" "enabled" false .Values.agent.config }}
+# Region CPU-usage collector (pkg/regionusage) lists PodMetrics from the
+# cluster metrics-server (metrics.k8s.io) across all Catalyst-managed namespaces
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+# The collector only measures namespaces carrying the cra.diagrid.io/managed
+# marker. ensureNamespace backfills that marker onto pre-existing infra
+# namespaces (root-dapr-system, shared-*, cra-agent) via a merge patch, which
+# needs patch on namespaces
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["patch"]
+{{- end }}
+
 # PVCs are touched in two flows:
 #   * teardown — single delete (vcluster handler) and deletecollection by
 #     label selector for dapr-scheduler-server / dapr-placement-server

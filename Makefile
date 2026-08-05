@@ -32,7 +32,7 @@ helm-lint: helm-prereqs ## Lint the helm chart
 	--set join_token="fake_token"
 
 .PHONY: helm-test
-helm-test: ## Run helm unit tests
+helm-test: helm-prereqs ## Run helm unit tests
 	@command -v helm >/dev/null 2>&1 || { echo "helm is not installed. Please install helm first."; exit 1; }
 	@helm plugin list | grep -q unittest || { echo "Installing helm-unittest plugin..."; helm plugin install https://github.com/helm-unittest/helm-unittest.git; }
 	cd $(CHART_DIR) && \

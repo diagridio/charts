@@ -1,0 +1,50 @@
+suite: Test agent region-usage RBAC
+templates:
+  - agent/rbac.yaml
+
+tests:
+  # The region-usage collector needs two extra grants on the agent ClusterRole:
+  # metrics.k8s.io/pods read (to sum pod CPU) and namespaces patch (to backfill the
+  # cra.diagrid.io/managed marker onto pre-existing infra namespaces). Both are
+  # gated on the collector flag, not metrics-server.enabled, so a region using a
+  # pre-existing metrics-server still gets them.
+  - it: grants metrics.k8s.io read and namespaces patch when the collector is enabled
+    documentIndex: 0
+    set:
+      join_token: "test-token"
+      agent.config.region_usage.enabled: true
+    asserts:
+      - isKind:
+          of: ClusterRole
+      - contains:
+          path: rules
+          content:
+            apiGroups: ["metrics.k8s.io"]
+            resources: ["pods"]
+            verbs: ["get", "list"]
+      - contains:
+          path: rules
+          content:
+            apiGroups: [""]
+            resources: ["namespaces"]
+            verbs: ["patch"]
+
+  - it: omits both collector grants when region-usage is disabled (default)
+    documentIndex: 0
+    set:
+      join_token: "test-token"
+    asserts:
+      - isKind:
+          of: ClusterRole
+      - notContains:
+          path: rules
+          content:
+            apiGroups: ["metrics.k8s.io"]
+            resources: ["pods"]
+            verbs: ["get", "list"]
+      - notContains:
+          path: rules
+          content:
+            apiGroups: [""]
+            resources: ["namespaces"]
+            verbs: ["patch"]
