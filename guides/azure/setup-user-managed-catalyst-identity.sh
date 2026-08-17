@@ -59,6 +59,16 @@ CATALYST_APP="${CATALYST_APP:-app1}"
 # Note: the sidecar service account namespace/name are always derived from the
 # project/appid UIDs (resolved below) — they are not configurable.
 
+# The regional Catalyst management service's Kubernetes service account.
+# Management resolves bring-your-own secret stores (e.g. Azure Key Vault)
+# in-process for a project's workflow / agent state stores, authenticating as
+# this service account rather than any appid's, so it is federated to the same
+# managed identity (below). The defaults match the catalyst chart installed as
+# release "catalyst" into the cra-agent namespace; override them if your
+# install differs (the generated name is <release>-management-sa).
+MANAGEMENT_NAMESPACE="${MANAGEMENT_NAMESPACE:-cra-agent}"
+MANAGEMENT_SERVICE_ACCOUNT="${MANAGEMENT_SERVICE_ACCOUNT:-catalyst-management-sa}"
+
 # Optional: when set, grant the identity data-plane access to these resources
 CATALYST_KEYVAULT="${CATALYST_KEYVAULT:-}"
 CATALYST_STORAGE_ACCOUNT="${CATALYST_STORAGE_ACCOUNT:-}"
@@ -72,12 +82,22 @@ Usage: $(basename "$0") [options]
 Sets up an Azure user-assigned managed identity federated to a Catalyst
 AppID service account via AKS workload-identity (service-account OIDC).
 
+A credential is also federated for the regional Catalyst management service's
+Kubernetes service account. Management resolves bring-your-own secret stores
+such as Azure Key Vault in-process for a project's workflow / agent state
+stores, authenticating as its own service account, so it must be trusted by
+the same managed identity to reach the granted resources. Opting the
+management pod into workload identity happens through Helm values; the script
+prints the values to apply when it finishes.
+
 Options:
   --resource-group NAME    Azure resource group        (default: ${RESOURCE_GROUP})
   --location NAME          Azure location               (default: ${LOCATION})
   --cluster-name NAME      AKS cluster name             (default: ${CLUSTER_NAME})
   --project NAME           Catalyst project name        (default: ${CATALYST_PROJECT})
   --app NAME               AppID name                   (default: ${CATALYST_APP})
+  --management-namespace NAME        Management service account namespace   (default: ${MANAGEMENT_NAMESPACE})
+  --management-service-account NAME  Management service account name        (default: ${MANAGEMENT_SERVICE_ACCOUNT})
   --keyvault NAME          Grant 'Key Vault Secrets User' on this Key Vault              (optional)
   --storage-account NAME   Grant 'Storage Blob Data Contributor' on this account         (optional)
   --cosmosdb NAME          Grant 'Cosmos DB Built-in Data Contributor' on this account   (optional)
@@ -96,6 +116,8 @@ while [[ $# -gt 0 ]]; do
         --cluster-name) CLUSTER_NAME="$2"; shift 2 ;;
         --project) CATALYST_PROJECT="$2"; shift 2 ;;
         --app) CATALYST_APP="$2"; shift 2 ;;
+        --management-namespace) MANAGEMENT_NAMESPACE="$2"; shift 2 ;;
+        --management-service-account) MANAGEMENT_SERVICE_ACCOUNT="$2"; shift 2 ;;
         --keyvault) CATALYST_KEYVAULT="$2"; shift 2 ;;
         --storage-account) CATALYST_STORAGE_ACCOUNT="$2"; shift 2 ;;
         --cosmosdb) CATALYST_COSMOSDB="$2"; shift 2 ;;
@@ -186,6 +208,30 @@ else
         --output none
 fi
 
+# Also federate the regional Catalyst management service's service account.
+# Management resolves bring-your-own secret stores (e.g. Azure Key Vault)
+# in-process for a project's workflow / agent state stores, authenticating as
+# this service account rather than any appid's, so the shared identity must
+# trust it too. The credential is region-wide (one per cluster, not per appid),
+# so re-runs of this script for other appids reuse it.
+MANAGEMENT_FIC_NAME="catalyst-management"
+if az identity federated-credential show \
+    --name "${MANAGEMENT_FIC_NAME}" \
+    --identity-name "${USER_ASSIGNED_IDENTITY_NAME}" \
+    --resource-group "${RESOURCE_GROUP}" &>/dev/null; then
+    log "Federated credential '${MANAGEMENT_FIC_NAME}' already exists; reusing it."
+else
+    log "Creating federated credential '${MANAGEMENT_FIC_NAME}' for subject 'system:serviceaccount:${MANAGEMENT_NAMESPACE}:${MANAGEMENT_SERVICE_ACCOUNT}'..."
+    az identity federated-credential create \
+        --name "${MANAGEMENT_FIC_NAME}" \
+        --identity-name "${USER_ASSIGNED_IDENTITY_NAME}" \
+        --resource-group "${RESOURCE_GROUP}" \
+        --issuer "${AKS_OIDC_ISSUER}" \
+        --subject system:serviceaccount:"${MANAGEMENT_NAMESPACE}":"${MANAGEMENT_SERVICE_ACCOUNT}" \
+        --audience api://AzureADTokenExchange \
+        --output none
+fi
+
 # Optional role assignments — only run when the corresponding resource was supplied
 if [[ -n "${CATALYST_KEYVAULT}" ]]; then
     log "Resolving Key Vault '${CATALYST_KEYVAULT}'..."
@@ -214,4 +260,16 @@ echo '--- User-Assigned Managed Identity ready ---'
 echo 'Run the following Diagrid CLI command in order to necessary labels/annotations to the AppID:'
 echo ''
 echo " diagrid appid update ${CATALYST_APP} --project ${CATALYST_PROJECT} --label azure.workload.identity/use=true --annotation azure.workload.identity/client-id=\"$USER_ASSIGNED_CLIENT_ID\""
+echo ''
+echo 'To let the management service resolve bring-your-own secret stores (workflow or'
+echo 'agent state stores that reference secrets via secretKeyRef), opt its pod into'
+echo 'workload identity by adding the following to your Helm values and upgrading the'
+echo 'catalyst release:'
+echo ''
+echo ' management:'
+echo '   podLabels:'
+echo '     azure.workload.identity/use: "true"'
+echo '   serviceAccount:'
+echo '     annotations:'
+echo "       azure.workload.identity/client-id: \"${USER_ASSIGNED_CLIENT_ID}\""
 echo ''

@@ -24,7 +24,7 @@ spec:
       annotations:
         {{ include "merge.maps" (dict "base" $baseAnns "overrides" $overrideAnns) | nindent 8 }}
       labels:
-        {{- include "merge.maps" (dict "base" (include "management.selectorLabels" . | fromYaml) "overrides" .Values.management.merge.selectorLabels) | nindent 8 }}
+        {{- include "merge.maps" (dict "base" (include "management.selectorLabels" . | fromYaml) "overrides" (merge (dict) (.Values.management.merge.selectorLabels | default dict) (.Values.management.podLabels | default dict))) | nindent 8 }}
     spec:
       restartPolicy: Always
       serviceAccountName: {{ include "management.serviceAccountName" . }}

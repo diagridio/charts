@@ -1,0 +1,57 @@
+suite: Test podLabels on pod templates
+templates:
+  - agent/deployment.yaml
+  - agent/configmap.yaml
+  - gateway/deployment.yaml
+  - gateway/configmap.yaml
+  - management/deployment.yaml
+  - management/configmap.yaml
+  - mcp/deployment.yaml
+
+tests:
+  - it: should add podLabels to every pod template
+    set:
+      join_token: "test-token"
+      mcp.enabled: true
+      agent.podLabels:
+        custom/label: agent
+      gateway.envoy.podLabels:
+        custom/label: envoy
+      gateway.controlplane.podLabels:
+        custom/label: controlplane
+      management.podLabels:
+        custom/label: management
+      mcp.podLabels:
+        custom/label: mcp
+    asserts:
+      - equal:
+          path: spec.template.metadata.labels["custom/label"]
+          value: agent
+        template: agent/deployment.yaml
+      - equal:
+          path: spec.template.metadata.labels["custom/label"]
+          value: envoy
+        template: gateway/deployment.yaml
+        documentIndex: 0
+      - equal:
+          path: spec.template.metadata.labels["custom/label"]
+          value: controlplane
+        template: gateway/deployment.yaml
+        documentIndex: 1
+      - equal:
+          path: spec.template.metadata.labels["custom/label"]
+          value: management
+        template: management/deployment.yaml
+      - equal:
+          path: spec.template.metadata.labels["custom/label"]
+          value: mcp
+        template: mcp/deployment.yaml
+
+  - it: should keep selector labels on pods when podLabels are unset
+    set:
+      join_token: "test-token"
+    asserts:
+      - equal:
+          path: spec.template.metadata.labels["app.kubernetes.io/component"]
+          value: agent
+        template: agent/deployment.yaml

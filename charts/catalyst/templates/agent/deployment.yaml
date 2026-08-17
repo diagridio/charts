@@ -22,6 +22,9 @@ spec:
         {{ end }}
       labels:
         {{- include "agent.selectorLabels" . | nindent 8 }}
+        {{- with .Values.agent.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       restartPolicy: Always
       serviceAccountName: {{ include "agent.serviceAccountName" . }}

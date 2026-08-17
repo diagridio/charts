@@ -1,0 +1,185 @@
+suite: Test Catalyst MCP bridge
+templates:
+  - mcp/deployment.yaml
+  - mcp/service.yaml
+  - mcp/serviceaccount.yaml
+
+tests:
+  - it: should render nothing by default
+    set:
+      join_token: "test-token"
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: mcp/deployment.yaml
+      - hasDocuments:
+          count: 0
+        template: mcp/service.yaml
+      - hasDocuments:
+          count: 0
+        template: mcp/serviceaccount.yaml
+
+  - it: should render the deployment, service and service account when enabled
+    set:
+      join_token: "test-token"
+      mcp.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: mcp/deployment.yaml
+      - isKind:
+          of: Deployment
+        template: mcp/deployment.yaml
+      - equal:
+          path: metadata.name
+          value: catalyst-mcp
+        template: mcp/deployment.yaml
+      - isKind:
+          of: Service
+        template: mcp/service.yaml
+      - equal:
+          path: metadata.name
+          value: catalyst-mcp
+        template: mcp/service.yaml
+      - isKind:
+          of: ServiceAccount
+        template: mcp/serviceaccount.yaml
+
+  - it: should run in http passthrough mode against the in-cluster management service
+    set:
+      join_token: "test-token"
+      mcp.enabled: true
+    release:
+      namespace: cra-agent
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].command
+          value: ["./catalyst-mcp"]
+        template: mcp/deployment.yaml
+      - equal:
+          path: spec.template.spec.containers[0].args
+          value:
+            - "--transport=http"
+            - "--http-addr=:8080"
+            - "--http-auth-mode=passthrough"
+            - "--base-url=http://management.cra-agent.svc.cluster.local:8181"
+            - "--spec=/app/config/openapi.yaml"
+            - "--timeout=30s"
+        template: mcp/deployment.yaml
+
+  - it: should honor an explicit baseUrl override
+    set:
+      join_token: "test-token"
+      mcp.enabled: true
+      mcp.baseUrl: "http://management.other-ns.svc.cluster.local:9999"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--base-url=http://management.other-ns.svc.cluster.local:9999"
+        template: mcp/deployment.yaml
+
+  - it: should not use the consolidated image, which lacks the catalyst-mcp binary
+    set:
+      join_token: "test-token"
+      mcp.enabled: true
+      global.consolidated_image.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-mcp:1.80.0
+        template: mcp/deployment.yaml
+
+  - it: should honor the global image registry override
+    set:
+      join_token: "test-token"
+      mcp.enabled: true
+      global.image.registry: my-registry.io
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: my-registry.io/catalyst-mcp:1.80.0
+        template: mcp/deployment.yaml
+
+  - it: should probe the listener with tcpSocket, since there is no health endpoint
+    set:
+      join_token: "test-token"
+      mcp.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.tcpSocket.port
+          value: http
+        template: mcp/deployment.yaml
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.tcpSocket.port
+          value: http
+        template: mcp/deployment.yaml
+
+  - it: should expose the http port on the service
+    set:
+      join_token: "test-token"
+      mcp.enabled: true
+    asserts:
+      - equal:
+          path: spec.ports[0].port
+          value: 8080
+        template: mcp/service.yaml
+      - equal:
+          path: spec.ports[0].targetPort
+          value: http
+        template: mcp/service.yaml
+      - equal:
+          path: spec.type
+          value: ClusterIP
+        template: mcp/service.yaml
+
+  - it: should reject the shared-credential server auth mode
+    set:
+      join_token: "test-token"
+      mcp.enabled: true
+      mcp.httpAuthMode: server
+    asserts:
+      - failedTemplate:
+          errorMessage: 'mcp.httpAuthMode: "server" is not supported by this chart — it would make every MCP tool call run under one shared service identity instead of the calling user''s, bypassing per-user RBAC in the Management API. Use "passthrough".'
+        template: mcp/deployment.yaml
+
+  - it: should reject an unknown auth mode
+    set:
+      join_token: "test-token"
+      mcp.enabled: true
+      mcp.httpAuthMode: bogus
+    asserts:
+      - failedTemplate:
+          errorMessage: 'mcp.httpAuthMode must be "passthrough" or "server", got "bogus"!'
+        template: mcp/deployment.yaml
+
+  # The controlplane surface is off unless an environment names the URL. It is
+  # not derived like mcp.baseUrl, because unlike management the controlplane is
+  # not in the region — enabling it sends tool calls out, which has to be a
+  # decision someone wrote down rather than a default.
+  - it: should serve management tools only when no controlplane URL is set
+    set:
+      join_token: "test-token"
+      mcp.enabled: true
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].args
+          content: "--controlplane-spec=./config/controlplane-openapi.yml"
+        template: mcp/deployment.yaml
+
+  - it: should add the controlplane upstream when its URL is set
+    set:
+      join_token: "test-token"
+      mcp.enabled: true
+      mcp.controlplaneBaseUrl: http://admingrid.controlplane.svc.cluster.local:3002
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--controlplane-base-url=http://admingrid.controlplane.svc.cluster.local:3002"
+        template: mcp/deployment.yaml
+      # The spec path must travel with the URL: the binary refuses to start with
+      # one and not the other, which would be a CrashLoopBackOff rather than a
+      # render error.
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--controlplane-spec=./config/controlplane-openapi.yml"
+        template: mcp/deployment.yaml

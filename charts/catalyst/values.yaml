@@ -495,7 +495,7 @@ agent:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       image_name: "{{ ternary .Values.global.consolidated_image.repository \"sidecar\" .Values.global.consolidated_image.enabled }}"
       # image_tag is the sidecar image version
-      image_tag: "1.81.0"
+      image_tag: "1.84.0"
       resources:
         limits:
           cpu: 300m
@@ -580,7 +580,7 @@ agent:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       image_name: "{{ ternary .Values.global.consolidated_image.repository \"catalyst-otel-collector\" .Values.global.consolidated_image.enabled }}"
       # image_tag is the otel collector image version
-      image_tag: "1.81.0"
+      image_tag: "1.84.0"
       image_pull_policy: "Always"
       metrics_endpoint: https://catalyst-metrics.r1.diagrid.io/api/v1/push
       # The logs collector exports with otlphttp, so this must be Loki's OTLP
@@ -693,7 +693,7 @@ agent:
           registry: us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public
           # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
           name: "{{ ternary .Values.global.consolidated_image.repository \"private-sentry\" .Values.global.consolidated_image.enabled }}"
-          tag: "1.81.0"
+          tag: "1.84.0"
         jwt:
           enabled: true
           # managed means agent automatically does key rotation and JWKS updates.
@@ -789,7 +789,7 @@ agent:
     # Example: "diagrid/cra-agent" or "cra-agent"
     repository: cra-agent
     # tag is the image tag/version to use
-    tag: "1.81.0"
+    tag: "1.84.0"
     # pullPolicy is the image pull policy for this specific image.
     # If empty, uses global.image.pullPolicy.
     # Valid values: Always, IfNotPresent, Never
@@ -808,6 +808,8 @@ agent:
   podAnnotations:
     prometheus.io/port: "9090"
     prometheus.io/scrape: "true"
+  # Additional labels to add to the agent pods
+  podLabels: {}
   podSecurityContext:
     runAsNonRoot: true
     seccompProfile:
@@ -882,7 +884,7 @@ gateway:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       repository: identity-injector
       # tag is the image tag/version to use
-      tag: "1.81.0"
+      tag: "1.84.0"
       # pullPolicy is the image pull policy for this specific image.
       # If empty, uses global.image.pullPolicy.
       pullPolicy: ""
@@ -920,6 +922,12 @@ gateway:
       # pullPolicy is the image pull policy for this specific image.
       # If empty, uses global.image.pullPolicy.
       pullPolicy: ""
+    # drainTimeSeconds is how long Envoy keeps a replaced or removed listener
+    # (and its remaining connections) alive before tearing it down. Envoy's
+    # default is 600s; every drained listener pins a full copy of the gateway
+    # config in memory, so frequent listener updates with a long drain window
+    # inflate Envoy's memory footprint.
+    drainTimeSeconds: 60
     admin:
       enabled: true
       address: "127.0.0.1"
@@ -953,6 +961,8 @@ gateway:
       hostname: gateway-controlplane
       port: 57206
     podAnnotations: {}
+    # Additional labels to add to the gateway envoy pods
+    podLabels: {}
     labels:
       app: gateway-envoy
     selectorLabels:
@@ -995,7 +1005,7 @@ gateway:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       repository: catalyst-gateway
       # tag is the image tag/version to use
-      tag: "1.81.0"
+      tag: "1.84.0"
       # pullPolicy is the image pull policy for this specific image.
       # If empty, uses global.image.pullPolicy.
       pullPolicy: ""
@@ -1019,6 +1029,8 @@ gateway:
       type: ClusterIP
       clusterIP: None
     podAnnotations: {}
+    # Additional labels to add to the gateway controlplane pods
+    podLabels: {}
     labels:
       app: gateway-controlplane
     selectorLabels:
@@ -1105,7 +1117,7 @@ management:
     # Deprecated: This field supports template evaluation for backwards compatibility.
     repository: "{{ ternary .Values.global.consolidated_image.repository \"catalyst-management\" .Values.global.consolidated_image.enabled }}"
     # tag is the image tag/version to use
-    tag: "1.81.0"
+    tag: "1.84.0"
     # pullPolicy is the image pull policy for this specific image.
     # If empty, uses global.image.pullPolicy.
     pullPolicy: ""
@@ -1131,6 +1143,8 @@ management:
   podAnnotations:
     prometheus.io/port: "9091"
     prometheus.io/scrape: "true"
+  # Additional labels to add to the management pods
+  podLabels: {}
   podSecurityContext:
     runAsNonRoot: true
     seccompProfile:
@@ -1162,6 +1176,147 @@ management:
   extraEnvs: []
   merge: {}
   patch: {}
+#------------------------------------------------------------------------------
+# Catalyst MCP bridge
+#
+# A shared, regional service that exposes the Catalyst Management REST API as
+# MCP tools. Tools are generated at startup from the Management OpenAPI
+# specification (one tool per operationId); the spec is baked into the image at
+# /app/config/openapi.yaml by services/catalyst/mcp/Dockerfile, so no ConfigMap
+# or volume is involved.
+#
+# It runs in HTTP passthrough auth mode: it holds no credentials of its own and
+# builds a fresh MCP server per request from the caller's `Authorization` and
+# `x-diagrid-orgid` headers, so every tool call reaches the Management API as
+# the end user and that user's RBAC applies.
+#
+# In-cluster address for callers (release namespace, default values):
+#   http://catalyst-mcp.<namespace>.svc.cluster.local:8080
+# The MCP streamable-HTTP handler is mounted at the server root and ignores the
+# request path, so /mcp and / are equivalent.
+#------------------------------------------------------------------------------
+mcp:
+  # enabled installs the MCP bridge. Off by default: it is only useful to
+  # regions serving MCP clients, and it is rolled out per environment.
+  enabled: false
+  replicaCount: 2
+  # baseUrl is the upstream Management REST API that tool calls are proxied to.
+  # Empty (recommended) derives the in-cluster management Service URL in this
+  # release's namespace, which cannot drift from the Service the chart renders.
+  # Only ever set this to another in-cluster address — a public endpoint would
+  # send every tool call out of the region and back in.
+  baseUrl: ""
+  # httpPort is the container port the MCP HTTP transport listens on
+  # (rendered as --http-addr=:<port>).
+  httpPort: 8080
+  # httpAuthMode selects where upstream credentials come from. Only
+  # "passthrough" is supported — see the note above; "server" is rejected at
+  # render time because it would collapse every caller onto one shared identity.
+  httpAuthMode: passthrough
+  # controlplaneBaseUrl turns on the SECOND tool surface: the controlplane
+  # Catalyst API, which is what answers "what exists" (projects, App IDs,
+  # components, MCP servers) as opposed to management's "what happened".
+  #
+  # Unlike mcp.baseUrl this is NOT derived and NOT in-cluster: the controlplane
+  # is a different system in a different place, so enabling this means tool
+  # calls leave the region. That is a deliberate crossing, which is why it is
+  # empty by default and has to be named per environment rather than inferred.
+  # Empty leaves catalyst-mcp serving management tools only.
+  controlplaneBaseUrl: ""
+  # controlplaneSpecPath is where that spec lives inside the image. Matches the
+  # second COPY in services/catalyst/mcp/Dockerfile; change only alongside it.
+  controlplaneSpecPath: ./config/controlplane-openapi.yml
+  # specPath is where the Management OpenAPI spec lives inside the image.
+  # Matches WORKDIR /app + `COPY openapi.yaml ./config/openapi.yaml` in
+  # services/catalyst/mcp/Dockerfile. Change only alongside that Dockerfile.
+  specPath: /app/config/openapi.yaml
+  # upstreamTimeout bounds each proxied Management API call (Go duration).
+  upstreamTimeout: 30s
+  # insecureSkipVerify disables upstream TLS verification. Not needed for the
+  # derived in-cluster http:// base URL; only for an https:// baseUrl with a
+  # certificate the pod does not trust (local development).
+  insecureSkipVerify: false
+  # extraArgs are appended verbatim to the container args.
+  extraArgs: []
+  image:
+    # registry is the container registry for the MCP image.
+    # If global.image.registry is set, it will override this value.
+    registry: us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public
+    # repository is the image name/path within the registry. The consolidated
+    # catalyst-all image does NOT contain the catalyst-mcp binary or the bundled
+    # OpenAPI spec, so this component never uses global.consolidated_image.
+    repository: catalyst-mcp
+    # tag is the image tag/version to use
+    tag: "1.80.0"
+    # pullPolicy is the image pull policy for this specific image.
+    # If empty, uses global.image.pullPolicy.
+    pullPolicy: ""
+  nameOverride: ""
+  fullnameOverride: ""
+  service:
+    type: ClusterIP
+    port: 8080
+    annotations: {}
+  serviceAccount:
+    # Annotations to add to the service account
+    annotations: {}
+    # The name of the service account to use.
+    # If not set, a name is generated using the fullname template
+    name: ""
+  podAnnotations: {}
+  # Additional labels to add to the mcp pods
+  podLabels: {}
+  podSecurityContext:
+    runAsNonRoot: true
+    # runAsUser/runAsGroup are REQUIRED alongside runAsNonRoot here, not
+    # decoration. The image is gcr.io/distroless/static:nonroot with
+    # `USER nonroot:nonroot` — a NAME, not a UID — and the kubelet cannot prove a
+    # named user is non-root, so it refuses the container with
+    # "image has non-numeric user (nonroot), cannot verify user is non-root".
+    # 65532 is the numeric id distroless assigns to `nonroot`.
+    runAsUser: 65532
+    runAsGroup: 65532
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+        - ALL
+  # catalyst-mcp serves only the MCP streamable-HTTP handler, mounted at the
+  # server root — there is no /healthz or /readyz, and a plain GET without
+  # `Accept: text/event-stream` is answered 400, which an httpGet probe would
+  # read as failure. So probe the listener itself. Set to null to disable.
+  readinessProbe:
+    tcpSocket:
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+  livenessProbe:
+    tcpSocket:
+      port: http
+    initialDelaySeconds: 15
+    periodSeconds: 20
+    timeoutSeconds: 3
+    failureThreshold: 3
+  resources:
+    limits:
+      memory: 256Mi
+    requests:
+      cpu: 10m
+      memory: 64Mi
+  # Scheduling for MCP pods. Merged with shared.* defaults (per-component wins
+  # for nodeSelector/affinity; tolerations are appended to shared.tolerations).
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  # Golang Soft Memory Limit via env var GOMEMLIMIT
+  goSoftLimit:
+    percent: 90
+  extraEnvs: []
 #------------------------------------------------------------------------------
 # Piko Configurations
 #------------------------------------------------------------------------------

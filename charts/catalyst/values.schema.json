@@ -670,6 +670,12 @@
                         "type": "string"
                     }
                 },
+                "podLabels": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
                 "podSecurityContext": {
                     "type": "object"
                 },
@@ -951,6 +957,12 @@
                     "$ref": "#/definitions/serviceAccountSpec"
                 },
                 "podAnnotations": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "podLabels": {
                     "type": "object",
                     "additionalProperties": {
                         "type": "string"

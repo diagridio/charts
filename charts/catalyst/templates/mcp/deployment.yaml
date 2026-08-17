@@ -1,0 +1,100 @@
+{{- if .Values.mcp.enabled }}
+{{- include "mcp.validateValues" . -}}
+{{- $gomemlimit := include "catalyst.GetGoLangGOMEMLIMITFromResourceLimits" (dict "limits" .Values.mcp.resources.limits "golimit" .Values.mcp.goSoftLimit) }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mcp.name" . }}
+  labels:
+    {{- include "mcp.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.mcp.replicaCount }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+  selector:
+    matchLabels:
+      {{- include "mcp.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.mcp.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "mcp.selectorLabels" . | nindent 8 }}
+        {{- with .Values.mcp.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      restartPolicy: Always
+      serviceAccountName: {{ include "mcp.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.mcp.podSecurityContext | nindent 8 }}
+      {{- with .Values.global.image.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ include "mcp.name" . }}
+          securityContext:
+            {{- toYaml .Values.mcp.securityContext | nindent 12 }}
+          {{- /* consolidated is deliberately nil: the consolidated catalyst-all
+                 image (services/catalyst/Dockerfile.all) does not contain the
+                 catalyst-mcp binary, nor the Management OpenAPI spec the bridge
+                 loads at startup. catalyst-mcp always runs from its own image. */}}
+          image: {{ include "catalyst.image" (dict "image" .Values.mcp.image "consolidated" nil "global" .Values.global.image "context" .) }}
+          imagePullPolicy: {{ include "catalyst.imagePullPolicy" (dict "image" .Values.mcp.image "consolidated" nil "global" .Values.global.image) }}
+          command: ["./catalyst-mcp"]
+          args:
+            - "--transport=http"
+            - "--http-addr=:{{ .Values.mcp.httpPort }}"
+            - "--http-auth-mode={{ .Values.mcp.httpAuthMode }}"
+            - "--base-url={{ include "mcp.baseURL" . }}"
+            - "--spec={{ .Values.mcp.specPath }}"
+            {{- if .Values.mcp.controlplaneBaseUrl }}
+            - "--controlplane-base-url={{ .Values.mcp.controlplaneBaseUrl }}"
+            - "--controlplane-spec={{ .Values.mcp.controlplaneSpecPath }}"
+            {{- end }}
+            - "--timeout={{ .Values.mcp.upstreamTimeout }}"
+            {{- if .Values.mcp.insecureSkipVerify }}
+            - "--insecure-skip-verify"
+            {{- end }}
+            {{- with .Values.mcp.extraArgs }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          env:
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            {{- if (and $gomemlimit (ne $gomemlimit "0")) }}
+            - name: GOMEMLIMIT
+              value: {{ $gomemlimit }}
+            {{- end }}
+            {{- with .Values.mcp.extraEnvs }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.mcp.httpPort }}
+              protocol: TCP
+          {{- with .Values.mcp.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.mcp.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.mcp.resources | nindent 12 }}
+      nodeSelector:
+        {{- include "catalyst.nodeSelector" (dict "shared" .Values.shared.scheduling "component" .Values.mcp) | nindent 8 }}
+      affinity:
+        {{- include "catalyst.affinity" (dict "shared" .Values.shared.scheduling "component" .Values.mcp) | nindent 8 }}
+      tolerations:
+        {{- include "catalyst.tolerations" (dict "shared" .Values.shared.scheduling "component" .Values.mcp) | nindent 8 }}
+{{- end }}

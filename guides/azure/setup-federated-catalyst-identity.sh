@@ -49,6 +49,50 @@ assign_cosmos_data_role() {
     fi
 }
 
+# federate_credential NAME SUBJECT — idempotently create or update a federated
+# identity credential (the issuer + subject -> api://AzureADTokenExchange trust
+# mapping) on the app registration. Relies on ISSUER, APP_ID and FIC_PARAMS,
+# which are resolved before the first call.
+federate_credential() {
+    local fic_name="$1" subject="$2"
+    fic_name="$(printf '%s' "${fic_name}" | tr -c 'A-Za-z0-9_-' '-')"
+
+    cat > "${FIC_PARAMS}" <<EOF
+{
+  "name": "${fic_name}",
+  "issuer": "${ISSUER}",
+  "subject": "${subject}",
+  "audiences": ["api://AzureADTokenExchange"]
+}
+EOF
+
+    if az ad app federated-credential show \
+        --id "${APP_ID}" \
+        --federated-credential-id "${fic_name}" &>/dev/null; then
+        log "Federated credential '${fic_name}' already exists; updating it."
+        az ad app federated-credential update \
+            --id "${APP_ID}" \
+            --federated-credential-id "${fic_name}" \
+            --parameters "@${FIC_PARAMS}" \
+            --output none
+    else
+        log "Creating federated credential '${fic_name}' for subject '${subject}'..."
+        az ad app federated-credential create \
+            --id "${APP_ID}" \
+            --parameters "@${FIC_PARAMS}" \
+            --output none
+    fi
+}
+
+# Fixed SPIFFE path of the regional Catalyst management service. Management
+# resolves bring-your-own secret stores (e.g. Azure Key Vault) in-process for a
+# project's workflow / agent state stores, authenticating with its own regional
+# identity rather than any appid's. That identity shares the appid's region-host
+# trust domain and differs only in this path, so the app registration must trust
+# it too. Mirrors the Go constants ManagementSpiffeNamespace / ManagementSpiffeAppID
+# in services/catalyst/pkg/tls/tls.go.
+MANAGEMENT_SPIFFE_PATH="/ns/cra-agent/management"
+
 # Defaults (override with the flags below or matching env vars)
 CATALYST_PROJECT="${CATALYST_PROJECT:-prj1}"
 CATALYST_APP="${CATALYST_APP:-app1}"
@@ -84,6 +128,12 @@ The app registration is scoped to the project (one per project), and the SPIFFE
 subject(s) are read straight from the appid's status (.status.spiffeIds, falling
 back to .status.spiffeId); a sidecar may run on more than one region host, so a
 credential is federated for each.
+
+A credential is also federated for the regional Catalyst management service's
+SPIFFE identity (one per region host). Management resolves bring-your-own secret
+stores such as Azure Key Vault in-process for a project's workflow / agent state
+stores, using its own regional identity, so it must be trusted by the same app
+registration to reach the granted resources.
 
 The OIDC issuer is resolved automatically from the project's region (via the
 diagrid CLI), so it does not need to be supplied.
@@ -204,40 +254,31 @@ log "Service principal object ID: ${SP_OBJECT_ID}"
 # mapping that lets the Catalyst identity exchange its token for an Azure AD token.
 FIC_PARAMS="$(mktemp)"
 trap 'rm -f "${FIC_PARAMS}"' EXIT
+
+# One credential per appid SPIFFE ID (a sidecar may run on more than one region
+# host). The credential name is derived from the appid and the host portion of
+# the SPIFFE ID (the part that differs between hosts); the project is already
+# implied by the per-project app registration.
 for SUBJECT in "${SPIFFE_IDS[@]}"; do
-    # Derive a stable, unique credential name from the appid and the host portion
-    # of the SPIFFE ID (the part that differs between region hosts). The project
-    # is already implied by the per-project app registration.
     authority="${SUBJECT#spiffe://}"; authority="${authority%%/*}"
     host_label="${authority%%.*}"
-    fic_name="${CATALYST_APP}-${host_label}"
-    fic_name="$(printf '%s' "${fic_name}" | tr -c 'A-Za-z0-9_-' '-')"
+    federate_credential "${CATALYST_APP}-${host_label}" "${SUBJECT}"
+done
 
-    cat > "${FIC_PARAMS}" <<EOF
-{
-  "name": "${fic_name}",
-  "issuer": "${ISSUER}",
-  "subject": "${SUBJECT}",
-  "audiences": ["api://AzureADTokenExchange"]
-}
-EOF
-
-    if az ad app federated-credential show \
-        --id "${APP_ID}" \
-        --federated-credential-id "${fic_name}" &>/dev/null; then
-        log "Federated credential '${fic_name}' already exists; updating it."
-        az ad app federated-credential update \
-            --id "${APP_ID}" \
-            --federated-credential-id "${fic_name}" \
-            --parameters "@${FIC_PARAMS}" \
-            --output none
-    else
-        log "Creating federated credential '${fic_name}' for subject '${SUBJECT}'..."
-        az ad app federated-credential create \
-            --id "${APP_ID}" \
-            --parameters "@${FIC_PARAMS}" \
-            --output none
-    fi
+# Also federate the regional management service's SPIFFE identity, once per
+# distinct region-host authority (deduped, since several appid SPIFFE IDs on the
+# same host share one management identity). Management reuses the appid's
+# region-host trust domain and only swaps the path to MANAGEMENT_SPIFFE_PATH, so
+# it can be derived from the appid subjects above without a separate lookup.
+# Space-delimited set of authorities already handled — a plain string keeps this
+# portable to the bash 3.2 that ships on macOS (no associative arrays).
+seen_authorities=" "
+for SUBJECT in "${SPIFFE_IDS[@]}"; do
+    authority="${SUBJECT#spiffe://}"; authority="${authority%%/*}"
+    case "${seen_authorities}" in *" ${authority} "*) continue ;; esac
+    seen_authorities="${seen_authorities}${authority} "
+    host_label="${authority%%.*}"
+    federate_credential "management-${host_label}" "spiffe://${authority}${MANAGEMENT_SPIFFE_PATH}"
 done
 
 # Optional role assignments — only run when the corresponding resource was supplied

@@ -187,20 +187,20 @@ By default, this is the full list of images that are installed in your cluster:
 |-----------|--------------|-------------|
 | **Alpine k8s** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy/alpine/k8s:1.36.0` | Utility image used by Helm install and cleanup hooks |
 | **Envoy Proxy** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy/envoyproxy/envoy:distroless-v1.38.0` | Envoy proxy for gateway |
-| **Catalyst** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.81.0` | Consolidated Catalyst services image |
+| **Catalyst** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.84.0` | Consolidated Catalyst services image |
 | **Piko** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/diagrid-piko:v1.0.1` | Piko reverse tunneling service |
-| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.19.0-20260727-catalyst.1` | Catalyst Dapr control plane services |
-| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.81.0` | Catalyst dapr server |
-| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.81.0` | OTel collector for telemetry |
+| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.19.0-20260806-catalyst.1` | Catalyst Dapr control plane services |
+| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.84.0` | Catalyst dapr server |
+| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.84.0` | OTel collector for telemetry |
 
 Alternatively, separate images can be used:
 
 | Component | Default Image | Description |
 |-----------|--------------|-------------|
-| **Catalyst Agent** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/cra-agent:1.81.0` | Catalyst agent service |
-| **Catalyst Management** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-management:1.81.0` | Catalyst management service |
-| **Gateway Control Plane** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-gateway:1.81.0` | Gateway control plane service |
-| **Gateway Identity Injector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/identity-injector:1.81.0` | Identity injection service |
+| **Catalyst Agent** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/cra-agent:1.84.0` | Catalyst agent service |
+| **Catalyst Management** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-management:1.84.0` | Catalyst management service |
+| **Gateway Control Plane** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-gateway:1.84.0` | Gateway control plane service |
+| **Gateway Identity Injector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/identity-injector:1.84.0` | Identity injection service |
 
 Dependencies:
 
@@ -216,9 +216,9 @@ The Agent provisions these at runtime:
 
 | Component | Default Image | Description |
 |-----------|--------------|-------------|
-| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/sidecar:1.81.0` | Catalyst dapr server |
-| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-otel-collector:1.81.0` | OTel collector for telemetry |
-| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.19.0-20260727-catalyst.1` | Catalyst Dapr control plane services |
+| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/sidecar:1.84.0` | Catalyst dapr server |
+| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-otel-collector:1.84.0` | OTel collector for telemetry |
+| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.19.0-20260806-catalyst.1` | Catalyst Dapr control plane services |
 
 #### Optional Images
 
@@ -297,7 +297,7 @@ For an end-to-end walkthrough using `cert-manager` and `trust-manager` to provis
 
 ### Workload Identity Federation (JWT-SVID Audiences)
 
-Sidecars mint JWT-SVIDs that identify the workload by its SPIFFE ID (`spiffe://<region-trust-domain>/ns/<project>/<app-id>`). In a private region these are issued by the **in-region Dapr Sentry**, and relying parties verify them against the region's OIDC discovery documents (`openid-configuration` and JWKS), which the control plane serves under a stable per-region path. By default the tokens are audience-scoped to the trust domain. To present a workload's SVID as a **federated credential** to an external identity provider, add the audience that provider expects via `global.sentry.jwt_audiences`:
+Both app sidecars and the regional **management** service mint JWT-SVIDs that identify the workload by its SPIFFE ID (`spiffe://<region-trust-domain>/ns/<project>/<app-id>` for a sidecar; `spiffe://<region-trust-domain>/ns/cra-agent/management` for management). In a private region these are issued by the **in-region Dapr Sentry**, and relying parties verify them against the region's OIDC discovery documents (`openid-configuration` and JWKS), which the control plane serves under a stable per-region path. By default the tokens are audience-scoped to the trust domain. To present a workload's SVID as a **federated credential** to an external identity provider, add the audience that provider expects via `global.sentry.jwt_audiences`:
 
 ```yaml
 global:
@@ -313,7 +313,9 @@ diagrid region get <region-id> -o json | jq -r '.status.endpoints.oidc'
 # https://oidc.r1.diagrid.io/<region-oidc-id>
 ```
 
-With that audience configured here, every sidecar the agent provisions receives an SVID that can be exchanged at Azure's token endpoint for an Entra ID access token — no client secret required.
+With that audience configured here, every sidecar the agent provisions — and the regional management service — receives an SVID that can be exchanged at Azure's token endpoint for an Entra ID access token, no client secret required.
+
+The management service uses the same mechanism when a **workflow or agent state store** references a bring-your-own secret store (for example Azure Key Vault) through a `secretKeyRef`: management resolves that secret **in-process** with its own SPIFFE identity in order to serve workflow/agent data. Federate the management SPIFFE ID (`…/ns/cra-agent/management`) on the same App Registration so it can read the store — [`setup-federated-catalyst-identity.sh`](../../guides/azure/setup-federated-catalyst-identity.sh) federates both the appid and management subjects and grants the identity the role the store needs (e.g. `Key Vault Secrets User`).
 
 The value applies to all sidecars in the deployment; it is empty by default (no extra audiences, no behavior change).
 
