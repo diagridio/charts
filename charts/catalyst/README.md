@@ -45,6 +45,40 @@ cleanup:
 
 Catalyst should be installed in a dedicated Kubernetes cluster. It manages global resources and dynamically provisions workloads, which may conflict with other applications in a shared cluster. If you must install into a shared cluster, you must ensure the cluster-wide permissions described in the [RBAC section](#permissions-rbac) are acceptable for your setup or consider using a cluster virtualization solution like [vcluster](https://github.com/loft-sh/vcluster).
 
+### Overriding nested values: Helm merges maps key by key
+
+Helm deep-merges your values file into the chart defaults per key, not per
+block. Overriding one key of a nested map keeps every chart-default sibling
+you did not mention. `resources` blocks are where this bites:
+
+```yaml
+# Intent: raise Envoy's memory limit. Effect: memory is raised, but cpu
+# silently stays at the chart default (1000m) because it was not mentioned.
+gateway:
+  envoy:
+    resources:
+      limits:
+        memory: 4096Mi
+```
+
+The result is an Envoy hard-capped at one core under load, felt as
+end-to-end latency on every request while looking healthy. The same applies
+to every `resources`, `nodeSelector`, `autoscaling`, and probe block in this
+chart.
+
+Rules of thumb:
+
+- When overriding any nested block, restate **every** key you care about,
+  including the ones you want at their documented default.
+- To remove a chart-default key rather than override it, set it to `null`
+  explicitly (this is how the production overlay drops `limits` blocks).
+- After an upgrade, `helm get values --all <release>` shows the merged
+  result; verify the block you overrode looks the way you intended.
+
+Separate from Helm's values merge, some values are later consumed atomically. For
+example, setting sidecar `affinity` replaces the downstream chart's default
+anti-affinity outright rather than merging with it.
+
 ### Network Policies
 
 Catalyst always generates NetworkPolicies for **project namespaces** (deny-all plus explicit allows, created by the agent at provisioning time). The **system namespaces** — the release namespace and the internal Dapr namespace — ship without policies by default. On clusters with a default-deny security mandate, enable the chart-managed set:

@@ -984,6 +984,10 @@ gateway:
     nodeSelector: {}
     affinity: {}
     tolerations: []
+    # NOTE: helm merges maps key by key. Overriding only `limits.memory` in
+    # your values keeps this cpu limit: restate every key you care about (see
+    # "Overriding nested values" in the README). An Envoy silently capped at
+    # 1 core is felt as end-to-end latency on every request.
     resources:
       limits:
         cpu: 1000m
