@@ -122,3 +122,37 @@ Get the name of the charts secret to use
   {{- .Values.global.charts.secretName | default (printf "%s-charts" .Release.Name) }}
 {{- end }}
 {{- end }}
+
+{{/*
+Name of the Secret holding the Catalyst Assistant's model credential for this
+region. Empty when none is configured, which is a normal deployment.
+
+The credential lives in the region and nowhere else: the control plane names it
+in the assistant's conversation component but never holds it. For a Diagrid
+public region Diagrid fills it; for a private or dedicated region the customer
+does, through existingSecret so the material never passes through Helm values.
+*/}}
+{{- define "agent.reagentLLMSecretName" -}}
+{{- $llm := (((.Values.agent).reagent).llm) | default dict -}}
+{{- $existing := ($llm.existingSecret) | default dict -}}
+{{- if $existing.name -}}
+  {{- $existing.name -}}
+{{- else if $llm.apiKey -}}
+  {{- printf "%s-reagent-llm" (include "agent.name" .) -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Key within that Secret. Settable only alongside existingSecret, where whoever
+created it chose the name; a chart-created Secret uses a fixed key so nothing
+has to be configured twice.
+*/}}
+{{- define "agent.reagentLLMSecretKey" -}}
+{{- $llm := (((.Values.agent).reagent).llm) | default dict -}}
+{{- $existing := ($llm.existingSecret) | default dict -}}
+{{- if $existing.name -}}
+  {{- $existing.key | default "api_key" -}}
+{{- else -}}
+  {{- "api_key" -}}
+{{- end -}}
+{{- end -}}

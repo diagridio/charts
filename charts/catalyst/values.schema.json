@@ -494,6 +494,37 @@
                         }
                     }
                 },
+                "reagent": {
+                    "type": "object",
+                    "description": "Catalyst Assistant configuration for this region. Its model credential lives here and nowhere else: the control plane names it but never holds it, so a private or dedicated region can supply its own key.",
+                    "properties": {
+                        "llm": {
+                            "type": "object",
+                            "description": "Model provider credential for the assistant running in this region.",
+                            "properties": {
+                                "apiKey": {
+                                    "type": "string",
+                                    "writeOnly": true,
+                                    "description": "The credential itself, for local and throwaway installs. Helm stores values verbatim in the release and its history, so a key set here is readable with `helm get values` for the life of every release that carried it, and rotating it does not remove the old one from history. Use existingSecret for any key you would not paste into a ticket."
+                                },
+                                "existingSecret": {
+                                    "type": "object",
+                                    "description": "A pre-created Secret in the release namespace, so the material never passes through Helm values. Takes precedence over apiKey.",
+                                    "properties": {
+                                        "name": {
+                                            "type": "string",
+                                            "description": "Name of the existing Kubernetes Secret"
+                                        },
+                                        "key": {
+                                            "type": "string",
+                                            "description": "Key within that Secret holding the credential"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
                 "logLevel": {
                     "type": "string",
                     "enum": [

@@ -58,6 +58,13 @@ spec:
             - "--controlplane-base-url={{ .Values.mcp.controlplaneBaseUrl }}"
             - "--controlplane-spec={{ .Values.mcp.controlplaneSpecPath }}"
             {{- end }}
+            {{- if .Values.mcp.deriveDataSharing }}
+            - "--derive-data-sharing"
+            {{- if .Values.mcp.orgPolicyBaseUrl }}
+            - "--org-policy-base-url={{ .Values.mcp.orgPolicyBaseUrl }}"
+            {{- end }}
+            - "--org-policy-ttl={{ .Values.mcp.orgPolicyTtl }}"
+            {{- end }}
             - "--timeout={{ .Values.mcp.upstreamTimeout }}"
             {{- if .Values.mcp.insecureSkipVerify }}
             - "--insecure-skip-verify"

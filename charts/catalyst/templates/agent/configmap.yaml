@@ -88,6 +88,16 @@
     {{- end -}}
   {{- end -}}
 {{- end -}}
+{{- /* Point the agent at the region's copy of the Catalyst Assistant's model
+       credential. Only the NAME and KEY are emitted — the material stays in the
+       Secret, which is why this is not simply an agent.config.project entry. The
+       block is omitted entirely when no credential is configured, so a region
+       without an assistant carries no half-set reference. */ -}}
+{{- $reagentLLMSecret := include "agent.reagentLLMSecretName" . -}}
+{{- if $reagentLLMSecret -}}
+  {{- if not $agentConfig.project -}}{{- $_ := set $agentConfig "project" dict -}}{{- end -}}
+  {{- $_ := set $agentConfig.project "reagent_llm" (dict "secret_name" $reagentLLMSecret "secret_key" (include "agent.reagentLLMSecretKey" .)) -}}
+{{- end -}}
 {{- $_ := set $agentConfig "control_plane_namespace" .Values.global.control_plane_namespace -}}
 {{- $_ := set $agentConfig "control_plane_url" .Values.global.control_plane_url -}}
 {{- $_ := set $agentConfig "control_plane_http_url" .Values.global.control_plane_http_url -}}

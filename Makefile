@@ -139,6 +139,7 @@ update-catalyst-tags:
 	yq -i '.gateway.identityInjector.image.tag="$(IMAGES_TAG)"' $(CHART_DIR)/values.yaml
 	yq -i '.gateway.controlplane.image.tag="$(IMAGES_TAG)"' $(CHART_DIR)/values.yaml
 	yq -i '.management.image.tag="$(IMAGES_TAG)"' $(CHART_DIR)/values.yaml
+	yq -i '.mcp.image.tag="$(IMAGES_TAG)"' $(CHART_DIR)/values.yaml
 
 update-catalyst-chart-version:
 	yq -i '.version="$(VERSION)"' ./charts/catalyst/Chart.yaml
@@ -155,5 +156,6 @@ update-catalyst-registry:
 	yq -i '.gateway.identityInjector.image.registry="$(REGISTRY)"' $(CHART_DIR)/values.yaml
 	yq -i '.gateway.controlplane.image.registry="$(REGISTRY)"' $(CHART_DIR)/values.yaml
 	yq -i '.management.image.registry="$(REGISTRY)"' $(CHART_DIR)/values.yaml
+	yq -i '.mcp.image.registry="$(REGISTRY)"' $(CHART_DIR)/values.yaml
 	yq -i '.piko.image.registry="$(REGISTRY)"' $(CHART_DIR)/values.yaml
 	yq -i '.agent.config.internal_dapr.container_registry="$(REGISTRY)"' $(CHART_DIR)/values.yaml

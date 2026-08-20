@@ -339,6 +339,30 @@ agent:
   existingJoinTokenSecret:
     name: ""
     key: "join_token"
+  # reagent is the Catalyst Assistant's configuration for this region.
+  #
+  # The assistant's model credential lives HERE and nowhere else. The control
+  # plane names it in the assistant's conversation component but never holds it,
+  # so a region can belong to the customer: for a Diagrid-run public region
+  # Diagrid fills this in, and for a private or dedicated region the customer
+  # supplies their own key without ever giving it to Diagrid.
+  #
+  # Leaving it unset is a normal deployment — a region running no assistant, or
+  # one on a model provider that needs no credential. To rotate, replace the
+  # secret: the assistant picks the new value up on its own, within the agent's
+  # drift-reconcile interval (15 minutes by default). Restart the assistant's
+  # workload if you need the old credential out of use immediately. See the
+  # chart README.
+  reagent:
+    llm:
+      # The credential itself. Convenient for local and dev installs; prefer
+      # existingSecret anywhere the values file is stored or transmitted.
+      apiKey: ""
+      # A Secret you created yourself, in the release namespace, so the material
+      # never passes through Helm values. Takes precedence over apiKey.
+      existingSecret:
+        name: ""
+        key: "api_key"
   logLevel: info
   # This agent config is read directly into the ConfigMap. However,
   # we do apply templating which allows us to provide inline
@@ -1234,6 +1258,35 @@ mcp:
   # Matches WORKDIR /app + `COPY openapi.yaml ./config/openapi.yaml` in
   # services/catalyst/mcp/Dockerfile. Change only alongside that Dockerfile.
   specPath: /app/config/openapi.yaml
+  # deriveDataSharing resolves each request's data-sharing level from the
+  # ORGANIZATION, via the controlplane, instead of trusting the
+  # x-diagrid-data-sharing header the request arrives with.
+  #
+  # Required when ONE assistant serves MANY organizations: a shared assistant has a
+  # single MCPServer resource, so a single static header, which cannot express a
+  # per-organization level. With one assistant per organization the header is
+  # already per-organization and this can stay off.
+  #
+  # Deriving also removes the last way a caller can state its own level. Leave it
+  # off and the level is only as trustworthy as the transport that stamps it.
+  #
+  # Defaults to false so an existing deployment is byte-identical. Needs somewhere
+  # to derive from — orgPolicyBaseUrl, or controlplaneBaseUrl — and the service
+  # refuses to start if it has neither, rather than silently falling back to the
+  # header.
+  deriveDataSharing: false
+  # orgPolicyBaseUrl is where organization policy is read from, when that is not
+  # the same place controlplane TOOLS are served from. Empty falls back to
+  # controlplaneBaseUrl.
+  #
+  # Separate because the two are different decisions: serving controlplane tools
+  # decides what the assistant can answer, while deriving the level is a security
+  # control, and neither should force the other on.
+  orgPolicyBaseUrl: ""
+  # orgPolicyTtl caps how long a resolved organization policy is reused, and so how
+  # long a posture change takes to bite. Zero disables caching — correct, but it
+  # puts a controlplane call in front of every tool call.
+  orgPolicyTtl: 30s
   # upstreamTimeout bounds each proxied Management API call (Go duration).
   upstreamTimeout: 30s
   # insecureSkipVerify disables upstream TLS verification. Not needed for the
@@ -1251,7 +1304,7 @@ mcp:
     # OpenAPI spec, so this component never uses global.consolidated_image.
     repository: catalyst-mcp
     # tag is the image tag/version to use
-    tag: "1.80.0"
+    tag: "1.90.0"
     # pullPolicy is the image pull policy for this specific image.
     # If empty, uses global.image.pullPolicy.
     pullPolicy: ""

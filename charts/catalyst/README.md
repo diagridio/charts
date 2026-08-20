@@ -406,6 +406,7 @@ Control-plane per-component overrides:
 |---|---|
 | agent | `agent.{nodeSelector,tolerations,affinity}` |
 | management | `management.{nodeSelector,tolerations,affinity}` |
+| mcp | `mcp.{nodeSelector,tolerations,affinity}` |
 | gateway envoy | `gateway.envoy.{nodeSelector,tolerations,affinity}` |
 | gateway control plane | `gateway.controlplane.{nodeSelector,tolerations,affinity}` |
 | piko | `piko.{nodeSelector,tolerations,affinity}` |
@@ -908,6 +909,59 @@ global:
         connection_string: "pg_conn_str"
         primary_encryption_key: "kek_primary"
         primary_key_version: "kek_primary_version"
+```
+
+### Catalyst Assistant model credential
+
+The Catalyst Assistant answers questions about the workflows and App IDs in this
+region, which means it calls a model provider. That provider credential lives in
+this region and nowhere else — Diagrid's control plane names it but never holds it,
+so a region you own runs the assistant on a key Diagrid never sees.
+
+Leaving this unset is a normal installation: a region that runs no assistant, or one
+whose model provider needs no credential, needs nothing here.
+
+Prefer `existingSecret`, so the key never passes through a values file that may be
+committed, templated or copied around:
+
+```yaml
+agent:
+  reagent:
+    llm:
+      existingSecret:
+        name: "my-model-key"
+        key: "api_key"
+```
+
+`apiKey` is the alternative, convenient for a local or throwaway install. It puts
+the credential in the chart's values, which Helm also stores verbatim in the
+release history:
+
+```yaml
+agent:
+  reagent:
+    llm:
+      apiKey: "sk-..."
+```
+
+`existingSecret` takes precedence when both are set. The Secret must live in the
+release namespace. Only its name and key reach the agent's ConfigMap; the material
+is read at reconcile time and copied into the assistant's own project namespace,
+which is the only place the assistant's model component will resolve it from.
+
+To rotate, replace the Secret. Nothing needs to be reinstalled and no pod needs to
+be restarted: the agent re-applies the copy in the assistant's project namespace on
+the next reconcile of that project, and the running assistant then picks the new
+credential up on its own.
+
+Rotation is therefore **eventual, not immediate** — allow up to the agent's
+drift-reconcile interval (15 minutes by default) for the copy to be re-applied,
+plus a few seconds for the assistant to observe it. If you are rotating in response
+to a suspected disclosure and want the old credential out of use at once, restart
+the assistant's workload rather than waiting:
+
+```bash
+kubectl rollout restart deployment -n <the assistant's project namespace> -l dapr.io/app-id=reagent
 ```
 
 ### App Tunnels

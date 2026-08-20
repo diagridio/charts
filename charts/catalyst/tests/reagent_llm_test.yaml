@@ -1,0 +1,104 @@
+suite: Test the Catalyst Assistant model credential
+templates:
+  - agent/reagent-llm-secret.yaml
+  - agent/configmap.yaml
+
+tests:
+  # A region running no assistant, or one on a credential-free model provider, is
+  # a normal deployment. It must render no Secret and — more importantly — no
+  # half-set reference, because the agent treats a named secret it cannot read as
+  # a provisioning failure.
+  - it: renders nothing when no credential is configured
+    set:
+      join_token: "test-token"
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: agent/reagent-llm-secret.yaml
+      - notMatchRegex:
+          path: data["config.yaml"]
+          pattern: reagent_llm
+        template: agent/configmap.yaml
+
+  - it: creates a Secret and points the agent at it when a key is supplied inline
+    set:
+      join_token: "test-token"
+      agent.reagent.llm.apiKey: "sk-test-key"
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: agent/reagent-llm-secret.yaml
+      - equal:
+          path: metadata.name
+          value: agent-reagent-llm
+        template: agent/reagent-llm-secret.yaml
+      - equal:
+          path: data.api_key
+          value: c2stdGVzdC1rZXk=
+        template: agent/reagent-llm-secret.yaml
+      # The name and key have to travel to the agent, or the Secret exists and
+      # nothing reads it.
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "secret_name: agent-reagent-llm"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "secret_key: api_key"
+        template: agent/configmap.yaml
+
+  # The path a private or dedicated region uses: the customer creates the Secret
+  # themselves, so their key never passes through a values file.
+  - it: uses a pre-created Secret and creates none of its own
+    set:
+      join_token: "test-token"
+      agent.reagent.llm.existingSecret.name: "customer-model-key"
+      agent.reagent.llm.existingSecret.key: "token"
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: agent/reagent-llm-secret.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "secret_name: customer-model-key"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "secret_key: token"
+        template: agent/configmap.yaml
+
+  # An existing Secret wins over an inline key rather than both rendering. The
+  # discriminating assertion is that no chart Secret appears: rendering one whose
+  # name nothing references would leave the credential sitting unused in the
+  # cluster while the agent read the other.
+  - it: prefers a pre-created Secret over an inline key
+    set:
+      join_token: "test-token"
+      agent.reagent.llm.apiKey: "sk-ignored"
+      agent.reagent.llm.existingSecret.name: "customer-model-key"
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: agent/reagent-llm-secret.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "secret_name: customer-model-key"
+        template: agent/configmap.yaml
+      # Defaulted, not inherited from the ignored inline path.
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "secret_key: api_key"
+        template: agent/configmap.yaml
+
+  # The credential must never reach the ConfigMap. A ConfigMap is not a Secret:
+  # it is readable by anything that can read the namespace and is dumped whole by
+  # ordinary support tooling.
+  - it: never writes the credential into the agent ConfigMap
+    set:
+      join_token: "test-token"
+      agent.reagent.llm.apiKey: "sk-test-key"
+    asserts:
+      - notMatchRegex:
+          path: data["config.yaml"]
+          pattern: "sk-test-key"
+        template: agent/configmap.yaml

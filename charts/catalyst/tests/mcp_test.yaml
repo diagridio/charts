@@ -78,15 +78,22 @@ tests:
           content: "--base-url=http://management.other-ns.svc.cluster.local:9999"
         template: mcp/deployment.yaml
 
+  # The two image assertions below match the repository with a semver-SHAPED tag
+  # rather than a literal version, which is what every other image test in this chart
+  # does (see image_global_registry_test.yaml). CI runs
+  # `make update-catalyst-tags IMAGES_TAG=0.0.0` before the suite
+  # (.github/workflows/ci-catalyst-chart.yaml:52), so a hardcoded version passes
+  # locally and fails there — these asserted `:1.80.0` and had been red on every run
+  # since the suite landed. The repository is the property under test; the tag is not.
   - it: should not use the consolidated image, which lacks the catalyst-mcp binary
     set:
       join_token: "test-token"
       mcp.enabled: true
       global.consolidated_image.enabled: true
     asserts:
-      - equal:
+      - matchRegex:
           path: spec.template.spec.containers[0].image
-          value: us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-mcp:1.80.0
+          pattern: ^us-central1-docker\.pkg\.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-mcp:[0-9]+\.[0-9]+\.[0-9]+$
         template: mcp/deployment.yaml
 
   - it: should honor the global image registry override
@@ -95,9 +102,9 @@ tests:
       mcp.enabled: true
       global.image.registry: my-registry.io
     asserts:
-      - equal:
+      - matchRegex:
           path: spec.template.spec.containers[0].image
-          value: my-registry.io/catalyst-mcp:1.80.0
+          pattern: ^my-registry\.io/catalyst-mcp:[0-9]+\.[0-9]+\.[0-9]+$
         template: mcp/deployment.yaml
 
   - it: should probe the listener with tcpSocket, since there is no health endpoint
@@ -180,6 +187,60 @@ tests:
       # one and not the other, which would be a CrashLoopBackOff rather than a
       # render error.
       - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--controlplane-spec=./config/controlplane-openapi.yml"
+        template: mcp/deployment.yaml
+
+  # Derivation is a security control, so both branches are pinned: off by default
+  # (every existing deployment byte-identical), and fully wired when enabled.
+  - it: should not derive the data-sharing level by default
+    set:
+      join_token: "test-token"
+      mcp.enabled: true
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].args
+          content: "--derive-data-sharing"
+        template: mcp/deployment.yaml
+
+  - it: should derive the level from the organization when enabled
+    set:
+      join_token: "test-token"
+      mcp.enabled: true
+      mcp.deriveDataSharing: true
+      mcp.controlplaneBaseUrl: http://admingrid.controlplane.svc.cluster.local:3002
+      mcp.orgPolicyTtl: 45s
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--derive-data-sharing"
+        template: mcp/deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--org-policy-ttl=45s"
+        template: mcp/deployment.yaml
+      # No dedicated URL set, so the binary falls back to the controlplane one.
+      # The flag must be ABSENT rather than empty: --org-policy-base-url= would
+      # override the fallback with the empty string and fail validation at boot.
+      - notContains:
+          path: spec.template.spec.containers[0].args
+          content: "--org-policy-base-url="
+        template: mcp/deployment.yaml
+
+  - it: should let organization policy come from somewhere other than the tool upstream
+    set:
+      join_token: "test-token"
+      mcp.enabled: true
+      mcp.deriveDataSharing: true
+      mcp.orgPolicyBaseUrl: http://admingrid.controlplane.svc.cluster.local:3002
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--org-policy-base-url=http://admingrid.controlplane.svc.cluster.local:3002"
+        template: mcp/deployment.yaml
+      # Deriving the level must NOT drag in the controlplane tool surface: that is a
+      # separate decision about what the assistant can answer.
+      - notContains:
           path: spec.template.spec.containers[0].args
           content: "--controlplane-spec=./config/controlplane-openapi.yml"
         template: mcp/deployment.yaml
