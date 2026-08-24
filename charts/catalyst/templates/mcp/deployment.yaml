@@ -65,6 +65,11 @@ spec:
             {{- end }}
             - "--org-policy-ttl={{ .Values.mcp.orgPolicyTtl }}"
             {{- end }}
+            {{- if .Values.mcp.exposeRawOperations }}
+            - "--expose-raw-operations=true"
+            {{- else }}
+            - "--expose-raw-operations=false"
+            {{- end }}
             - "--timeout={{ .Values.mcp.upstreamTimeout }}"
             {{- if .Values.mcp.insecureSkipVerify }}
             - "--insecure-skip-verify"

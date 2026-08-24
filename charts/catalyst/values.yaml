@@ -40,7 +40,7 @@ global:
     # Helm chart from the registry. Override per overlay when the destination
     # registry hosts the dapr chart under a different name.
     daprChartName: "dapr"
-    # Non-empty routes Bitnami chart/image pulls to that registry (AMMP ECR overlay); empty uses GCP pull-through.
+    # Non-empty routes Bitnami chart/image pulls to that registry; empty uses GCP pull-through.
     bitnamiChartRegistry: ""
     bitnamiImageRegistry: ""
     # Empty defers to the agent's built-in defaults.
@@ -519,7 +519,7 @@ agent:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       image_name: "{{ ternary .Values.global.consolidated_image.repository \"sidecar\" .Values.global.consolidated_image.enabled }}"
       # image_tag is the sidecar image version
-      image_tag: "1.90.0"
+      image_tag: "1.91.0"
       resources:
         limits:
           cpu: 300m
@@ -604,7 +604,7 @@ agent:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       image_name: "{{ ternary .Values.global.consolidated_image.repository \"catalyst-otel-collector\" .Values.global.consolidated_image.enabled }}"
       # image_tag is the otel collector image version
-      image_tag: "1.90.0"
+      image_tag: "1.91.0"
       image_pull_policy: "Always"
       metrics_endpoint: https://catalyst-metrics.r1.diagrid.io/api/v1/push
       # The logs collector exports with otlphttp, so this must be Loki's OTLP
@@ -717,7 +717,7 @@ agent:
           registry: us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public
           # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
           name: "{{ ternary .Values.global.consolidated_image.repository \"private-sentry\" .Values.global.consolidated_image.enabled }}"
-          tag: "1.90.0"
+          tag: "1.91.0"
         jwt:
           enabled: true
           # managed means agent automatically does key rotation and JWKS updates.
@@ -813,7 +813,7 @@ agent:
     # Example: "diagrid/cra-agent" or "cra-agent"
     repository: cra-agent
     # tag is the image tag/version to use
-    tag: "1.90.0"
+    tag: "1.91.0"
     # pullPolicy is the image pull policy for this specific image.
     # If empty, uses global.image.pullPolicy.
     # Valid values: Always, IfNotPresent, Never
@@ -908,7 +908,7 @@ gateway:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       repository: identity-injector
       # tag is the image tag/version to use
-      tag: "1.90.0"
+      tag: "1.91.0"
       # pullPolicy is the image pull policy for this specific image.
       # If empty, uses global.image.pullPolicy.
       pullPolicy: ""
@@ -1033,7 +1033,7 @@ gateway:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       repository: catalyst-gateway
       # tag is the image tag/version to use
-      tag: "1.90.0"
+      tag: "1.91.0"
       # pullPolicy is the image pull policy for this specific image.
       # If empty, uses global.image.pullPolicy.
       pullPolicy: ""
@@ -1145,7 +1145,7 @@ management:
     # Deprecated: This field supports template evaluation for backwards compatibility.
     repository: "{{ ternary .Values.global.consolidated_image.repository \"catalyst-management\" .Values.global.consolidated_image.enabled }}"
     # tag is the image tag/version to use
-    tag: "1.90.0"
+    tag: "1.91.0"
     # pullPolicy is the image pull policy for this specific image.
     # If empty, uses global.image.pullPolicy.
     pullPolicy: ""
@@ -1293,6 +1293,19 @@ mcp:
   # derived in-cluster http:// base URL; only for an https:// baseUrl with a
   # certificate the pod does not trust (local development).
   insecureSkipVerify: false
+  # exposeRawOperations also registers one tool per OpenAPI operation, alongside
+  # the curated catalyst_* toolset.
+  #
+  # True here because reagent drives this server by raw operationId, and its
+  # MCPServerAccessPolicy grants those ids by name — turning this off would leave it
+  # holding a tool list its allow-list no longer matches. Stated explicitly rather
+  # than inherited from the binary's default, so the deployment that needs the raw
+  # surface is the one asking for it.
+  #
+  # Set false for any deployment reachable from outside the cluster: the raw surface
+  # is unannotated and includes every delete, and the binary refuses to start with it
+  # enabled alongside --public-url.
+  exposeRawOperations: true
   # extraArgs are appended verbatim to the container args.
   extraArgs: []
   image:
@@ -1304,7 +1317,7 @@ mcp:
     # OpenAPI spec, so this component never uses global.consolidated_image.
     repository: catalyst-mcp
     # tag is the image tag/version to use
-    tag: "1.90.0"
+    tag: "1.91.0"
     # pullPolicy is the image pull policy for this specific image.
     # If empty, uses global.image.pullPolicy.
     pullPolicy: ""

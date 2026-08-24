@@ -64,7 +64,28 @@ tests:
             - "--http-auth-mode=passthrough"
             - "--base-url=http://management.cra-agent.svc.cluster.local:8181"
             - "--spec=/app/config/openapi.yaml"
+            - "--expose-raw-operations=true"
             - "--timeout=30s"
+        template: mcp/deployment.yaml
+
+  # The raw surface is one tool per OpenAPI operation, unannotated and including
+  # every delete. reagent needs it and says so in values; anything reachable from
+  # outside the cluster must turn it off, and the binary refuses to start with it
+  # enabled alongside --public-url. Both branches are asserted because the flag is
+  # rendered by an if/else, where a template edit could silently drop one.
+  - it: should turn the raw operation surface off when asked
+    set:
+      join_token: "test-token"
+      mcp.enabled: true
+      mcp.exposeRawOperations: false
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--expose-raw-operations=false"
+        template: mcp/deployment.yaml
+      - notContains:
+          path: spec.template.spec.containers[0].args
+          content: "--expose-raw-operations=true"
         template: mcp/deployment.yaml
 
   - it: should honor an explicit baseUrl override

@@ -169,6 +169,19 @@ spec:
           {{- toYaml .Values.agent.extraEnvs | nindent 10 }}
           {{- end }}
           {{- include "inject.patch" (dict "patch" .Values.agent.patch.env "indent" 10) }}
+          # startupProbe gates liveness until boot completes. It has to target
+          # /ready, not /livez: /livez goes true early in boot and then back to
+          # false while root dapr is reinstalled, so a startupProbe on /livez
+          # would succeed, hand over to liveness, and let liveness kill the pod
+          # mid-boot. /ready is registered only on the last line of boot, so
+          # the whole boot sits inside the startup phase — and a boot that
+          # genuinely hangs is still restarted once the budget below runs out.
+          startupProbe:
+            httpGet:
+              path: /ready
+              port: probes
+            failureThreshold: 60
+            periodSeconds: 5
           livenessProbe:
             httpGet:
               path: /livez

@@ -4,10 +4,8 @@
   {{- $_ := set $agentConfig.host "join_token" .Values.join_token -}}
 {{- end -}}
 {{- /* Default ingress.service.namespace to the release namespace when the
-       value is empty. Marketplace deployments leave it blank in their buyer-
-       side overlay (deploy/aws-marketplace/cloudformation/catalyst-values.yaml.tmpl
-       in the cloudgrid repo) with a comment promising render-time resolution;
-       this block fulfills that promise. */ -}}
+       value is empty, so a buyer-side overlay can leave it blank and rely on
+       render-time resolution. */ -}}
 {{- if and $agentConfig.host.ingress.service.name (not $agentConfig.host.ingress.service.namespace) -}}
   {{- $_ := set $agentConfig.host.ingress.service "namespace" .Release.Namespace -}}
 {{- end -}}
@@ -135,7 +133,7 @@
   {{- if .Values.global.charts.daprChartName -}}
     {{- $_ := set $agentConfig.artifacts "internal_dapr_chart_name" .Values.global.charts.daprChartName -}}
   {{- end -}}
-  {{- /* Route Bitnami chart + image pulls to the AMMP ECR namespace when set; empty preserves default docker.io behavior. */ -}}
+  {{- /* Route Bitnami chart + image pulls to a private registry when set; empty preserves default docker.io behavior. */ -}}
   {{- if .Values.global.charts.bitnamiChartRegistry -}}
     {{- $_ := set $agentConfig.artifacts "bitnami_chart_registry" .Values.global.charts.bitnamiChartRegistry -}}
   {{- end -}}
