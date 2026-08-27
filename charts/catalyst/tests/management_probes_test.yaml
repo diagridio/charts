@@ -1,0 +1,79 @@
+suite: Test management deployment health probes
+templates:
+  - management/deployment.yaml
+  - management/configmap.yaml
+
+tests:
+  - it: should render the readiness probe with generous defaults, and no liveness probe
+    # Generous on purpose: the command-stream client backs off up to 30s on
+    # reconnect (commandstream/client.go), so the budget below
+    # (failureThreshold * periodSeconds) sits comfortably past that ceiling —
+    # a pod riding out one backoff cycle must not be pulled from service for it.
+    #
+    # And no liveness probe by default: /livez and /ready are backed by the same
+    # hz.IsReady, so a liveness probe would restart pods for an EventsService
+    # outage a restart cannot fix. See the comment in values.yaml.
+    set:
+      join_token: "test-token"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe
+          value:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+        template: management/deployment.yaml
+      - notExists:
+          path: spec.template.spec.containers[0].livenessProbe
+        template: management/deployment.yaml
+
+  - it: should honour readiness probe overrides
+    set:
+      join_token: "test-token"
+      management.readinessProbe.periodSeconds: 20
+      management.readinessProbe.timeoutSeconds: 2
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.periodSeconds
+          value: 20
+        template: management/deployment.yaml
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.timeoutSeconds
+          value: 2
+        template: management/deployment.yaml
+      # Untouched fields keep their default.
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /ready
+        template: management/deployment.yaml
+
+  - it: should omit the readiness probe entirely when set to null
+    set:
+      join_token: "test-token"
+      management.readinessProbe: null
+    asserts:
+      - notExists:
+          path: spec.template.spec.containers[0].readinessProbe
+        template: management/deployment.yaml
+
+  - it: should render a liveness probe when an operator opts in
+    # The template hook stays, so an operator who has split livez off hz.IsReady
+    # can set one. It is only the default that is absent.
+    set:
+      join_token: "test-token"
+      management.livenessProbe.httpGet.path: /livez
+      management.livenessProbe.httpGet.port: 8080
+      management.livenessProbe.failureThreshold: 10
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet.path
+          value: /livez
+        template: management/deployment.yaml
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.failureThreshold
+          value: 10
+        template: management/deployment.yaml

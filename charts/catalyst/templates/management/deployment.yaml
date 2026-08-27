@@ -154,6 +154,14 @@ spec:
           ports:
           {{- include "inject.patch" (dict "patch" .Values.management.patch.ports "indent" 10) }}
           {{- end }}
+          {{- with .Values.management.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.management.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           resources:
             {{- if .Values.management.merge.resources }}
               {{- toYaml .Values.management.merge.resources | nindent 12 }}

@@ -1187,6 +1187,28 @@ management:
   # readOnlyRootFilesystem: true
   # runAsUser: 1000
 
+  # /ready is backed by the shared healthz.Healthz in cmd/management/main.go, so
+  # it only succeeds once every registered target is ready — including the
+  # "command-stream" target tracking the gRPC connection to cloudgrid's
+  # EventsService. main.go serves both probes on port 8080.
+  #
+  # failureThreshold * periodSeconds is deliberately well past the command
+  # stream's 30s reconnect backoff ceiling, so a pod riding out one backoff
+  # cycle against a slow controlplane keeps taking traffic.
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: 8080
+    initialDelaySeconds: 15
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 6
+  # No liveness probe, on purpose: main.go backs /livez with the same hz.IsReady
+  # as /ready, so one would restart pods for being unable to reach cloudgrid's
+  # EventsService — which a restart does not fix, and an outage of it would then
+  # roll every management pod in every region. Split livez off hz.IsReady in
+  # main.go before setting one here.
+  livenessProbe: null
   resources:
     limits:
       memory: 1200Mi
