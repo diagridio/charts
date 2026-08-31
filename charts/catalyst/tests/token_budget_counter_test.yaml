@@ -1,0 +1,71 @@
+suite: Test mediated LLM token-budget counter derivation
+templates:
+  - management/configmap.yaml
+
+tests:
+  - it: is absent by default, so management registers no mediated counter
+    set:
+      join_token: "test-token"
+    asserts:
+      - notMatchRegex:
+          path: data["config.yaml"]
+          pattern: "token_budget_counter"
+
+  - it: is derived from the agent's rate-limit service when that is enabled
+    # One switch enables both sides: the agent installs the counter service and
+    # management becomes its only permitted caller.
+    set:
+      join_token: "test-token"
+      agent:
+        config:
+          project:
+            ratelimit_service:
+              enabled: true
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "token_budget_counter:"
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "enabled: true"
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "endpoint: shared-ratelimit-rls\\.shared-ratelimit-redis\\.svc\\.cluster\\.local:8081"
+
+  - it: stays absent when the agent's rate-limit service is explicitly disabled
+    set:
+      join_token: "test-token"
+      agent:
+        config:
+          project:
+            ratelimit_service:
+              enabled: false
+    asserts:
+      - notMatchRegex:
+          path: data["config.yaml"]
+          pattern: "token_budget_counter"
+
+  - it: an explicit management override wins over the derivation
+    set:
+      join_token: "test-token"
+      agent:
+        config:
+          project:
+            ratelimit_service:
+              enabled: true
+      management:
+        config:
+          token_budget_counter:
+            enabled: true
+            endpoint: "rls.example.com:8081"
+            domain: "custom-domain"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "endpoint: rls\\.example\\.com:8081"
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "domain: custom-domain"
+      - notMatchRegex:
+          path: data["config.yaml"]
+          pattern: "shared-ratelimit-rls"

@@ -64,7 +64,7 @@ tests:
             - "--http-auth-mode=passthrough"
             - "--base-url=http://management.cra-agent.svc.cluster.local:8181"
             - "--spec=/app/config/openapi.yaml"
-            - "--expose-raw-operations=true"
+            - "--expose-raw-operations=false"
             - "--timeout=30s"
         template: mcp/deployment.yaml
 
