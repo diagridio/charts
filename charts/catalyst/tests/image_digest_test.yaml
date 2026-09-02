@@ -1,0 +1,200 @@
+# Covers RFC0033: every Diagrid-supplied runtime image must be renderable as an
+# immutable digest reference (registry/repository@sha256:<64 hex>) instead of a
+# mutable tag. See catalyst.image in templates/_helpers.tpl.
+#
+# Note on the "invalid digest" cases: every Diagrid-supplied image.digest field
+# is also constrained by values.schema.json with the identical
+# "^(sha256:[0-9a-f]{64})?$" pattern, and Helm validates that schema BEFORE
+# executing any template. So an invalid digest on a schema-covered field (e.g.
+# agent.image.digest) never reaches catalyst.image's own `fail` — it is
+# rejected earlier, in a way helm-unittest's `failedTemplate.errorMessage`
+# cannot match against (see the bare `failedTemplate: {}` case below). To
+# exercise catalyst.image's own validation message directly, this file uses
+# global.waitForDaprConfig.image.digest, which has no values.schema.json entry
+# at all.
+suite: Test Immutable Digest Image References
+templates:
+  - agent/deployment.yaml
+  - agent/configmap.yaml
+  - management/deployment.yaml
+  - management/configmap.yaml
+  - gateway/deployment.yaml
+  - gateway/configmap.yaml
+  - gateway/gateway-controlplane-configmap.yaml
+  - piko/statefulset.yaml
+  - piko/configmap.yaml
+  - mcp/deployment.yaml
+  - mcp/service.yaml
+  - mcp/serviceaccount.yaml
+tests:
+  - it: should render cra-agent with a digest
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: false
+      agent.image.digest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: "us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/cra-agent@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        template: agent/deployment.yaml
+
+  - it: should render identity-injector with a digest
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: false
+      gateway.controlplane.xds.mtls.enabled: true
+      gateway.identityInjector.image.digest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: "us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/identity-injector@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        template: gateway/deployment.yaml
+        documentIndex: 0
+
+  - it: should render catalyst-gateway (controlplane) with a digest
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: false
+      gateway.controlplane.xds.mtls.enabled: false
+      gateway.controlplane.image.digest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: "us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-gateway@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        template: gateway/deployment.yaml
+        documentIndex: 1
+
+  - it: should render catalyst-management with a digest
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: false
+      management.image.digest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: "us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-management@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        template: management/deployment.yaml
+
+  - it: should render catalyst-mcp with a digest
+    set:
+      join_token: "test-token"
+      mcp.enabled: true
+      mcp.image.digest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: "us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-mcp@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        template: mcp/deployment.yaml
+
+  - it: should render diagrid-piko with a digest
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: false
+      piko.image.digest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: "us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/diagrid-piko@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        template: piko/statefulset.yaml
+
+  - it: should ignore tag and drop it entirely when digest is also set
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: false
+      agent.image.tag: "9.9.9"
+      agent.image.digest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: "us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/cra-agent@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        template: agent/deployment.yaml
+      - notMatchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: "cra-agent:"
+        template: agent/deployment.yaml
+
+  - it: should combine digest with global.image.registry
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: false
+      global.image.registry: "my-registry.io"
+      agent.image.digest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: "my-registry.io/cra-agent@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        template: agent/deployment.yaml
+
+  - it: should use the component's own digest under the consolidated image (repository/registry swap, digest unchanged)
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: true
+      agent.image.digest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: "us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        template: agent/deployment.yaml
+
+  - it: should let global.consolidated_image.digest win over every component's own tag AND digest
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: true
+      global.consolidated_image.digest: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      agent.image.tag: "9.9.9"
+      agent.image.digest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: "us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        template: agent/deployment.yaml
+
+  - it: should render the wait-for-dapr-config init container with a digest
+    set:
+      join_token: "test-token"
+      global.waitForDaprConfig.image.digest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].image
+          value: "us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy/alpine/k8s@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        template: management/deployment.yaml
+
+  # global.waitForDaprConfig has no values.schema.json entry, so this is the one
+  # place an invalid digest reaches catalyst.image's own `fail` (see suite
+  # comment above) and we can assert on its exact message.
+  - it: should fail the render for a malformed digest with a message naming the repository and the bad value
+    set:
+      join_token: "test-token"
+      global.waitForDaprConfig.image.digest: "sha256:not-a-real-digest"
+    asserts:
+      - failedTemplate:
+          errorMessage: 'alpine/k8s: invalid image digest "sha256:not-a-real-digest" — must match sha256:<64 lowercase hex characters>'
+        template: management/deployment.yaml
+
+  # For a Diagrid-supplied image, the same malformed digest is instead caught
+  # earlier by values.schema.json, which aborts the whole render before any
+  # template (and its `fail` calls) ever runs — helm-unittest surfaces that as
+  # an unmatchable error, so only a bare failedTemplate (no errorMessage) can
+  # assert it here.
+  - it: should also refuse a malformed digest on a Diagrid-supplied image (caught by the values schema)
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: false
+      agent.image.digest: "sha256:not-a-real-digest"
+    asserts:
+      - failedTemplate: {}
+        template: agent/deployment.yaml
+
+  - it: should still render repository:tag when no digest is set (regression)
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: false
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ^us-central1-docker\.pkg\.dev/prj-common-p-shared-79896/reg-p-common-docker-public/cra-agent:[0-9]+\.[0-9]+\.[0-9]+$
+        template: agent/deployment.yaml
+      - matchRegex:
+          path: spec.template.spec.initContainers[0].image
+          pattern: ^us-central1-docker\.pkg\.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy/alpine/k8s:[0-9]+\.[0-9]+\.[0-9]+$
+        template: management/deployment.yaml

@@ -33,6 +33,35 @@ helm install catalyst oci://public.ecr.aws/diagrid/catalyst \
      --set join_token="${JOIN_TOKEN}"
 ```
 
+### Chart channels
+
+| Channel | Repository | Contains |
+|---------|-----------|----------|
+| Stable | `oci://public.ecr.aws/diagrid/catalyst` | Released versions. This is the path above, and what you want. |
+| Stable | `oci://public.ecr.aws/diagrid/stable/catalyst` | The same released versions, under an explicit channel path. |
+| Candidate | `oci://public.ecr.aws/diagrid/candidate/catalyst` | Release candidates, published for testing before a release. Opt-in; pin the exact version. |
+
+Release candidates are published only to the candidate path. The two stable
+paths carry the same charts, so either works and existing installs keep
+working unchanged.
+
+The command has no `--version`, so it installs whichever version the registry
+reports as highest. That is a convenience for a first look, not a guarantee of
+what you get — pin `--version <version>` for anything you intend to keep, and
+for every environment you want to reproduce.
+
+To try a release candidate, install it from the candidate channel with an
+explicit version:
+
+```bash
+helm install catalyst oci://public.ecr.aws/diagrid/candidate/catalyst \
+     --version <version>-rc.<n> \
+     -n cra-agent \
+     --create-namespace \
+     -f catalyst-values.yaml \
+     --set join_token="${JOIN_TOKEN}"
+```
+
 ## Step 3: Verify the Installation
 
 ```bash

@@ -164,6 +164,12 @@ global:
     # repository is the image repository path (without registry or tag).
     # Example: "catalyst-all" or "diagrid/catalyst-all"
     repository: catalyst-all
+    # digest, if set, pins this image to an exact content digest
+    # ("sha256:<64 lowercase hex characters>") and wins over tag, producing an
+    # immutable reference of the form registry/repository@sha256:.... For the
+    # consolidated image this takes precedence over every component's own
+    # image.tag AND image.digest. Leave empty (the default) to use tag.
+    digest: ""
     # pullPolicy is the image pull policy for the consolidated image
     # If not set, uses global.image.pullPolicy
     pullPolicy: ""
@@ -187,6 +193,8 @@ global:
       registry: us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy
       repository: alpine/k8s
       tag: "1.36.0"
+      # digest, if set, wins over tag (see global.consolidated_image.digest above).
+      digest: ""
       pullPolicy: IfNotPresent
     # resources for the init container — small footprint, polls only.
     resources:
@@ -519,7 +527,7 @@ agent:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       image_name: "{{ ternary .Values.global.consolidated_image.repository \"sidecar\" .Values.global.consolidated_image.enabled }}"
       # image_tag is the sidecar image version
-      image_tag: "1.95.0"
+      image_tag: "1.96.0"
       resources:
         limits:
           cpu: 300m
@@ -604,7 +612,7 @@ agent:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       image_name: "{{ ternary .Values.global.consolidated_image.repository \"catalyst-otel-collector\" .Values.global.consolidated_image.enabled }}"
       # image_tag is the otel collector image version
-      image_tag: "1.95.0"
+      image_tag: "1.96.0"
       image_pull_policy: "Always"
       metrics_endpoint: https://catalyst-metrics.r1.diagrid.io/api/v1/push
       # The logs collector exports with otlphttp, so this must be Loki's OTLP
@@ -717,7 +725,7 @@ agent:
           registry: us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public
           # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
           name: "{{ ternary .Values.global.consolidated_image.repository \"private-sentry\" .Values.global.consolidated_image.enabled }}"
-          tag: "1.95.0"
+          tag: "1.96.0"
         jwt:
           enabled: true
           # managed means agent automatically does key rotation and JWKS updates.
@@ -813,7 +821,9 @@ agent:
     # Example: "diagrid/cra-agent" or "cra-agent"
     repository: cra-agent
     # tag is the image tag/version to use
-    tag: "1.95.0"
+    tag: "1.96.0"
+    # digest, if set, wins over tag (see global.consolidated_image.digest above).
+    digest: ""
     # pullPolicy is the image pull policy for this specific image.
     # If empty, uses global.image.pullPolicy.
     # Valid values: Always, IfNotPresent, Never
@@ -908,7 +918,9 @@ gateway:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       repository: identity-injector
       # tag is the image tag/version to use
-      tag: "1.95.0"
+      tag: "1.96.0"
+      # digest, if set, wins over tag (see global.consolidated_image.digest above).
+      digest: ""
       # pullPolicy is the image pull policy for this specific image.
       # If empty, uses global.image.pullPolicy.
       pullPolicy: ""
@@ -943,6 +955,8 @@ gateway:
       repository: envoyproxy/envoy
       # tag is the image tag/version to use
       tag: distroless-v1.38.0
+      # digest, if set, wins over tag (see global.consolidated_image.digest above).
+      digest: ""
       # pullPolicy is the image pull policy for this specific image.
       # If empty, uses global.image.pullPolicy.
       pullPolicy: ""
@@ -1033,7 +1047,9 @@ gateway:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       repository: catalyst-gateway
       # tag is the image tag/version to use
-      tag: "1.95.0"
+      tag: "1.96.0"
+      # digest, if set, wins over tag (see global.consolidated_image.digest above).
+      digest: ""
       # pullPolicy is the image pull policy for this specific image.
       # If empty, uses global.image.pullPolicy.
       pullPolicy: ""
@@ -1145,7 +1161,9 @@ management:
     # Deprecated: This field supports template evaluation for backwards compatibility.
     repository: "{{ ternary .Values.global.consolidated_image.repository \"catalyst-management\" .Values.global.consolidated_image.enabled }}"
     # tag is the image tag/version to use
-    tag: "1.95.0"
+    tag: "1.96.0"
+    # digest, if set, wins over tag (see global.consolidated_image.digest above).
+    digest: ""
     # pullPolicy is the image pull policy for this specific image.
     # If empty, uses global.image.pullPolicy.
     pullPolicy: ""
@@ -1329,23 +1347,40 @@ mcp:
   # deployment would also silently empty Reagent's tool list — the Rego gates on the
   # advertised tool name, so a curated grant matches nothing once the names revert
   # to operationIds.
-  # ⚠️ DEPLOY ORDER: controlplane BEFORE dataplane.
+  # ⚠️ CHANGING THIS RETIRES A GRANT, AND THE STORED GRANT LAGS EVERY DEPLOY.
   #
-  # The grant ships with the controlplane and this default ships with the
-  # dataplane, and release.config.yaml releases them as separate components, so
-  # nothing enforces the order. One of the two windows is broken and does not
-  # self-heal until the other side lands:
+  # The advertised names come from this chart, on the dataplane. The names the
+  # grant asks for come from services/catalyst/pkg/reagent.GrantedTools, on the
+  # controlplane. When the two disagree, tools/list matches nothing and Reagent is
+  # filtered down to no tools at all — reaching a user as an assistant that
+  # answers "I cannot see your project" rather than as an error anyone pages on.
   #
-  #   new chart + old grant  BROKEN. tools/list serves only catalyst_* names and
-  #                          the old operationId grant matches none of them, so
-  #                          Reagent is filtered down to no tools at all.
-  #   old chart + new grant  Safe. Both surfaces are advertised, the curated
-  #                          subset matches, and Reagent works immediately.
+  # This comment used to say "roll the controlplane first and the dataplane
+  # second". That advice was wrong twice over, and is recorded here rather than
+  # quietly deleted because it reads so plausibly:
   #
-  # So roll the controlplane first and the dataplane second. Reversing it takes
-  # the assistant's tools away for the length of the gap, and the symptom is an
-  # assistant that answers "I cannot see your project" rather than an error
-  # anyone would page on.
+  #   1. There is no such lever. One deploy PR rewrites both
+  #      deploy/config/controlplane/<env>/ and
+  #      deploy/config/catalyst-dataplane/<env>/, and ArgoCD syncs both on merge.
+  #      Nobody chooses an order.
+  #
+  #   2. It would not have helped. The half that goes stale is not the
+  #      controlplane's CODE but the STORED MCPServerAccessPolicy, which
+  #      reagentprovision rewrites only when it converges. That lags every deploy
+  #      whatever order the components land in, so a perfectly ordered rollout
+  #      opens the same window.
+  #
+  # What actually closes it is the converge sweep. RegionAssistantState compares
+  # the stored grant against grantedTools, and a mismatch reports StateGrantStale
+  # and is re-driven within one sweep interval — ten minutes by default, where it
+  # used to wait on the region controller's six-hourly resync.
+  #
+  # So the operational answer to a grant change is not an ordering ritual. It is:
+  # expect a window of up to one sweep interval, and if an assistant is still
+  # toolless after that, look for
+  # catalyst_reagent_regions{state="grant_stale"} — the sweep's gauge, not the
+  # converge_attempts_total counter, which the reconcile path feeds and which
+  # never carries this state.
   exposeRawOperations: false
   # extraArgs are appended verbatim to the container args.
   extraArgs: []
@@ -1358,7 +1393,9 @@ mcp:
     # OpenAPI spec, so this component never uses global.consolidated_image.
     repository: catalyst-mcp
     # tag is the image tag/version to use
-    tag: "1.95.0"
+    tag: "1.96.0"
+    # digest, if set, wins over tag (see global.consolidated_image.digest above).
+    digest: ""
     # pullPolicy is the image pull policy for this specific image.
     # If empty, uses global.image.pullPolicy.
     pullPolicy: ""
@@ -1449,6 +1486,8 @@ piko:
     repository: diagrid-piko
     # tag is the image tag/version to use
     tag: "v1.0.1"
+    # digest, if set, wins over tag (see global.consolidated_image.digest above).
+    digest: ""
     # pullPolicy is the image pull policy for this specific image.
     # If empty, uses global.image.pullPolicy.
     pullPolicy: IfNotPresent
@@ -1809,6 +1848,8 @@ cleanup:
     repository: alpine/k8s
     # tag is the image tag/version
     tag: "1.36.0"
+    # digest, if set, wins over tag (see global.consolidated_image.digest above).
+    digest: ""
     # pullPolicy is the image pull policy
     pullPolicy: IfNotPresent
 #------------------------------------------------------------------------------

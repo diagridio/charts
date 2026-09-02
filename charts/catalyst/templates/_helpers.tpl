@@ -174,14 +174,23 @@ This helper:
 1. Uses global.image.registry if set, otherwise uses the component's registry (or consolidated registry if using consolidated image)
 2. Uses consolidated_image.repository if consolidated_image.enabled is true
 3. Properly constructs the full image reference as registry/repository:tag
+4. When image.digest is set (or consolidated_image.digest, if using the consolidated
+   image), renders registry/repository@<digest> instead, ignoring tag entirely, and
+   fails the render if the digest is not a well-formed "sha256:<64 hex chars>" value.
+   This is the only place in the chart that constructs an image reference — see
+   catalyst.waitForDaprConfigInitContainer below.
 */}}
 {{- define "catalyst.image" -}}
 {{- $registry := .image.registry -}}
 {{- $repository := .image.repository -}}
+{{- $digest := .image.digest | default "" -}}
 {{- $tag := include "catalyst.imageTag" (dict "image" .image) -}}
 {{- if and .consolidated .consolidated.enabled -}}
   {{- $repository = .consolidated.repository -}}
   {{- $registry = .consolidated.registry -}}
+  {{- if .consolidated.digest -}}
+    {{- $digest = .consolidated.digest -}}
+  {{- end -}}
 {{- end -}}
 {{- if .global.registry -}}
   {{- $registry = .global.registry -}}
@@ -189,7 +198,16 @@ This helper:
 {{- if kindIs "string" $repository -}}
   {{- $repository = tpl $repository .context -}}
 {{- end -}}
-{{- if $registry -}}
+{{- if $digest -}}
+  {{- if not (regexMatch "^sha256:[0-9a-f]{64}$" $digest) -}}
+    {{- fail (printf "%s: invalid image digest %q — must match sha256:<64 lowercase hex characters>" $repository $digest) -}}
+  {{- end -}}
+  {{- if $registry -}}
+{{- printf "%s/%s@%s" $registry $repository $digest -}}
+  {{- else -}}
+{{- printf "%s@%s" $repository $digest -}}
+  {{- end -}}
+{{- else if $registry -}}
 {{- printf "%s/%s:%s" $registry $repository $tag -}}
 {{- else -}}
 {{- printf "%s:%s" $repository $tag -}}
@@ -255,9 +273,8 @@ Usage:
 {{- define "catalyst.waitForDaprConfigInitContainer" -}}
 {{- $w := .context.Values.global.waitForDaprConfig -}}
 {{- if $w.enabled -}}
-{{- $wRegistry := or $w.image.registry .context.Values.global.registry -}}
 - name: wait-for-dapr-config
-  image: "{{ $wRegistry }}/{{ $w.image.repository }}:{{ $w.image.tag }}"
+  image: {{ include "catalyst.image" (dict "image" $w.image "consolidated" nil "global" .context.Values.global.image "context" .context) }}
   imagePullPolicy: {{ $w.image.pullPolicy }}
   command:
     - sh

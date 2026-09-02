@@ -320,6 +320,11 @@
                             "type": "string",
                             "default": "catalyst-all"
                         },
+                        "digest": {
+                            "type": "string",
+                            "pattern": "^(sha256:[0-9a-f]{64})?$",
+                            "description": "Optional content digest that pins the consolidated image to an immutable reference, overriding tag"
+                        },
                         "pullPolicy": {
                             "type": "string",
                             "enum": [
@@ -1350,6 +1355,11 @@
                 "tag": {
                     "type": "string",
                     "description": "Image tag/version"
+                },
+                "digest": {
+                    "type": "string",
+                    "pattern": "^(sha256:[0-9a-f]{64})?$",
+                    "description": "Optional content digest that pins this image to an immutable reference, overriding tag"
                 },
                 "pullPolicy": {
                     "type": "string",

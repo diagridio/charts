@@ -8,9 +8,10 @@ help: ## Show this help message.
 	@echo ""
 	@echo "CHART_DIR:  The directory of the helm chart (default: ./charts/catalyst)"
 	@echo "CHART_NAME: The name of the helm chart (default: catalyst)"
-	@echo "VERSION:    The version of the helm chart (default: 0.0.0-<git sha>)"
+	@echo "VERSION:    The version of the helm chart (default: 0.0.0-edge)"
 	@echo "REGISTRY:   The OCI registry to push the helm chart to"
 	@echo "REPO:       The repository to push the helm chart to"
+	@echo "CHANNEL:    The publication channel to push to: stable, candidate or edge (no default)"
 	@echo ""
 	@echo "The following targets are available:"
 	@awk 'BEGIN {FS = ":.*##"; printf "\n  make \033[36m\033[0m\n"} \
@@ -24,6 +25,33 @@ help: ## Show this help message.
 VERSION ?= 0.0.0-edge
 CHART_DIR ?= ./charts/catalyst
 CHART_NAME ?= catalyst
+
+# CHANNEL is the publication channel helm-push publishes to. Each channel is
+# its own repository prefix under $(REPO), so a release candidate published for
+# testing is never served to an install that asked for a release.
+#
+# There is deliberately no default. The unprefixed path is what the documented
+# install command resolves against, so a caller that has not said which channel
+# it is publishing must fail rather than land there by omission.
+#
+# Resolve it from a release version with:
+#   go run ./deploy/tools/cmd/release/chart-channel <version-or-tag>
+CHANNEL ?=
+VALID_CHANNELS := stable candidate edge
+
+# Channels that also publish to the unprefixed compatibility path
+# (oci://$(REGISTRY)/$(REPO)/$(CHART_NAME)).
+#
+#   stable — required: every existing install and every documented install
+#            command resolves against that path.
+# Edge was here too, because the edge chart published to the unprefixed path
+# from before channels existed and its consumers still read it there. They now
+# resolve $(REPO)/edge/$(CHART_NAME), so the mirror is stable's alone.
+#
+# This is the ONLY statement of the mirror rule. An earlier version also
+# computed it in Go, which is how the two came to disagree, and nothing read
+# the Go. The publish step passes CHANNEL and this decides the rest.
+COMPAT_MIRROR_CHANNELS := stable
 
 .PHONY: helm-lint
 helm-lint: helm-prereqs ## Lint the helm chart
@@ -91,8 +119,37 @@ helm-package: helm-clean ## Package helm chart
 	cd $(CHART_DIR) && \
 	helm package . --version $(VERSION) --destination ./dist
 
+.PHONY: check-channel
+check-channel: ## Fail unless CHANNEL names a valid publication channel
+	@if [ -z "$(CHANNEL)" ]; then \
+		echo "CHANNEL is not set. Set CHANNEL to one of: $(VALID_CHANNELS)"; \
+		echo "Resolve it from a release version with:"; \
+		echo "  go run ./deploy/tools/cmd/release/chart-channel <version-or-tag>"; \
+		exit 1; \
+	fi
+	@case " $(VALID_CHANNELS) " in \
+		*" $(CHANNEL) "*) ;; \
+		*) echo "CHANNEL must be one of: $(VALID_CHANNELS) (got '$(CHANNEL)')"; exit 1 ;; \
+	esac
+
 .PHONY: helm-push
-helm-push: helm-package ## Push the Helm chart to the OCI registry
+helm-push: check-channel helm-package ## Push the Helm chart to the OCI registry for CHANNEL
+	cd $(CHART_DIR) && \
+	helm push ./dist/$(CHART_NAME)-$(VERSION).tgz oci://$(REGISTRY)/$(REPO)/$(CHANNEL)
+ifneq ($(filter $(CHANNEL),$(COMPAT_MIRROR_CHANNELS)),)
+	cd $(CHART_DIR) && \
+	helm push ./dist/$(CHART_NAME)-$(VERSION).tgz oci://$(REGISTRY)/$(REPO)
+endif
+
+# helm-push-preview publishes to the unprefixed path with no channel, for a
+# throwaway chart in a DEVELOPMENT registry — the per-PR preview built by
+# deploy/Makefile's helm-package-pr. It is deliberately a separate target
+# rather than a CHANNEL value: helm-push's guard protects the public release
+# path, and an escape hatch spelled "none" would sit one typo away from
+# publishing an unchannelled chart to it. A reviewer seeing this target name
+# next to a public registry knows immediately that it is wrong.
+.PHONY: helm-push-preview
+helm-push-preview: helm-package ## Push an unchannelled preview chart (development registries only)
 	cd $(CHART_DIR) && \
 	helm push ./dist/$(CHART_NAME)-$(VERSION).tgz oci://$(REGISTRY)/$(REPO)
 

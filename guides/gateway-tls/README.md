@@ -27,6 +27,11 @@ helm install catalyst oci://public.ecr.aws/diagrid/catalyst \
   --set-file gateway.tls.key=server-key.pem
 ```
 
+Without `--version` this installs whichever version the registry reports as
+highest, which is fine for a dev cluster but is not a guarantee of what you
+get — pin `--version <version>` anywhere you need a reproducible install. See
+[chart channels](../getting-started/README.md#chart-channels).
+
 with the values:
 
 ```yaml
