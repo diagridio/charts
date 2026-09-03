@@ -1,0 +1,60 @@
+suite: Test agent project-namespace RBAC
+templates:
+  - agent/rbac.yaml
+
+tests:
+  # The namespace release reconciles an EXISTING project namespace, so applying the
+  # rendered manifest is a patch, not only a create. Without namespaces:patch every
+  # project sync fails at its first step and the Helm rollback that follows fails
+  # identically, which is how 178 production projects wedged at once when
+  # namespaceVersion was bumped (it re-reconciles every project namespace).
+  - it: grants namespaces patch by default, so an existing project namespace can reconcile
+    documentIndex: 0
+    set:
+      join_token: "test-token"
+    asserts:
+      - isKind:
+          of: ClusterRole
+      - contains:
+          path: rules
+          content:
+            apiGroups: [""]
+            resources: ["namespaces"]
+            verbs: ["get", "list", "watch", "create", "delete", "patch"]
+
+  # region_usage is off by default and grants namespaces:patch for its own reason
+  # (backfilling the managed marker onto infra namespaces). The grant above must not
+  # depend on it — that dependency is exactly what left production without patch.
+  - it: grants namespaces patch even with region-usage disabled
+    documentIndex: 0
+    set:
+      join_token: "test-token"
+      agent.config.region_usage.enabled: false
+    asserts:
+      - contains:
+          path: rules
+          content:
+            apiGroups: [""]
+            resources: ["namespaces"]
+            verbs: ["get", "list", "watch", "create", "delete", "patch"]
+
+  # When the namespace is pre-provisioned and reaped by an external owner the agent
+  # owns none of its lifecycle, so it gets neither create, delete nor patch.
+  - it: withholds create, delete and patch when namespaces are externally managed
+    documentIndex: 0
+    set:
+      join_token: "test-token"
+      agent.config.project.externally_managed_namespaces: true
+    asserts:
+      - contains:
+          path: rules
+          content:
+            apiGroups: [""]
+            resources: ["namespaces"]
+            verbs: ["get", "list", "watch"]
+      - notContains:
+          path: rules
+          content:
+            apiGroups: [""]
+            resources: ["namespaces"]
+            verbs: ["get", "list", "watch", "create", "delete", "patch"]

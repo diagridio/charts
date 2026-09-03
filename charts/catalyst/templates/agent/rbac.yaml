@@ -7,18 +7,24 @@ rules:
 # Agent binary — direct kubernetes client calls (non-Helm)
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Project namespaces — get/list/watch always; create/delete only when the agent owns
-# the namespace lifecycle. When project.externally_managed_namespaces is true the
-# namespace is pre-provisioned and reaped by an external owner, so the agent needs
-# neither create nor delete on namespaces.
+# Project namespaces — get/list/watch always; create/delete/patch only when the
+# agent owns the namespace lifecycle. When project.externally_managed_namespaces is
+# true the namespace is pre-provisioned and reaped by an external owner, so the
+# agent needs none of the three.
 # `watch` is required for no-escalation when installing the Dapr chart
 # (dapr-scheduler ClusterRole grants namespaces:{get,list,watch}).
+# `patch` is required because the namespace release reconciles an EXISTING project
+# namespace, not just creates a new one: the rendered manifest carries labels, so
+# changing them (or bumping namespaceVersion, which re-reconciles every project)
+# applies as a patch. Without it every sync fails at its first step, and the Helm
+# rollback that follows fails the same way. See the region_usage block below,
+# which needs patch on infra namespaces for an unrelated reason.
 - apiGroups: [""]
   resources: ["namespaces"]
   {{- if .Values.agent.config.project.externally_managed_namespaces }}
   verbs: ["get", "list", "watch"]
   {{- else }}
-  verbs: ["get", "list", "watch", "create", "delete"]
+  verbs: ["get", "list", "watch", "create", "delete", "patch"]
   {{- end }}
 
 # Leader-election lease for the agent itself (cra-agent namespace).
