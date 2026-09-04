@@ -1,6 +1,6 @@
-# Getting Started with Catalyst Enterprise Self-Hosted
+# Getting Started with Catalyst BYOC (self-managed)
 
-This guide walks you through a first-time install of Catalyst Enterprise Self-Hosted: signing up for Diagrid Cloud, creating a region, retrieving a join token, and installing the Helm chart into your cluster.
+This guide walks you through a first-time install of Catalyst BYOC (self-managed): signing up for Diagrid Cloud, creating a region, retrieving a join token, and installing the Helm chart into your cluster.
 
 For the full chart reference (every configurable value), see the [Catalyst chart README](../../charts/catalyst/README.md).
 

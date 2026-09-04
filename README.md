@@ -12,9 +12,9 @@ https://catalyst.diagrid.io
 
 Catalyst is an enterprise platform for workflow orchestration, service discovery and pub/sub, powered by Dapr. Build apps and AI agents that are compliant, secure and failure-proof. Find out more at [diagrid.io/catalyst](https://www.diagrid.io/catalyst).
 
-**Catalyst Enterprise Self-Hosted** enables you to self-host a Catalyst region within your own environment while using it as a service via Diagrid Cloud. This architecture separates the control plane (hosted by Diagrid Cloud) from the data plane (hosted in your Kubernetes cluster). The control plane manages configuration, while the data plane handles application connectivity and data.
+**Catalyst BYOC (self-managed)** enables you to self-host a Catalyst region within your own environment while using it as a service via Diagrid Cloud. This architecture separates the control plane (hosted by Diagrid Cloud) from the data plane (hosted in your Kubernetes cluster). The control plane manages configuration, while the data plane handles application connectivity and data.
 
-You interact with your Catalyst Enterprise Self-Hosted installation via the [Diagrid Cloud web console](https://catalyst.diagrid.io) and CLI. The console fetches app data directly from your installation, so your machine must be able to reach your Catalyst Enterprise Self-Hosted ingress.
+You interact with your Catalyst BYOC (self-managed) installation via the [Diagrid Cloud web console](https://catalyst.diagrid.io) and CLI. The console fetches app data directly from your installation, so your machine must be able to reach your Catalyst BYOC (self-managed) ingress.
 
 ![Catalyst](./assets/img/catalyst.svg)
 

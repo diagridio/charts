@@ -1010,7 +1010,7 @@ The overlay enables HPAs, drops Kubernetes resource `limits` on Go components (w
 
 ## Networking
 
-Catalyst Enterprise Self-Hosted requires outbound connectivity to Diagrid Cloud. Ensure your network allows access to:
+Catalyst BYOC (self-managed) requires outbound connectivity to Diagrid Cloud. Ensure your network allows access to:
 
 | Domain | Description | Required |
 |--------|-------------|----------|
