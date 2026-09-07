@@ -1,0 +1,3 @@
+{{- include "catalyst.pdb" (dict "name" "catalyst-gateway" "replicas" (include "gateway.envoy.replicas" .) "labels" (include "gateway.envoy.labels" .) "selectorLabels" (include "gateway.envoy.selectorLabels" .) "availability" .Values.shared.availability) }}
+---
+{{- include "catalyst.pdb" (dict "name" "catalyst-gateway-controlplane" "replicas" (include "gateway.controlplane.replicas" .) "labels" (include "gateway.controlplane.labels" .) "selectorLabels" (include "gateway.controlplane.selectorLabels" .) "availability" .Values.shared.availability) }}

@@ -116,3 +116,15 @@ Usage:
   name: dapr-identity-token
   readOnly: true
 {{- end }}
+
+{{/*
+Replicas each gateway Deployment runs: the HPA minimum when autoscaled, the HA
+minimum when HA is on, else the plain replicaCount. Drives the PDB and spread.
+*/}}
+{{- define "gateway.envoy.replicas" -}}
+{{- if .Values.gateway.envoy.autoscaling.enabled }}{{ .Values.gateway.envoy.autoscaling.minReplicas }}{{ else if .Values.gateway.ha.enabled }}{{ .Values.gateway.ha.minReplicas }}{{ else }}{{ .Values.gateway.envoy.replicaCount }}{{ end }}
+{{- end }}
+
+{{- define "gateway.controlplane.replicas" -}}
+{{- if .Values.gateway.ha.enabled }}{{ .Values.gateway.ha.minReplicas }}{{ else }}{{ .Values.gateway.controlplane.replicaCount }}{{ end }}
+{{- end }}

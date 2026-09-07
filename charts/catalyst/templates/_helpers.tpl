@@ -371,6 +371,44 @@ Input dict: { shared, component, componentMerge }
 {{- end }}
 
 {{/*
+catalyst.topologySpread: spread a multi-replica workload across nodes.
+Input dict: { replicas, selectorLabels (yaml), availability (.Values.shared.availability) }
+Renders nothing for a single replica or when disabled.
+*/}}
+{{- define "catalyst.topologySpread" -}}
+{{- if and .availability.topologySpread.enabled (gt (int .replicas) 1) }}
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: {{ .availability.topologySpread.whenUnsatisfiable }}
+    labelSelector:
+      matchLabels:
+        {{- .selectorLabels | nindent 8 }}
+{{- end }}
+{{- end }}
+
+{{/*
+catalyst.pdb: PodDisruptionBudget so a drain never takes a workload's last pod.
+Input dict: { name, replicas, labels (yaml), selectorLabels (yaml), availability }
+Renders nothing for a single replica or when disabled.
+*/}}
+{{- define "catalyst.pdb" -}}
+{{- if and .availability.podDisruptionBudget.enabled (gt (int .replicas) 1) }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ .name }}
+  labels:
+    {{- .labels | nindent 4 }}
+spec:
+  minAvailable: {{ .availability.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      {{- .selectorLabels | nindent 6 }}
+{{- end }}
+{{- end }}
+
+{{/*
 Validate global values shared by agent and management.
 Both services require sentry and correct secrets provider configuration.
 */}}

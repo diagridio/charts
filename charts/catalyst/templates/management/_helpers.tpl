@@ -81,3 +81,11 @@ Calculate GoLang GOMEMLIMIT From .Values.Resources.Limit.Memory
 {{-         end }}
 {{-     end }}
 {{- end }}
+
+{{/*
+Replicas management runs: the HPA minimum when autoscaled, else replicaCount.
+Drives the PDB and spread.
+*/}}
+{{- define "management.replicas" -}}
+{{- if .Values.management.autoscaling.enabled }}{{ .Values.management.autoscaling.minReplicas }}{{ else }}{{ .Values.management.replicaCount }}{{ end }}
+{{- end }}

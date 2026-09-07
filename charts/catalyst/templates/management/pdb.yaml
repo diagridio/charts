@@ -1,0 +1,1 @@
+{{- include "catalyst.pdb" (dict "name" (include "management.name" .) "replicas" (include "management.replicas" .) "labels" (include "management.labels" .) "selectorLabels" (include "management.selectorLabels" .) "availability" .Values.shared.availability) }}

@@ -11,7 +11,7 @@ metadata:
     {{- include "merge.maps" (dict "base" (fromYaml (include "gateway.envoy.labels" .)) "overrides" .Values.gateway.envoy.merge.labels) | nindent 4 }}
 spec:
   {{- if not .Values.gateway.envoy.autoscaling.enabled }}
-  replicas: {{ if .Values.gateway.ha.enabled }}{{ .Values.gateway.ha.minReplicas }}{{ else }}{{ .Values.gateway.envoy.replicaCount }}{{ end }}
+  replicas: {{ include "gateway.envoy.replicas" . }}
   {{- end }}
   selector:
     matchLabels:
@@ -97,6 +97,15 @@ spec:
             - name: https
               containerPort: 8443
               protocol: TCP
+            {{- if and .Values.gateway.envoy.admin.enabled .Values.gateway.envoy.health.enabled }}
+            - name: health
+              containerPort: {{ .Values.gateway.envoy.health.port }}
+              protocol: TCP
+            {{- with .Values.gateway.envoy.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+            {{- end }}
           volumeMounts:
             - name: envoy-config
               mountPath: /etc/envoy
@@ -148,6 +157,7 @@ spec:
         {{- include "catalyst.affinity" (dict "shared" .Values.shared.scheduling "component" .Values.gateway.envoy) | nindent 8 }}
       tolerations:
         {{- include "catalyst.tolerations" (dict "shared" .Values.shared.scheduling "component" .Values.gateway.envoy) | nindent 8 }}
+      {{- include "catalyst.topologySpread" (dict "replicas" (include "gateway.envoy.replicas" .) "selectorLabels" (include "gateway.envoy.selectorLabels" .) "availability" .Values.shared.availability) | nindent 6 }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -160,7 +170,7 @@ metadata:
   labels:
     {{- include "merge.maps" (dict "base" (fromYaml (include "gateway.controlplane.labels" .)) "overrides" .Values.gateway.controlplane.merge.labels) | nindent 4 }}
 spec:
-  replicas: {{ if .Values.gateway.ha.enabled }}{{ .Values.gateway.ha.minReplicas }}{{ else }}{{ .Values.gateway.controlplane.replicaCount }}{{ end }}
+  replicas: {{ include "gateway.controlplane.replicas" . }}
   selector:
     matchLabels:
       {{- include "gateway.controlplane.selectorLabels" . | nindent 6 }}
@@ -386,3 +396,4 @@ spec:
         {{- include "catalyst.affinity" (dict "shared" .Values.shared.scheduling "component" .Values.gateway.controlplane) | nindent 8 }}
       tolerations:
         {{- include "catalyst.tolerations" (dict "shared" .Values.shared.scheduling "component" .Values.gateway.controlplane) | nindent 8 }}
+      {{- include "catalyst.topologySpread" (dict "replicas" (include "gateway.controlplane.replicas" .) "selectorLabels" (include "gateway.controlplane.selectorLabels" .) "availability" .Values.shared.availability) | nindent 6 }}

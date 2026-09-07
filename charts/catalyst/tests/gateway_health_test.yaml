@@ -1,0 +1,77 @@
+suite: Test gateway envoy health listener and readiness probe
+templates:
+  - gateway/deployment.yaml
+  - gateway/configmap.yaml
+
+tests:
+  - it: should probe /ready on the health port and front the admin API with a health listener
+    set:
+      join_token: "test-token"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[?(@.name == "envoy")].readinessProbe
+          value:
+            httpGet:
+              path: /ready
+              port: health
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
+        template: gateway/deployment.yaml
+        documentIndex: 0
+      - contains:
+          path: spec.template.spec.containers[?(@.name == "envoy")].ports
+          content:
+            name: health
+            containerPort: 9091
+            protocol: TCP
+        template: gateway/deployment.yaml
+        documentIndex: 0
+      - matchRegex:
+          path: data["bootstrap-envoy.yaml"]
+          pattern: "port_value: 9091"
+        template: gateway/configmap.yaml
+      - matchRegex:
+          path: data["bootstrap-envoy.yaml"]
+          pattern: "name: envoy_admin"
+        template: gateway/configmap.yaml
+
+  - it: should honour the health port override
+    set:
+      join_token: "test-token"
+      gateway.envoy.health.port: 19091
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[?(@.name == "envoy")].ports
+          content:
+            name: health
+            containerPort: 19091
+            protocol: TCP
+        template: gateway/deployment.yaml
+        documentIndex: 0
+      - matchRegex:
+          path: data["bootstrap-envoy.yaml"]
+          pattern: "port_value: 19091"
+        template: gateway/configmap.yaml
+
+  - it: should render no probe, port or listener when health is disabled
+    set:
+      join_token: "test-token"
+      gateway.envoy.health.enabled: false
+    asserts:
+      - notExists:
+          path: spec.template.spec.containers[?(@.name == "envoy")].readinessProbe
+        template: gateway/deployment.yaml
+        documentIndex: 0
+      - notContains:
+          path: spec.template.spec.containers[?(@.name == "envoy")].ports
+          content:
+            name: health
+            containerPort: 9091
+            protocol: TCP
+        template: gateway/deployment.yaml
+        documentIndex: 0
+      - notMatchRegex:
+          path: data["bootstrap-envoy.yaml"]
+          pattern: "envoy_admin"
+        template: gateway/configmap.yaml

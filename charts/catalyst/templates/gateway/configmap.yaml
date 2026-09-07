@@ -41,7 +41,48 @@ data:
             private_key:
               filename: /etc/ssl/certs/{{ .Values.gateway.tls.certificates.keyFile }}
       {{- end }}
+      {{- if and .Values.gateway.envoy.admin.enabled .Values.gateway.envoy.health.enabled }}
+      # Pod-IP front for the loopback admin API: only /ready and /stats/prometheus.
+      listeners:
+        - name: health
+          address:
+            socket_address: { address: 0.0.0.0, port_value: {{ .Values.gateway.envoy.health.port }} }
+          filter_chains:
+            - filters:
+                - name: envoy.filters.network.http_connection_manager
+                  typed_config:
+                    "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                    stat_prefix: health
+                    route_config:
+                      name: health
+                      virtual_hosts:
+                        - name: health
+                          domains: ["*"]
+                          routes:
+                            - match: { path: "/ready" }
+                              route: { cluster: envoy_admin }
+                            - match: { path: "/stats/prometheus" }
+                              route: { cluster: envoy_admin }
+                            - match: { prefix: "/" }
+                              direct_response: { status: 404 }
+                    http_filters:
+                      - name: envoy.filters.http.router
+                        typed_config:
+                          "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+      {{- end }}
       clusters:
+        {{- if and .Values.gateway.envoy.admin.enabled .Values.gateway.envoy.health.enabled }}
+        - name: envoy_admin
+          connect_timeout: 1s
+          type: STATIC
+          load_assignment:
+            cluster_name: envoy_admin
+            endpoints:
+              - lb_endpoints:
+                  - endpoint:
+                      address:
+                        socket_address: { address: {{ .Values.gateway.envoy.admin.address }}, port_value: {{ .Values.gateway.envoy.admin.port }} }
+        {{- end }}
         - name: controlplane
           connect_timeout: {{ .Values.gateway.envoy.xds.connect_timeout }}
           type: STRICT_DNS

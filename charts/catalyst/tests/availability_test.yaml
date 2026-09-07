@@ -1,0 +1,122 @@
+suite: Test PodDisruptionBudgets and topology spread for multi-replica workloads
+templates:
+  - gateway/deployment.yaml
+  - gateway/configmap.yaml
+  - gateway/pdb.yaml
+  - management/deployment.yaml
+  - management/configmap.yaml
+  - management/pdb.yaml
+  - piko/statefulset.yaml
+  - piko/pdb.yaml
+
+tests:
+  - it: should protect management, which runs two replicas by default, and leave single-replica workloads alone
+    set:
+      join_token: "test-token"
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: management/pdb.yaml
+      - equal:
+          path: spec.minAvailable
+          value: 1
+        template: management/pdb.yaml
+      - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/component"]
+          value: management
+        template: management/pdb.yaml
+      - equal:
+          path: spec.template.spec.topologySpreadConstraints[0].whenUnsatisfiable
+          value: ScheduleAnyway
+        template: management/deployment.yaml
+      - equal:
+          path: spec.template.spec.topologySpreadConstraints[0].topologyKey
+          value: kubernetes.io/hostname
+        template: management/deployment.yaml
+      - hasDocuments:
+          count: 0
+        template: gateway/pdb.yaml
+      - notExists:
+          path: spec.template.spec.topologySpreadConstraints
+        template: gateway/deployment.yaml
+        documentIndex: 0
+      - hasDocuments:
+          count: 0
+        template: piko/pdb.yaml
+      - notExists:
+          path: spec.template.spec.topologySpreadConstraints
+        template: piko/statefulset.yaml
+
+  - it: should protect both gateway deployments when HA is on
+    set:
+      join_token: "test-token"
+      gateway.ha.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 2
+        template: gateway/pdb.yaml
+      - equal:
+          path: metadata.name
+          value: catalyst-gateway
+        template: gateway/pdb.yaml
+        documentIndex: 0
+      - equal:
+          path: metadata.name
+          value: catalyst-gateway-controlplane
+        template: gateway/pdb.yaml
+        documentIndex: 1
+      - equal:
+          path: spec.template.spec.topologySpreadConstraints[0].labelSelector.matchLabels["app.kubernetes.io/component"]
+          value: gateway-envoy
+        template: gateway/deployment.yaml
+        documentIndex: 0
+      - equal:
+          path: spec.template.spec.topologySpreadConstraints[0].labelSelector.matchLabels["app.kubernetes.io/component"]
+          value: gateway-controlplane
+        template: gateway/deployment.yaml
+        documentIndex: 1
+
+  - it: should protect piko once it runs two replicas
+    set:
+      join_token: "test-token"
+      piko.replicaCount: 2
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: piko/pdb.yaml
+      - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/name"]
+          value: piko
+        template: piko/pdb.yaml
+      - equal:
+          path: spec.template.spec.topologySpreadConstraints[0].maxSkew
+          value: 1
+        template: piko/statefulset.yaml
+
+  - it: should honour the spread policy and PDB overrides
+    set:
+      join_token: "test-token"
+      shared.availability.topologySpread.whenUnsatisfiable: DoNotSchedule
+      shared.availability.podDisruptionBudget.minAvailable: 50%
+    asserts:
+      - equal:
+          path: spec.template.spec.topologySpreadConstraints[0].whenUnsatisfiable
+          value: DoNotSchedule
+        template: management/deployment.yaml
+      - equal:
+          path: spec.minAvailable
+          value: 50%
+        template: management/pdb.yaml
+
+  - it: should render neither when availability is switched off
+    set:
+      join_token: "test-token"
+      shared.availability.podDisruptionBudget.enabled: false
+      shared.availability.topologySpread.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: management/pdb.yaml
+      - notExists:
+          path: spec.template.spec.topologySpreadConstraints
+        template: management/deployment.yaml

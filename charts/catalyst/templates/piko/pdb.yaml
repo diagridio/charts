@@ -1,0 +1,3 @@
+{{- if .Values.piko.enabled }}
+{{- include "catalyst.pdb" (dict "name" .Values.piko.releaseName "replicas" .Values.piko.replicaCount "labels" (include "piko.selectorLabels" .) "selectorLabels" (include "piko.selectorLabels" .) "availability" .Values.shared.availability) }}
+{{- end }}

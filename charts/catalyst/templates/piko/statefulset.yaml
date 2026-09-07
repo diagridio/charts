@@ -91,6 +91,7 @@ spec:
         {{- include "catalyst.affinity" (dict "shared" .Values.shared.scheduling "component" .Values.piko) | nindent 8 }}
       tolerations:
         {{- include "catalyst.tolerations" (dict "shared" .Values.shared.scheduling "component" .Values.piko) | nindent 8 }}
+      {{- include "catalyst.topologySpread" (dict "replicas" .Values.piko.replicaCount "selectorLabels" (include "piko.selectorLabels" .) "availability" .Values.shared.availability) | nindent 6 }}
       volumes:
         - name: config
           configMap:
