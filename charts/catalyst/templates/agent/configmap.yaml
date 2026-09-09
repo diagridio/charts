@@ -122,6 +122,35 @@
   {{- $_ := set $agentConfig.internal_dapr "container_registry" .Values.global.image.registry -}}
   {{- $_ := set $agentConfig.internal_dapr.sentry.image "registry" .Values.global.image.registry -}}
 {{- end -}}
+{{- /* Resolve the digests of the three Diagrid-supplied runtime images the agent
+       installs into the region: the Dapr sidecar (injected into every customer
+       app pod), the Catalyst OTel collector, and the private Sentry. They reach
+       the cluster through this ConfigMap as separate registry/name/tag values —
+       the agent composes the reference — so catalyst.image cannot render them.
+       catalyst.imageDigest (../_helpers.tpl) is the shared resolve-and-validate
+       step, so the consolidated-image precedence and the "sha256:<64 hex>" check
+       are identical to the pod-spec images'. An empty digest is dropped entirely
+       rather than emitted as "", keeping the rendered config byte-identical to
+       what it was before digests existed. */ -}}
+{{- $consolidated := .Values.global.consolidated_image -}}
+{{- $sidecarDigest := include "catalyst.imageDigest" (dict "digest" $agentConfig.sidecar.image_digest "consolidated" $consolidated "name" "sidecar") -}}
+{{- if $sidecarDigest -}}
+  {{- $_ := set $agentConfig.sidecar "image_digest" $sidecarDigest -}}
+{{- else -}}
+  {{- $_ := unset $agentConfig.sidecar "image_digest" -}}
+{{- end -}}
+{{- $otelDigest := include "catalyst.imageDigest" (dict "digest" $agentConfig.otel.image_digest "consolidated" $consolidated "name" "catalyst-otel-collector") -}}
+{{- if $otelDigest -}}
+  {{- $_ := set $agentConfig.otel "image_digest" $otelDigest -}}
+{{- else -}}
+  {{- $_ := unset $agentConfig.otel "image_digest" -}}
+{{- end -}}
+{{- $sentryDigest := include "catalyst.imageDigest" (dict "digest" $agentConfig.internal_dapr.sentry.image.digest "consolidated" $consolidated "name" "private-sentry") -}}
+{{- if $sentryDigest -}}
+  {{- $_ := set $agentConfig.internal_dapr.sentry.image "digest" $sentryDigest -}}
+{{- else -}}
+  {{- $_ := unset $agentConfig.internal_dapr.sentry.image "digest" -}}
+{{- end -}}
 {{- /* Apply global charts configuration */ -}}
 {{- if or .Values.global.charts.registry .Values.global.charts.username .Values.global.charts.password .Values.global.charts.clientCert .Values.global.charts.clientKey .Values.global.charts.customCA .Values.global.charts.existingSecret .Values.global.charts.bitnamiChartRegistry .Values.global.charts.bitnamiImageRegistry .Values.global.charts.bitnamiKafkaChartVersion .Values.global.charts.bitnamiPostgresqlChartVersion .Values.global.charts.bitnamiRedisChartVersion -}}
   {{- if not $agentConfig.artifacts -}}

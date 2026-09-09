@@ -321,9 +321,7 @@
                             "default": "catalyst-all"
                         },
                         "digest": {
-                            "type": "string",
-                            "pattern": "^(sha256:[0-9a-f]{64})?$",
-                            "description": "Optional content digest that pins the consolidated image to an immutable reference, overriding tag"
+                            "$ref": "#/definitions/imageDigest"
                         },
                         "pullPolicy": {
                             "type": "string",
@@ -548,6 +546,9 @@
                         "otel": {
                             "type": "object",
                             "properties": {
+                                "image_digest": {
+                                    "$ref": "#/definitions/imageDigest"
+                                },
                                 "metrics_private_export": {
                                     "type": "object",
                                     "description": "Forward a subset of collected metrics to a private, customer-owned OTLP endpoint, in addition to the Diagrid Cortex path. Private-region only; inert unless enabled.",
@@ -664,6 +665,32 @@
                                             "type": "string",
                                             "default": "token",
                                             "description": "Key within credential_secret_name that holds the token."
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        "sidecar": {
+                            "type": "object",
+                            "properties": {
+                                "image_digest": {
+                                    "$ref": "#/definitions/imageDigest"
+                                }
+                            }
+                        },
+                        "internal_dapr": {
+                            "type": "object",
+                            "properties": {
+                                "sentry": {
+                                    "type": "object",
+                                    "properties": {
+                                        "image": {
+                                            "type": "object",
+                                            "properties": {
+                                                "digest": {
+                                                    "$ref": "#/definitions/imageDigest"
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -1341,6 +1368,11 @@
         }
     },
     "definitions": {
+        "imageDigest": {
+            "type": "string",
+            "pattern": "^(sha256:[0-9a-f]{64})?$",
+            "description": "Optional content digest that pins this image to an immutable reference, overriding tag. Empty pins by tag instead."
+        },
         "imageSpec": {
             "type": "object",
             "properties": {
@@ -1357,9 +1389,7 @@
                     "description": "Image tag/version"
                 },
                 "digest": {
-                    "type": "string",
-                    "pattern": "^(sha256:[0-9a-f]{64})?$",
-                    "description": "Optional content digest that pins this image to an immutable reference, overriding tag"
+                    "$ref": "#/definitions/imageDigest"
                 },
                 "pullPolicy": {
                     "type": "string",

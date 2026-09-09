@@ -1,0 +1,161 @@
+# Covers RFC0033 for the three Diagrid-supplied runtime images that do NOT reach
+# the cluster as a pod-spec image: the Dapr sidecar, the catalyst-otel-collector
+# and the private Sentry. The chart writes them into the agent's ConfigMap as
+# separate registry/name/tag values and the agent composes the reference when it
+# installs them into the region, so catalyst.image never sees them. The digest
+# block in templates/agent/configmap.yaml resolves them through
+# catalyst.imageDigest (../_helpers.tpl), which catalyst.image uses too — so the
+# consolidated-image precedence and the digest check are the same for both.
+#
+# All three digest fields are covered by values.schema.json, which Helm validates
+# before any template runs, so a malformed digest is caught there and never
+# reaches catalyst.imageDigest's own `fail` — helm-unittest can only assert that
+# as a bare `failedTemplate: {}` (the same limitation documented at the top of
+# image_digest_test.yaml).
+#
+# Note the quoting in the expected values: image_name / name are Go-template
+# strings in values.yaml, so toYaml quotes them and `tpl` leaves the quotes in
+# place around the resolved name.
+suite: Test Immutable Digest Image References In The Agent ConfigMap
+templates:
+  - agent/configmap.yaml
+tests:
+  - it: should render the sidecar image with a digest
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: false
+      agent.config.sidecar.image_digest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "image_digest: sha256:a{64}\n  image_name: 'sidecar'"
+
+  - it: should render the otel collector image with a digest
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: false
+      agent.config.otel.image_digest: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "image_digest: sha256:b{64}\n  image_name: 'catalyst-otel-collector'"
+
+  - it: should render the private sentry image with a digest
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: false
+      agent.config.internal_dapr.sentry.image.digest: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "digest: sha256:c{64}\n      name: 'private-sentry'"
+
+  - it: should keep the tag form for the other two when only one is pinned
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: false
+      agent.config.sidecar.image_digest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "image_name: 'catalyst-otel-collector'\n  image_pull_policy: Always\n  image_registry: [^\n]+\n  image_tag: [0-9]+\\.[0-9]+\\.[0-9]+"
+      - notMatchRegex:
+          path: data["config.yaml"]
+          pattern: "digest: sha256:c"
+
+  - it: should let global.consolidated_image.digest pin the sidecar
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: true
+      global.consolidated_image.digest: "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "image_digest: sha256:d{64}\n  image_name: 'catalyst-all'\n  image_registry:"
+
+  - it: should let global.consolidated_image.digest pin the otel collector
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: true
+      global.consolidated_image.digest: "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "image_digest: sha256:d{64}\n  image_name: 'catalyst-all'\n  image_pull_policy: Always"
+
+  - it: should let global.consolidated_image.digest pin the private sentry
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: true
+      global.consolidated_image.digest: "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "digest: sha256:d{64}\n      name: 'catalyst-all'"
+
+  - it: should let global.consolidated_image.digest win over a per-image digest
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: true
+      global.consolidated_image.digest: "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      agent.config.sidecar.image_digest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "image_digest: sha256:d{64}"
+      - notMatchRegex:
+          path: data["config.yaml"]
+          pattern: "sha256:a{64}"
+
+  - it: should keep a per-image digest under the consolidated image when no consolidated digest is set
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: true
+      agent.config.sidecar.image_digest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "image_digest: sha256:a{64}\n  image_name: 'catalyst-all'"
+
+  - it: should refuse a malformed sidecar digest
+    set:
+      join_token: "test-token"
+      agent.config.sidecar.image_digest: "sha256:not-a-real-digest"
+    asserts:
+      - failedTemplate: {}
+
+  - it: should refuse a malformed otel digest
+    set:
+      join_token: "test-token"
+      agent.config.otel.image_digest: "sha256:not-a-real-digest"
+    asserts:
+      - failedTemplate: {}
+
+  - it: should refuse a malformed sentry digest
+    set:
+      join_token: "test-token"
+      agent.config.internal_dapr.sentry.image.digest: "sha256:not-a-real-digest"
+    asserts:
+      - failedTemplate: {}
+
+  # An empty digest must leave the rendered agent config exactly as it was before
+  # digests existed: the key is dropped, not emitted as "". An agent older than
+  # this chart rejects a config field it does not know, and a stray empty key
+  # would show as drift on every region.
+  - it: should emit no digest key at all when none is set (regression)
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: false
+    asserts:
+      - notMatchRegex:
+          path: data["config.yaml"]
+          pattern: "digest"
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "image_name: 'sidecar'"
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "image_name: 'catalyst-otel-collector'"
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "name: 'private-sentry'"

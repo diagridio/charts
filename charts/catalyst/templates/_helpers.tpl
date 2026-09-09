@@ -174,23 +174,19 @@ This helper:
 1. Uses global.image.registry if set, otherwise uses the component's registry (or consolidated registry if using consolidated image)
 2. Uses consolidated_image.repository if consolidated_image.enabled is true
 3. Properly constructs the full image reference as registry/repository:tag
-4. When image.digest is set (or consolidated_image.digest, if using the consolidated
-   image), renders registry/repository@<digest> instead, ignoring tag entirely, and
-   fails the render if the digest is not a well-formed "sha256:<64 hex chars>" value.
+4. When a digest applies (see catalyst.imageDigest below, which resolves it and
+   fails the render on a malformed one), renders registry/repository@<digest>
+   instead, ignoring tag entirely.
    This is the only place in the chart that constructs an image reference — see
    catalyst.waitForDaprConfigInitContainer below.
 */}}
 {{- define "catalyst.image" -}}
 {{- $registry := .image.registry -}}
 {{- $repository := .image.repository -}}
-{{- $digest := .image.digest | default "" -}}
 {{- $tag := include "catalyst.imageTag" (dict "image" .image) -}}
 {{- if and .consolidated .consolidated.enabled -}}
   {{- $repository = .consolidated.repository -}}
   {{- $registry = .consolidated.registry -}}
-  {{- if .consolidated.digest -}}
-    {{- $digest = .consolidated.digest -}}
-  {{- end -}}
 {{- end -}}
 {{- if .global.registry -}}
   {{- $registry = .global.registry -}}
@@ -198,10 +194,8 @@ This helper:
 {{- if kindIs "string" $repository -}}
   {{- $repository = tpl $repository .context -}}
 {{- end -}}
+{{- $digest := include "catalyst.imageDigest" (dict "digest" .image.digest "consolidated" .consolidated "name" $repository) -}}
 {{- if $digest -}}
-  {{- if not (regexMatch "^sha256:[0-9a-f]{64}$" $digest) -}}
-    {{- fail (printf "%s: invalid image digest %q — must match sha256:<64 lowercase hex characters>" $repository $digest) -}}
-  {{- end -}}
   {{- if $registry -}}
 {{- printf "%s/%s@%s" $registry $repository $digest -}}
   {{- else -}}
@@ -212,6 +206,30 @@ This helper:
 {{- else -}}
 {{- printf "%s:%s" $repository $tag -}}
 {{- end -}}
+{{- end -}}
+
+{{/*
+Resolve and validate an image content digest. Returns the digest to pin with, or
+"" to fall back to the tag.
+Usage: include "catalyst.imageDigest" (dict "digest" .Values.component.image.digest "consolidated" .Values.global.consolidated_image "name" "cra-agent")
+This is the single place the chart applies the consolidated-image digest
+precedence and checks the digest's shape, so a pod-spec image ("catalyst.image",
+above) and an image the agent ConfigMap carries as separate registry/name/tag
+values (templates/agent/configmap.yaml) pin by exactly the same rules and fail
+with exactly the same message. `name` only names the offending image in that
+message.
+*/}}
+{{- define "catalyst.imageDigest" -}}
+{{- $digest := .digest | default "" -}}
+{{- if and .consolidated .consolidated.enabled .consolidated.digest -}}
+  {{- $digest = .consolidated.digest -}}
+{{- end -}}
+{{- if $digest -}}
+  {{- if not (regexMatch "^sha256:[0-9a-f]{64}$" $digest) -}}
+    {{- fail (printf "%s: invalid image digest %q — must match sha256:<64 lowercase hex characters>" .name $digest) -}}
+  {{- end -}}
+{{- end -}}
+{{- $digest -}}
 {{- end -}}
 
 {{/*
