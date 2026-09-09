@@ -627,3 +627,119 @@ so operators get the error at `helm template` time rather than a CrashLoop later
   {{- end -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Trusted CA. Extra certificates every dataplane workload adds to its system TLS
+trust. See global.trustedCA in values.yaml.
+*/}}
+
+{{/* The ConfigMap holding the bundle, or "" when none is configured. */}}
+{{- define "catalyst.trustedCA.configMapName" -}}
+{{- $ca := (.Values.global).trustedCA | default dict -}}
+{{- $existing := (($ca.existingConfigMap).name) | default "" -}}
+{{- $certs := $ca.certs | default "" -}}
+{{- if and $certs $existing -}}
+  {{- fail "global.trustedCA: set either certs (inline PEM, chart renders the ConfigMap) or existingConfigMap.name (you own the ConfigMap), not both." -}}
+{{- end -}}
+{{- if $existing -}}
+  {{- $existing -}}
+{{- else if $certs -}}
+  {{- printf "%s-trusted-ca" .Release.Name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+{{- end -}}
+
+{{/* ConfigMap data key holding the PEM. ca.crt is also the agent's default. */}}
+{{- define "catalyst.trustedCA.key" -}}
+{{- $ca := (.Values.global).trustedCA | default dict -}}
+{{- (($ca.existingConfigMap).key) | default "ca.crt" -}}
+{{- end -}}
+
+{{- define "catalyst.trustedCA.mountPath" -}}
+/var/run/diagrid.io/trusted-ca
+{{- end -}}
+
+{{/*
+The SSL_CERT_DIR entry. The image default stays first so the public roots still
+load and these CAs are additional.
+
+Usage: {{- with include "catalyst.trustedCA.env" . }}{{- . | nindent 10 }}{{- end }}
+Use `with`: a bare include renders the indent even when empty.
+*/}}
+{{- define "catalyst.trustedCA.env" -}}
+{{- if include "catalyst.trustedCA.configMapName" . -}}
+- name: SSL_CERT_DIR
+  value: "/etc/ssl/certs:{{ include "catalyst.trustedCA.mountPath" . }}"
+{{- end -}}
+{{- end -}}
+
+{{/* Usage: {{- with include "catalyst.trustedCA.volumeMount" . }}{{- . | nindent 10 }}{{- end }} */}}
+{{- define "catalyst.trustedCA.volumeMount" -}}
+{{- if include "catalyst.trustedCA.configMapName" . -}}
+- name: trusted-ca
+  mountPath: {{ include "catalyst.trustedCA.mountPath" . }}
+  readOnly: true
+{{- end -}}
+{{- end -}}
+
+{{/*
+Usage: {{- with include "catalyst.trustedCA.volume" . }}{{- . | nindent 6 }}{{- end }}
+
+Projects only the selected key: SSL_CERT_DIR reads every file in the mount, so
+mounting the whole ConfigMap would trust unrelated keys.
+*/}}
+{{- define "catalyst.trustedCA.volume" -}}
+{{- $cm := include "catalyst.trustedCA.configMapName" . -}}
+{{- if $cm -}}
+- name: trusted-ca
+  configMap:
+    name: {{ $cm }}
+    items:
+      - key: {{ include "catalyst.trustedCA.key" . }}
+        path: {{ include "catalyst.trustedCA.key" . }}
+{{- end -}}
+{{- end -}}
+
+{{/*
+sha256 of the inline bundle, or "". A rotated CA needs a pod restart, and this
+rolls them. Only the inline source can be checksummed.
+*/}}
+{{- define "catalyst.trustedCA.checksum" -}}
+{{- with ((.Values.global).trustedCA | default dict).certs -}}
+{{- . | sha256sum -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+The checksum as an annotation line. A pod template that builds its annotations
+as a dict should use catalyst.trustedCA.checksum instead.
+
+Usage: {{- with include "catalyst.trustedCA.podAnnotation" . }}{{- . | nindent 8 }}{{- end }}
+*/}}
+{{- define "catalyst.trustedCA.podAnnotation" -}}
+{{- with include "catalyst.trustedCA.checksum" . -}}
+checksum/trusted-ca: {{ . }}
+{{- end -}}
+{{- end -}}
+
+{{/*
+The deployment-wide skip-verify switch as "true"/"false". It only ever loosens;
+templates resolve one endpoint as `or $insecureSkipVerify <per-endpoint flag>`.
+
+Usage: {{- $insecureSkipVerify := eq (include "catalyst.tls.insecureSkipVerify" .) "true" }}
+*/}}
+{{- define "catalyst.tls.insecureSkipVerify" -}}
+{{- ((.Values.global).tls).insecureSkipVerify | default false -}}
+{{- end -}}
+
+{{/*
+global.sentry with trust_anchors_endpoint_insecure resolved against the
+deployment-wide switch, once here rather than in each of the three consumers.
+
+Usage: {{- $_ := set $configMap "sentry" (include "catalyst.sentryConfig" . | fromYaml) }}
+*/}}
+{{- define "catalyst.sentryConfig" -}}
+{{- $sentry := deepCopy (.Values.global.sentry | default dict) -}}
+{{- $insecureSkipVerify := eq (include "catalyst.tls.insecureSkipVerify" .) "true" -}}
+{{- $_ := set $sentry "trust_anchors_endpoint_insecure" (or $insecureSkipVerify ($sentry.trust_anchors_endpoint_insecure | default false)) -}}
+{{- toYaml $sentry -}}
+{{- end -}}

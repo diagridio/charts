@@ -1,0 +1,17 @@
+{{- /*
+CA bundle added to the system TLS trust of every Catalyst dataplane workload.
+Rendered only for the inline source; an existingConfigMap is mounted as-is.
+*/ -}}
+{{- if (.Values.global.trustedCA | default dict).certs }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "catalyst.trustedCA.configMapName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+data:
+  {{ include "catalyst.trustedCA.key" . }}: |
+    {{- .Values.global.trustedCA.certs | nindent 4 }}
+{{- end }}

@@ -254,7 +254,46 @@
                 },
                 "control_plane_http_insecure": {
                     "type": "boolean",
-                    "description": "Allow insecure HTTP connections to control plane"
+                    "description": "Allow insecure HTTP connections to control plane",
+                    "default": false
+                },
+                "trustedCA": {
+                    "type": "object",
+                    "description": "CA certificates every Catalyst dataplane workload adds to its system TLS trust for all outbound connections, including those to the Diagrid control plane. Set it when outbound traffic leaves through an inspecting (deep packet inspection) proxy that re-signs TLS with your own CA. Set exactly one of certs and existingConfigMap.name.",
+                    "properties": {
+                        "certs": {
+                            "type": "string",
+                            "default": "",
+                            "description": "Inline PEM bundle. The chart renders a ConfigMap holding it and mounts that into every dataplane workload."
+                        },
+                        "existingConfigMap": {
+                            "type": "object",
+                            "description": "A ConfigMap you manage, in the release namespace, holding the CA bundle. Preferred over certs for anything but the smallest bundle.",
+                            "properties": {
+                                "name": {
+                                    "type": "string",
+                                    "default": "",
+                                    "description": "Name of the ConfigMap. Empty disables this source."
+                                },
+                                "key": {
+                                    "type": "string",
+                                    "default": "ca.crt",
+                                    "description": "Key within its data holding the PEM bundle."
+                                }
+                            }
+                        }
+                    }
+                },
+                "tls": {
+                    "type": "object",
+                    "description": "Deployment-wide TLS behaviour for outbound connections.",
+                    "properties": {
+                        "insecureSkipVerify": {
+                            "type": "boolean",
+                            "default": false,
+                            "description": "Turn OFF certificate verification for every outbound connection this chart configures to a Diagrid endpoint — a diagnostic escape hatch, not the answer to an inspecting proxy, which is what global.trustedCA is for. With it on, any certificate is accepted, so anything on the path can read and rewrite control-plane traffic."
+                        }
+                    }
                 },
                 "sentry": {
                     "type": "object",

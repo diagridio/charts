@@ -15,6 +15,7 @@ spec:
     metadata:
       annotations:
         checksum/cra-agent-config: {{ include (print $.Template.BasePath "/agent/configmap.yaml") . | sha256sum }}
+        {{- with include "catalyst.trustedCA.podAnnotation" . }}{{- . | nindent 8 }}{{- end }}
         dapr.io/app-id: agent
         dapr.io/config: agent
         {{ with .Values.agent.podAnnotations }}
@@ -165,6 +166,7 @@ spec:
           - name: CRA_HOST_JOIN_TOKEN
             value: {{ .Values.join_token | quote }}
           {{- end }}
+          {{- with include "catalyst.trustedCA.env" . }}{{- . | nindent 10 }}{{- end }}
           {{- if .Values.agent.extraEnvs }}
           {{- toYaml .Values.agent.extraEnvs | nindent 10 }}
           {{- end }}
@@ -229,9 +231,11 @@ spec:
             mountPath: /var/run/secrets/charts
             readOnly: true
           {{- end }}
+          {{- with include "catalyst.trustedCA.volumeMount" . }}{{- . | nindent 10 }}{{- end }}
           {{- include "inject.patch" (dict "patch" .Values.agent.patch.volumeMounts "indent" 10) }}
         {{- include "inject.patch" (dict "patch" .Values.agent.patch.containers "indent" 6) }}
       volumes:
+      {{- with include "catalyst.trustedCA.volume" . }}{{- . | nindent 6 }}{{- end }}
       - name: agent-config
         configMap:
           name: {{ include "agent.name" . }}-config

@@ -3,8 +3,15 @@
 {{- $_ := set $configMap "control_plane_namespace" .Values.global.control_plane_namespace -}}
 {{- $_ := set $configMap "control_plane_url" .Values.global.control_plane_url -}}
 {{- $_ := set $configMap "control_plane_http_url" .Values.global.control_plane_http_url -}}
-{{- $_ := set $configMap "control_plane_http_insecure" .Values.global.control_plane_http_insecure -}}
-{{- $_ := set $configMap "sentry" .Values.global.sentry -}}
+{{- /* The deployment-wide skip-verify switch only ever loosens a per-endpoint flag. */ -}}
+{{- $insecureSkipVerify := eq (include "catalyst.tls.insecureSkipVerify" .) "true" -}}
+{{- $_ := set $configMap "control_plane_http_insecure" (or $insecureSkipVerify .Values.global.control_plane_http_insecure) -}}
+{{- $_ := set $configMap "sentry" (include "catalyst.sentryConfig" . | fromYaml) -}}
+{{- /* Remaining endpoint the switch covers. */ -}}
+{{- if and $insecureSkipVerify (dig "tunnel" "enabled" false $configMap) -}}
+  {{- if not $configMap.tunnel.piko -}}{{- $_ := set $configMap.tunnel "piko" dict -}}{{- end -}}
+  {{- $_ := set $configMap.tunnel.piko "insecure" true -}}
+{{- end -}}
 {{- $_ := set $configMap "nats" .Values.global.nats -}}
 {{- $_ := set $configMap "secretsprovider" .Values.global.secrets.provider -}}
 {{- $_ := set $configMap "secrets_redis" .Values.global.secrets.redis -}}

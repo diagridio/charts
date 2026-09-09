@@ -12,7 +12,7 @@ Configuration reference for the Catalyst Helm chart.
 
 This chart includes the following dependencies:
 
-- **OpenTelemetry Collector** — Optional telemetry collection and export
+- **OpenTelemetry Collector**: optional telemetry collection and export
 
 ## Install
 
@@ -79,45 +79,6 @@ Separate from Helm's values merge, some values are later consumed atomically. Fo
 example, setting sidecar `affinity` replaces the downstream chart's default
 anti-affinity outright rather than merging with it.
 
-### Network Policies
-
-Catalyst always generates NetworkPolicies for **project namespaces** (deny-all plus explicit allows, created by the agent at provisioning time). The **system namespaces** — the release namespace and the internal Dapr namespace — ship without policies by default. On clusters with a default-deny security mandate, enable the chart-managed set:
-
-```yaml
-networkPolicies:
-  enabled: true
-```
-
-This installs deny-all policies for both system namespaces plus the explicit allows Catalyst needs: intra-namespace traffic, project-sidecar access to piko/management and the Dapr control plane, public ingress to the gateway, and egress to DNS, the Kubernetes API server, the Diagrid control plane (public internet except private ranges — standard NetworkPolicy cannot match hostnames), and project namespaces.
-
-These policies only take effect on clusters whose CNI enforces NetworkPolicy (Calico, Cilium, Azure NPM, ...). Without one they are silently inert — the agent logs a warning at startup when no enforcing CNI is detected.
-
-Install-specific values:
-
-```yaml
-networkPolicies:
-  enabled: true
-  # NetworkPolicy is evaluated after kube-proxy DNAT, so API server traffic is
-  # matched against the real endpoint (kubectl get endpoints kubernetes -n default),
-  # never the kubernetes.default ClusterIP. Unset, the policy falls back to
-  # allowing all private ranges on ports 443 and 6443.
-  apiserver:
-    endpointCIDR: "10.224.0.4/32"
-    port: 443
-  # Allows agent egress to an in-cluster PostgreSQL on 5432 (scheduler and
-  # managed state store databases). Omit when not using postgres-backed features.
-  postgres:
-    namespace: "postgres"
-  # Extra egress allows for private destinations (VNet databases, private
-  # endpoints) that the internet-egress policy's private-range excepts block.
-  extraEgress:
-    - cidr: 10.100.0.0/24
-      ports:
-        - port: 5432
-```
-
-If the PostgreSQL namespace is itself default-deny, its ingress allows are yours to manage: both the release namespace (agent) and every project namespace (sidecars connect directly for managed state stores) need ingress on 5432.
-
 ### Permissions (RBAC)
 
 Catalyst is a self-managing infrastructure platform: not a static set of workloads, the Catalyst **agent** acts as an in-cluster provisioner that creates and manages a Dapr control plane, dapr sidecars, dapr CRDs, and optionally supporting infrastructure (Kafka, PostgreSQL, Redis, vcluster, sandboxes) **on demand** as you create Catalyst projects and resources. Because the exact resource set and target namespaces are decided at runtime, not at install time, the agent is granted a **cluster-scoped** role. The management and gateway components are scoped more narrowly.
@@ -148,19 +109,19 @@ The agent's ServiceAccount (`<release>-agent-sa`, e.g. `catalyst-agent-sa`) carr
 | autoscaling | `horizontalpodautoscalers` | full CRUD | HPA installed by the CRA sidecar chart. |
 | policy | `poddisruptionbudgets` | full CRUD | PDBs installed by the Dapr chart. |
 | batch | `cronjobs`, `jobs` | full CRUD | The Dapr JWT key-rotation chart. |
-| networking.k8s.io | `networkpolicies` | full CRUD | Per-project egress/ingress policies created by the namespace chart (see [Network Policies](#network-policies)). |
+| networking.k8s.io | `networkpolicies` | full CRUD | Per-project egress/ingress policies created by the namespace chart (see [Network Policies (Projects)](#network-policies-projects)). |
 | rbac.authorization.k8s.io | `roles`, `rolebindings`, `clusterroles`, `clusterrolebindings` | full CRUD | Per-sidecar Role/RoleBinding (CRA chart) plus the ClusterRoles/Bindings installed by the Dapr chart and the OTel collectors. |
 | dapr.io | `components`, `configurations`, `subscriptions`, `resiliencies`, `httpendpoints`, `mcpservers` | full CRUD | Per-project/per-app Dapr resources rendered by the component and resource charts, plus the agent's own bootstrap Configuration. |
 | apiextensions.k8s.io | `customresourcedefinitions` | full CRUD | The Dapr (and potentially vcluster) CRDs that Helm applies ahead of templated resources on install/upgrade. |
 | admissionregistration.k8s.io | `mutatingwebhookconfigurations`, `validatingwebhookconfigurations` | full CRUD | The Dapr sidecar-injector `MutatingWebhookConfiguration` (validating is included to stay forward-compatible with future chart versions). |
 | discovery.k8s.io | `endpointslices` | get | Reads the `kubernetes` service EndpointSlice in `default` to build NetworkPolicy rules that allow access to the API server. |
 | agents.x-k8s.io | `sandboxes` | full CRUD | The upstream `kubernetes-sigs/agent-sandbox` CRs the gVisor sandbox provider materializes per project. |
-| node.k8s.io | `runtimeclasses` | get | The gVisor sandbox provider's preflight check verifies the configured RuntimeClass is registered before creating any Sandbox. `get` only — read once at boot. |
+| node.k8s.io | `runtimeclasses` | get | The gVisor sandbox provider's preflight check verifies the configured RuntimeClass is registered before creating any Sandbox. `get` only, read once at boot. |
 | coordination.k8s.io | `leases` | full CRUD | Leader election for the agent itself. |
 
 #### 2. Management Service
 
-The management service watches resources across all project namespaces, so its role is cluster-scoped — but it is almost entirely read-only.
+The management service watches resources across all project namespaces, so its role is cluster-scoped, but it is almost entirely read-only.
 
 | API group | Resources | Verbs | Why it is required |
 |-----------|-----------|-------|--------------------|
@@ -193,7 +154,7 @@ The gateway control plane needs only a narrow cluster-wide read for service disc
 
 #### 4. Cleanup hook (optional)
 
-When `cleanup.enabled` is `true` (the default), `helm uninstall` runs a `post-delete` Job that tears down everything the agent provisioned at runtime — Dapr/OTel Helm releases, the Dapr namespace, and any `cra.diagrid.io/project-namespace=true` namespaces. Its RBAC objects carry `helm.sh/hook-delete-policy: hook-succeeded,hook-failed`, so they exist only for the duration of the uninstall and are then removed.
+When `cleanup.enabled` is `true` (the default), `helm uninstall` runs a `post-delete` Job that tears down everything the agent provisioned at runtime: Dapr/OTel Helm releases, the Dapr namespace, and any `cra.diagrid.io/project-namespace=true` namespaces. Its RBAC objects carry `helm.sh/hook-delete-policy: hook-succeeded,hook-failed`, so they exist only for the duration of the uninstall and are then removed.
 
 | API group | Resources | Verbs | Why it is required |
 |-----------|-----------|-------|--------------------|
@@ -207,7 +168,7 @@ When `cleanup.enabled` is `true` (the default), `helm uninstall` runs a `post-de
 | admissionregistration.k8s.io | `mutatingwebhookconfigurations`, `validatingwebhookconfigurations` | get, list, delete | Remove the Dapr sidecar-injector webhook. |
 | dapr.io | `*` | get, list, delete | Remove all Dapr custom resources. |
 
-Set `cleanup.enabled: false` to skip this hook (and its RBAC) entirely — note this also leaves the `region` resource intact for re-installation, as described under [Uninstall](#uninstall).
+Set `cleanup.enabled: false` to skip this hook (and its RBAC) entirely. Note this also leaves the `region` resource intact for re-installation, as described under [Uninstall](#uninstall).
 
 ### Images
 
@@ -221,20 +182,20 @@ By default, this is the full list of images that are installed in your cluster:
 |-----------|--------------|-------------|
 | **Alpine k8s** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy/alpine/k8s:1.36.0` | Utility image used by Helm install and cleanup hooks |
 | **Envoy Proxy** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy/envoyproxy/envoy:distroless-v1.38.0` | Envoy proxy for gateway |
-| **Catalyst** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.104.0` | Consolidated Catalyst services image |
+| **Catalyst** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.105.0` | Consolidated Catalyst services image |
 | **Piko** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/diagrid-piko:v1.0.1` | Piko reverse tunneling service |
 | **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.19.0-20260820-catalyst.3` | Catalyst Dapr control plane services |
-| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.104.0` | Catalyst dapr server |
-| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.104.0` | OTel collector for telemetry |
+| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.105.0` | Catalyst dapr server |
+| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.105.0` | OTel collector for telemetry |
 
 Alternatively, separate images can be used:
 
 | Component | Default Image | Description |
 |-----------|--------------|-------------|
-| **Catalyst Agent** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/cra-agent:1.104.0` | Catalyst agent service |
-| **Catalyst Management** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-management:1.104.0` | Catalyst management service |
-| **Gateway Control Plane** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-gateway:1.104.0` | Gateway control plane service |
-| **Gateway Identity Injector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/identity-injector:1.104.0` | Identity injection service |
+| **Catalyst Agent** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/cra-agent:1.105.0` | Catalyst agent service |
+| **Catalyst Management** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-management:1.105.0` | Catalyst management service |
+| **Gateway Control Plane** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-gateway:1.105.0` | Gateway control plane service |
+| **Gateway Identity Injector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/identity-injector:1.105.0` | Identity injection service |
 
 Dependencies:
 
@@ -250,8 +211,8 @@ The Agent provisions these at runtime:
 
 | Component | Default Image | Description |
 |-----------|--------------|-------------|
-| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/sidecar:1.104.0` | Catalyst dapr server |
-| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-otel-collector:1.104.0` | OTel collector for telemetry |
+| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/sidecar:1.105.0` | Catalyst dapr server |
+| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-otel-collector:1.105.0` | OTel collector for telemetry |
 | **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.19.0-20260820-catalyst.3` | Catalyst Dapr control plane services |
 
 #### Optional Images
@@ -340,16 +301,16 @@ global:
       - api://AzureADTokenExchange
 ```
 
-The most common use is **Microsoft Entra ID Workload Identity Federation**. Register a federated identity credential on an App Registration whose `subject` is the workload's SPIFFE ID, `audiences` is `api://AzureADTokenExchange`, and `issuer` is the region's public OIDC issuer. Read the issuer off the region rather than constructing it — it ends in an opaque per-region path segment:
+The most common use is **Microsoft Entra ID Workload Identity Federation**. Register a federated identity credential on an App Registration whose `subject` is the workload's SPIFFE ID, `audiences` is `api://AzureADTokenExchange`, and `issuer` is the region's public OIDC issuer. Read the issuer off the region rather than constructing it; it ends in an opaque per-region path segment:
 
 ```bash
 diagrid region get <region-id> -o json | jq -r '.status.endpoints.oidc'
 # https://oidc.r1.diagrid.io/<region-oidc-id>
 ```
 
-With that audience configured here, every sidecar the agent provisions — and the regional management service — receives an SVID that can be exchanged at Azure's token endpoint for an Entra ID access token, no client secret required.
+With that audience configured here, every sidecar the agent provisions (and the regional management service) receives an SVID that can be exchanged at Azure's token endpoint for an Entra ID access token, no client secret required.
 
-The management service uses the same mechanism when a **workflow or agent state store** references a bring-your-own secret store (for example Azure Key Vault) through a `secretKeyRef`: management resolves that secret **in-process** with its own SPIFFE identity in order to serve workflow/agent data. Federate the management SPIFFE ID (`…/ns/cra-agent/management`) on the same App Registration so it can read the store — [`setup-federated-catalyst-identity.sh`](../../guides/azure/setup-federated-catalyst-identity.sh) federates both the appid and management subjects and grants the identity the role the store needs (e.g. `Key Vault Secrets User`).
+The management service uses the same mechanism when a **workflow or agent state store** references a bring-your-own secret store (for example Azure Key Vault) through a `secretKeyRef`: management resolves that secret **in-process** with its own SPIFFE identity in order to serve workflow/agent data. Federate the management SPIFFE ID (`…/ns/cra-agent/management`) on the same App Registration so it can read the store. [`setup-federated-catalyst-identity.sh`](../../guides/azure/setup-federated-catalyst-identity.sh) federates both the appid and management subjects and grants the identity the role the store needs (e.g. `Key Vault Secrets User`).
 
 The value applies to all sidecars in the deployment; it is empty by default (no extra audiences, no behavior change).
 
@@ -369,7 +330,7 @@ agent:
 
 ### Pod Scheduling
 
-Every Catalyst workload exposes standard Kubernetes scheduling primitives — `nodeSelector`, `tolerations`, and `affinity` — so you can pin pods to specific node pools or tolerate node taints.
+Every Catalyst workload exposes standard Kubernetes scheduling primitives (`nodeSelector`, `tolerations`, and `affinity`), so you can pin pods to specific node pools or tolerate node taints.
 
 **One knob for everything: `shared.scheduling`**
 
@@ -419,7 +380,7 @@ Agent-provisioned per-workload overrides:
 | Per-project Dapr control plane | `agent.config.internal_dapr.{node_selector,tolerations,affinity}` |
 | Per-project OTel collectors | `agent.config.otel.{node_selector,tolerations,affinity}` |
 
-Example — pin everything to one pool, but also spread the gateway across nodes:
+Example: pin everything to one pool, but also spread the gateway across nodes:
 
 ```yaml
 shared:
@@ -443,7 +404,7 @@ gateway:
 
 **Caveats worth knowing**
 
-- **Sidecar `affinity` override replaces the default pod anti-affinity.** When `agent.config.sidecar.affinity` is unset, the cra chart spreads sidecar replicas across nodes via a built-in `podAntiAffinity`. Setting `affinity` replaces that block entirely — include an equivalent `podAntiAffinity` in your override if you want to keep the spread.
+- **Sidecar `affinity` override replaces the default pod anti-affinity.** When `agent.config.sidecar.affinity` is unset, the cra chart spreads sidecar replicas across nodes via a built-in `podAntiAffinity`. Setting `affinity` replaces that block entirely. Include an equivalent `podAntiAffinity` in your override if you want to keep the spread.
 - **Sidecar tolerations are always appended to platform-managed ones.** The free-plan spot toleration (`diagrid.dev/spot`) is appended on top of shared + per-workload tolerations when the sidecar is scheduled on spot.
 - **Affinity map-merge is shallow.** If `shared.scheduling.affinity` has `nodeAffinity` and a per-workload block sets `podAntiAffinity`, both end up on the pod. If both set the same top-level key (e.g. both set `nodeAffinity`), the per-workload value replaces shared's.
 - **For agent-provisioned workloads (sidecar, internal_dapr, otel), prefer `matchExpressions` over `matchLabels` inside affinity** when your label keys contain `.` (e.g. `kubernetes.io/arch`). The agent's config loader (viper) treats `.` as a path separator, so dotted keys inside `matchLabels` get split. Chart-rendered workloads (agent, management, gateway, piko) don't have this constraint.
@@ -475,87 +436,14 @@ shared:
 
 The gateway Envoy also serves `/ready` and `/stats/prometheus` on a pod-IP `health` port (`gateway.envoy.health`, default 9091) in front of its loopback admin API. The readiness probe on it keeps a new pod out of service until Envoy has loaded its routes.
 
-### Gateway TLS
-
-To terminate TLS at the Catalyst Gateway, provide a certificate and key:
-
-```yaml
-gateway:
-  tls:
-    enabled: true
-    existingSecret: "my-tls-secret"
-    # Or provide cert/key inline
-```
-
-For step-by-step instructions covering self-signed (dev), bring-your-own certificates, cert-manager integration, private CA trust for sidecars, and rotation, see the [Gateway TLS guide](../../guides/gateway-tls/README.md).
-
-### Sidecar Outbound TLS Trust
-
-The `gateway.tls` settings above cover TLS *into* the region. To let the Dapr sidecars trust upstreams they connect *out* to — MCP servers, external HTTP endpoints, service invocation, bindings — that terminate TLS with a **private or self-signed CA**, add the CA to the sidecars' trust via `agent.config.sidecar`.
-
-These CAs are **added** to the public root bundle baked into the sidecar image (via `SSL_CERT_DIR`), so public-CA upstreams keep working. The trust applies region-wide to every sidecar the agent provisions.
-
-There are two sources, which combine (all listed CAs are trusted when both are set):
-
-**Recommended — reference a Kubernetes ConfigMap** (keeps the PEM out of your Helm values and lets you manage/rotate the CA as a first-class ConfigMap; CA certificates are public data, so a ConfigMap is the natural home):
-
-```yaml
-agent:
-  config:
-    sidecar:
-      trusted_ca:
-        existing_config_map:
-          # ConfigMap holding the CA bundle. Read by the agent at deploy time
-          # and mounted into every sidecar.
-          name: my-private-ca
-          # Optional. Empty = the control plane namespace (where the agent runs).
-          namespace: ""
-          # Optional. ConfigMap data key holding the PEM. Empty defaults to "ca.crt".
-          key: ""
-```
-
-**Inline PEM** (suitable for small bundles):
-
-```yaml
-agent:
-  config:
-    sidecar:
-      trusted_ca:
-        certs:
-          - |
-            -----BEGIN CERTIFICATE-----
-            ...
-            -----END CERTIFICATE-----
-```
-
-Leave both sources empty to trust only public roots (the default).
-
-### Managed Domain
-
-Set this when you want Diagrid Cloud to allocate the region's public wildcard hostname and TLS certificate for you, instead of bringing your own. Your `--ingress` endpoint then only needs to resolve **locally** (or privately) to the gateway — the controlplane allocates a public wildcard subdomain (under `privatediagrid.net` for Diagrid Cloud) and a matching wildcard certificate, then delivers them to the dataplane.
-
-Use this if you do not want to own a public wildcard DNS zone for the region, or provision and rotate a wildcard TLS certificate for the gateway.
-
-Enable it at region creation time:
-
-```bash
-diagrid region create <region-id> --enable-managed-domain --ingress <local-endpoint>
-```
-
-With managed domain, `--ingress` is a locally resolvable address (e.g. an internal hostname or an IP). Without it, `--ingress` must be a publicly resolvable wildcard FQDN that you control (e.g. `*.my-region.company.com`).
-
-When managed domain is enabled, you can omit the `gateway.tls` block from your Helm values — the certificate is provisioned by the controlplane and delivered to the dataplane gateway. See [Gateway TLS](#gateway-tls) for the bring-your-own case.
-
-> **Note:** managed domains add a runtime dependency on the controlplane's DNS and certificate-issuance infrastructure. If you require strict isolation from external services, stick with a bring-your-own domain and certificate.
-
 ### Data backends (PostgreSQL, Kafka, Redis)
 
 Catalyst relies on data backends shared across a region:
 
-- **PostgreSQL** — backs workflows state and visualizations, AI Agents metadata, managed state components and the Dapr **scheduler** (jobs,
+- **PostgreSQL**: backs workflows state and visualizations, AI Agents metadata, managed state components and the Dapr **scheduler** (jobs,
   reminders, cron). Catalyst defaults to automatic self-hosted deployment of PostgreSQL. It is a core part of Catalyst and all the features mentioned previously depend on the database being available. PostgreSQL is also crucial for the performance of workflows.
-- **Kafka** — backs managed pub/sub. Catalyst defaults to no deployment, disallowing managed pub/sub brokers to be available on project creation.
-- **Redis** — a standalone shared Redis. Disabled by default; provisioned self-hosted in-cluster or connected externally, with optional high availability. Each of the three backends is configured independently and provisioned the same way (self-hosted vs external).
+- **Kafka**: backs managed pub/sub. Catalyst defaults to no deployment, disallowing managed pub/sub brokers to be available on project creation.
+- **Redis**: a standalone shared Redis. Disabled by default; provisioned self-hosted in-cluster or connected externally, with optional high availability. Each of the three backends is configured independently and provisioned the same way (self-hosted vs external).
 
 #### Backwards compatibility and upgrades
 
@@ -570,7 +458,7 @@ We advise to update helm values for existing installations to the new configurat
 > **Default behaviour change (breaking on upgrade):** Catalyst now uses a **Postgres-backed scheduler**
 > by default. Previously the scheduler used an etcd backend.
 > By default, on upgrade the scheduler will move from etcd to PostgreSQL.
-> **There is no automatic state migration** — existing scheduler jobs/reminders
+> **There is no automatic state migration.** Existing scheduler jobs/reminders
 > held in etcd are not copied to PostgreSQL. If you must keep etcd, opt out explicitly using the values below.
 > However we suggest to update scheduler to use the PostgreSQL backend due to its improved performance and reliability.
 
@@ -616,7 +504,7 @@ streams changes via logical decoding). Catalyst's self-hosted PostgreSQL
    ALTER SYSTEM SET wal_level = logical;
    ```
 
-   Managed offerings ship it disabled — enable their equivalent instead:
+   Managed offerings ship it disabled; enable their equivalent instead:
 
    | Provider | Setting |
    |---|---|
@@ -630,7 +518,7 @@ streams changes via logical decoding). Catalyst's self-hosted PostgreSQL
    ALTER ROLE <username> WITH REPLICATION;
    ```
 
-   On Amazon RDS/Aurora the `REPLICATION` attribute cannot be granted directly —
+   On Amazon RDS/Aurora the `REPLICATION` attribute cannot be granted directly;
    use the built-in role instead:
 
    ```sql
@@ -639,7 +527,7 @@ streams changes via logical decoding). Catalyst's self-hosted PostgreSQL
 
 #### Scheduler
 
-The Dapr scheduler persists per-project scheduler state — scheduled jobs, actor
+The Dapr scheduler persists per-project scheduler state: scheduled jobs, actor
 reminders, and workflow triggers. It supports two backends:
 
 | `backend_type` | Where state lives | When to use |
@@ -648,7 +536,7 @@ reminders, and workflow triggers. It supports two backends:
 | `etcd` | An etcd instance on a PVC | Opt out of PostgreSQL entirely (see below). |
 
 > [!IMPORTANT]
-> The PostgreSQL scheduler uses **logical replication** — the database backing it
+> The PostgreSQL scheduler uses **logical replication**, so the database backing it
 > (global or dedicated) must meet the
 > [logical replication requirements](#logical-replication-requirements-external-postgresql)
 > above: `wal_level = logical` plus replication permission for the connecting user.
@@ -672,15 +560,15 @@ agent:
 
 > **Requires PostgreSQL to be enabled.** `use_global: true` reuses
 > `global.postgresql`, so it cannot be combined with `global.postgresql.disabled: true`.
-> If you disable the managed PostgreSQL, switch the scheduler to `etcd` (see below)
-> — otherwise rendering fails with a validation error.
+> If you disable the managed PostgreSQL, switch the scheduler to `etcd` (see below),
+> otherwise rendering fails with a validation error.
 
-**Dedicated scheduler database(s)** — *advanced*
+**Dedicated scheduler database(s)**, *advanced*
 
 For advanced scenarios where you want the scheduler to use a dedicated
 database (or spread across multiple databases) separate from the global
 PostgreSQL, set `use_global: false` and provide the connection(s) yourself. Each
-entry in `connections` is one scheduler database — supply several to shard the
+entry in `connections` is one scheduler database; supply several to shard the
 scheduler across databases.
 
 ```yaml
@@ -733,7 +621,7 @@ global:
 #### Redis
 
 A standalone shared Redis used for caching and key value storage.
-This chart version ships it as **opt-in — disabled by default** provisioned in-cluster or connected
+This chart version ships it as **opt-in, disabled by default** provisioned in-cluster or connected
 externally, and enabled per environment:
 
 ```yaml
@@ -751,8 +639,8 @@ global:
 
 | `replica_count` | Topology |
 |---|---|
-| `0` (default) | `standalone` — single node, no failover. |
-| `>= 1` | `replication` + **Redis Sentinel** — master + N replicas with automatic failover. |
+| `0` (default) | `standalone`: single node, no failover. |
+| `>= 1` | `replication` + **Redis Sentinel**: master + N replicas with automatic failover. |
 
 ```yaml
 global:
@@ -860,7 +748,7 @@ Catalyst includes optional OpenTelemetry Collector addons for collecting and exp
 
 See the [official documentation](https://opentelemetry.io/docs/collector/configuration/) for configuration details.
 
-To emit traces from Dapr apps into the collector (or any other OTLP backend), see the [tracing guide](../../guides/tracing/README.md) — tracing is enabled per App ID via the Diagrid CLI, not through chart values.
+To emit traces from Dapr apps into the collector (or any other OTLP backend), see the [tracing guide](../../guides/tracing/README.md); tracing is enabled per App ID via the Diagrid CLI, not through chart values.
 
 ### Secrets
 
@@ -893,7 +781,7 @@ global:
       primary_key_version: 1
 ```
 
-**Using an existing Kubernetes secret** (recommended for production — keeps all sensitive config out of values files):
+**Using an existing Kubernetes secret** (recommended for production, since it keeps all sensitive config out of values files):
 
 First, create the Kubernetes secret in the same namespace as the Catalyst installation:
 
@@ -915,7 +803,7 @@ global:
       existingSecret: "catalyst-pg-secrets"
 ```
 
->NOTE: When `existingSecret` is set, **all** PostgreSQL secrets provider config is read from the referenced Kubernetes secret via environment variables — nothing is written to the ConfigMap. All keys are read with `optional: true`, so keys that are absent from the secret are simply not set and the application uses its built-in defaults (useful for optional fields like secondary keys or AWS KMS config). By default the secret key names match the config field names. Override individual key names using `existingSecretKeys` if your secret uses different naming:
+>NOTE: When `existingSecret` is set, **all** PostgreSQL secrets provider config is read from the referenced Kubernetes secret via environment variables. Nothing is written to the ConfigMap. All keys are read with `optional: true`, so keys that are absent from the secret are simply not set and the application uses its built-in defaults (useful for optional fields like secondary keys or AWS KMS config). By default the secret key names match the config field names. Override individual key names using `existingSecretKeys` if your secret uses different naming:
 
 ```yaml
 global:
@@ -932,7 +820,7 @@ global:
 
 The Catalyst Assistant answers questions about the workflows and App IDs in this
 region, which means it calls a model provider. That provider credential lives in
-this region and nowhere else — Diagrid's control plane names it but never holds it,
+this region and nowhere else. Diagrid's control plane names it but never holds it,
 so a region you own runs the assistant on a key Diagrid never sees.
 
 Leaving this unset is a normal installation: a region that runs no assistant, or one
@@ -971,7 +859,7 @@ be restarted: the agent re-applies the copy in the assistant's project namespace
 the next reconcile of that project, and the running assistant then picks the new
 credential up on its own.
 
-Rotation is therefore **eventual, not immediate** — allow up to the agent's
+Rotation is therefore **eventual, not immediate**. Allow up to the agent's
 drift-reconcile interval (15 minutes by default) for the copy to be re-applied,
 plus a few seconds for the assistant to observe it. If you are rotating in response
 to a suspected disclosure and want the old credential out of use at once, restart
@@ -980,6 +868,161 @@ the assistant's workload rather than waiting:
 ```bash
 kubectl rollout restart deployment -n <the assistant's project namespace> -l dapr.io/app-id=reagent
 ```
+
+### Production Tuning
+
+For production deployments, start from the `values-production.yaml` overlay shipped alongside this chart:
+
+```bash
+helm install catalyst ./catalyst \
+  -f values-production.yaml \
+  -f my-environment.yaml \
+  --set join_token="${JOIN_TOKEN}"
+```
+
+The overlay enables HPAs, drops Kubernetes resource `limits` on Go components (which also drops the auto-derived `GOMEMLIMIT`), lowers log verbosity, and raises the per-project Dapr scheduler memory floor. See the [Production Tuning guide](../../guides/production/README.md) for the rationale behind each value, plus guidance on managed infrastructure (managed Kubernetes, managed PostgreSQL), PodDisruptionBudgets, securityContext hardening, and NetworkPolicies.
+
+## Networking
+
+Catalyst Enterprise Self-Hosted requires outbound connectivity to Diagrid Cloud.
+
+| Endpoint | mTLS | Client | Purpose | Required |
+|---|---|---|---|---|
+| `catalyst-cloud.r1.diagrid.io:443` | Yes | agent, management, gateway-controlplane | Resource and configuration sync, events | Yes |
+| `sentry.r1.diagrid.io:443` | Yes | agent, project sidecars, in-region Sentry | Workload identity (SVID issuance) | Yes |
+| `trust.r1.diagrid.io` | No | agent, management, gateway-controlplane, sidecars, in-region Sentry | Fetches the Diagrid trust anchors at startup. A workload that cannot verify it does not start. | Yes |
+| `api.r1.diagrid.io` | No | agent, management, sidecars | Control plane HTTPS API | Yes |
+| `public.ecr.aws` | No | agent | Pulls the internal Dapr chart at runtime | Yes |
+| `us-central1-docker.pkg.dev` | No | agent, container runtime | Container images | Yes |
+| `login.diagrid.io` | No | management | IdP JWKS, to validate user tokens | Yes |
+| `catalyst-metrics.r1.diagrid.io` | No | metrics collector | Dapr runtime metrics | No |
+| `catalyst-logs.r1.diagrid.io` | No | logs collector | Dapr sidecar logs | No |
+| `tunnel-upstream.r1.diagrid.io` | No | management | Management API tunnel upstream, Piko | Only when `exposeTunnel` is set on the region |
+
+Container image pulls are performed by the container runtime, not by this chart,
+so a proxy in front of the registry needs its CA in the nodes' trust store.
+
+### Proxying Outbound Connections
+
+It is possible to route the outbound connections via a firewall or proxy. You will only be able to terminate TLS for the non-mTLS connections from the table above. The mTLS connections must pass through your firewall or proxy without content inspection.
+
+To proxy the TLS connections, you need to configure Catalyst to trust the CA that your firewall or proxy uses to terminate TLS. You can do this by setting `global.trustedCA` in your Helm values.
+
+To provide a trusted CA, set exactly one of the following two sources.
+
+1. **Reference an existing ConfigMap (Recommended)**:
+
+```yaml
+global:
+  trustedCA:
+    existingConfigMap:
+      name: corporate-dpi-ca
+      # Optional; defaults to "ca.crt".
+      key: ca.crt
+```
+
+2. **Inline PEM**:
+
+```yaml
+global:
+  trustedCA:
+    certs: |
+      -----BEGIN CERTIFICATE-----
+      ...
+      -----END CERTIFICATE-----
+```
+
+If you choose to use the `existingConfigMap` source, you must roll out the following workloads after you've updated the ConfigMap to ensure that the new CA is picked up:
+
+```sh
+kubectl -n <release-namespace> rollout restart deploy/agent deploy/management \
+  deploy/catalyst-mcp deploy/catalyst-gateway-controlplane
+```
+
+#### Disabling TLS Verification
+
+You should never disable TLS verification in production. If you need to trust a self-signed certificate for your proxy or firewall, use the `global.trustedCA` option above.
+
+If you do need to disable TLS verification for testing or troubleshooting, you can set `global.tls.insecureSkipVerify: true` in your Helm values. This will turn off certificate verification for every outbound connection this chart configures to a Diagrid endpoint.
+
+```yaml
+global:
+  tls:
+    insecureSkipVerify: true
+```
+
+### Sidecar Outbound TLS Trust
+
+the setting `global.trustedCA` documented above already reaches every sidecar; this section is for CAs that **only** the
+sidecars need and you do not want to load into other services. To let the Catalyst sidecars trust upstreams they connect *out* to (MCP servers, external HTTP endpoints, service invocation, bindings) that terminate TLS with a **private or self-signed CA**, add the CA to the sidecars' trust via `agent.config.sidecar`. The trust applies region-wide to every sidecar the agent provisions.
+
+To provide a sidecar trusted CA, set exactly one of the following two sources.
+
+1. **Reference an existing ConfigMap (recommended)**:
+
+```yaml
+agent:
+  config:
+    sidecar:
+      trusted_ca:
+        existing_config_map:
+          # ConfigMap holding the CA bundle. Read by the agent at deploy time
+          # and mounted into every sidecar.
+          name: my-private-ca
+          # Optional. Empty = the control plane namespace (where the agent runs).
+          namespace: ""
+          # Optional. ConfigMap data key holding the PEM. Empty defaults to "ca.crt".
+          key: ""
+```
+
+2. **Inline PEM**:
+
+```yaml
+agent:
+  config:
+    sidecar:
+      trusted_ca:
+        certs:
+          - |
+            -----BEGIN CERTIFICATE-----
+            ...
+            -----END CERTIFICATE-----
+```
+
+Leave both sources empty to trust only public roots (the default). This setting
+composes with `global.trustedCA`: sidecars trust the union of the two.
+
+### Gateway TLS
+
+The Catalyst gateway is responsible for ingress traffic into the region. It terminates TLS for the public endpoint and forwards traffic internally to the desired service. You can provide your own TLS certificate and key for the gateway via the following Helm values. The certificate and key can be provided inline or via an existing Kubernetes secret.
+
+```yaml
+gateway:
+  tls:
+    enabled: true
+    existingSecret: "my-tls-secret"
+    # Or provide cert/key inline
+```
+
+For step-by-step instructions covering self-signed (dev), bring-your-own certificates, cert-manager integration, private CA trust for sidecars, and rotation, see the [Gateway TLS guide](../../guides/gateway-tls/README.md).
+
+### Managed Domain
+
+Set this when you want Diagrid Cloud to allocate the region's public wildcard hostname and TLS certificate for you, instead of bringing your own. Your `--ingress` endpoint then only needs to resolve **locally** (or privately) to the gateway. The controlplane allocates a public wildcard subdomain (under `privatediagrid.net` for Diagrid Cloud) and a matching wildcard certificate, then delivers them to the dataplane.
+
+Use this if you do not want to own a public wildcard DNS zone for the region, or provision and rotate a wildcard TLS certificate for the gateway.
+
+Enable it at region creation time:
+
+```bash
+diagrid region create <region-id> --enable-managed-domain --ingress <local-endpoint>
+```
+
+With managed domain, `--ingress` is a locally resolvable address (e.g. an internal hostname or an IP). Without it, `--ingress` must be a publicly resolvable wildcard FQDN that you control (e.g. `*.my-region.company.com`).
+
+When managed domain is enabled, you can omit the `gateway.tls` block from your Helm values; the certificate is provisioned by the controlplane and delivered to the dataplane gateway. See [Gateway TLS](#gateway-tls) for the bring-your-own case.
+
+> **Note:** managed domains add a runtime dependency on the controlplane's DNS and certificate-issuance infrastructure. If you require strict isolation from external services, stick with a bring-your-own domain and certificate.
 
 ### App Tunnels
 
@@ -1008,41 +1051,50 @@ management:
         audience: piko        # optional, defaults to "piko"
 ```
 
-`upstream_url` is the Piko upstream of the controlplane that issued the region — the operator of that controlplane provides this value.
+`upstream_url` is the Piko upstream of the controlplane that issued the region; the operator of that controlplane provides this value.
 
 The management service authenticates to Piko using a JWT-SVID issued by Dapr Sentry, so the Sentry remote endpoint configured during region join must already be in place (it is, by default).
 
-### Production Tuning
+### Network Policies (System)
 
-For production deployments, start from the `values-production.yaml` overlay shipped alongside this chart:
+Catalyst always generates NetworkPolicies for **project namespaces** (deny-all plus explicit allows, created by the agent at provisioning time). The **system namespaces** (the release namespace and the internal Dapr namespace) ship without policies by default. On clusters with a default-deny security mandate, enable the chart-managed set:
 
-```bash
-helm install catalyst ./catalyst \
-  -f values-production.yaml \
-  -f my-environment.yaml \
-  --set join_token="${JOIN_TOKEN}"
+```yaml
+networkPolicies:
+  enabled: true
 ```
 
-The overlay enables HPAs, drops Kubernetes resource `limits` on Go components (which also drops the auto-derived `GOMEMLIMIT`), lowers log verbosity, and raises the per-project Dapr scheduler memory floor. See the [Production Tuning guide](../../guides/production/README.md) for the rationale behind each value, plus guidance on managed infrastructure (managed Kubernetes, managed PostgreSQL), PodDisruptionBudgets, securityContext hardening, and NetworkPolicies.
+This installs deny-all policies for both system namespaces plus the explicit allows Catalyst needs: intra-namespace traffic, project-sidecar access to piko/management and the Dapr control plane, public ingress to the gateway, and egress to DNS, the Kubernetes API server, the Diagrid control plane (public internet except private ranges, since standard NetworkPolicy cannot match hostnames), and project namespaces.
 
-## Networking
+These policies only take effect on clusters whose CNI enforces NetworkPolicy (Calico, Cilium, Azure NPM, ...). Without one they are silently inert; the agent logs a warning at startup when no enforcing CNI is detected.
 
-Catalyst Enterprise Self-Hosted requires outbound connectivity to Diagrid Cloud. Ensure your network allows access to:
+Install-specific values:
 
-| Domain | Description | Required |
-|--------|-------------|----------|
-| `api.r1.diagrid.io` | Region join (installation only). | Yes |
-| `catalyst-cloud.r1.diagrid.io` | Resource configuration updates. | Yes |
-| `sentry.r1.diagrid.io` | Workload identity (mTLS). | Yes |
-| `trust.r1.diagrid.io` | Trust anchors (mTLS). | Yes |
-| `tunnels.trust.diagrid.io` | OIDC provider for Piko tunnels. | No |
-| `tunnel-upstream.r1.diagrid.io` | Management API tunnel upstream (Piko). | Only if `exposeTunnel` is set on the region. |
-| `catalyst-metrics.r1.diagrid.io` | Dapr runtime metrics. | No |
-| `catalyst-logs.r1.diagrid.io` | Dapr sidecar logs. | No |
+```yaml
+networkPolicies:
+  enabled: true
+  # NetworkPolicy is evaluated after kube-proxy DNAT, so API server traffic is
+  # matched against the real endpoint (kubectl get endpoints kubernetes -n default),
+  # never the kubernetes.default ClusterIP. Unset, the policy falls back to
+  # allowing all private ranges on ports 443 and 6443.
+  apiserver:
+    endpointCIDR: "10.224.0.4/32"
+    port: 443
+  # Allows agent egress to an in-cluster PostgreSQL on 5432 (scheduler and
+  # managed state store databases). Omit when not using postgres-backed features.
+  postgres:
+    namespace: "postgres"
+  # Extra egress allows for private destinations (VNet databases, private
+  # endpoints) that the internet-egress policy's private-range excepts block.
+  extraEgress:
+    - cidr: 10.100.0.0/24
+      ports:
+        - port: 5432
+```
 
-**Note:** mTLS is used for secure communication. Ensure your proxy/firewall does not inspect this traffic.
+If the PostgreSQL namespace is itself default-deny, its ingress allows are yours to manage: both the release namespace (agent) and every project namespace (sidecars connect directly for managed state stores) need ingress on 5432.
 
-### Network Policies
+### Network Policies (Projects)
 
 Catalyst configures Kubernetes `NetworkPolicy` resources per project namespace using three symmetric lists:
 
@@ -1052,7 +1104,7 @@ Catalyst configures Kubernetes `NetworkPolicy` resources per project namespace u
 | `agent.config.project.allowed_egress`  | Additive egress allow rules. May target CIDRs and/or namespaces, with optional port scoping. |
 | `agent.config.project.allowed_ingress` | Additive ingress allow rules into project namespaces. May target CIDRs and/or namespaces, with optional port scoping. |
 
-**Precedence: allow beats block.** NetworkPolicy rules are additive — the API server OR's them together — so any
+**Precedence: allow beats block.** NetworkPolicy rules are additive (the API server OR's them together), so any
 destination matched by an `allowed_egress` entry is reachable even if its CIDR also appears in `blocked_egress`. Use
 this to punch narrow holes through the block list rather than weakening it.
 

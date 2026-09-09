@@ -1,0 +1,401 @@
+suite: Test outbound TLS trust (global.trustedCA and global.tls.insecureSkipVerify)
+# Each deployment `include`s sibling templates by path (agent and management
+# their configmap, gateway its configmap and tls-secret); every sibling must be
+# listed or the render fails with "no template ... associated". Assertions are
+# pinned per assert with `template:`.
+templates:
+  - trusted-ca.yaml
+  - agent/deployment.yaml
+  - agent/configmap.yaml
+  - management/deployment.yaml
+  - management/configmap.yaml
+  - mcp/deployment.yaml
+  - gateway/deployment.yaml
+  - gateway/configmap.yaml
+  - gateway/tls-secret.yaml
+  - gateway/gateway-controlplane-configmap.yaml
+  - piko/statefulset.yaml
+
+tests:
+  # ---------------------------------------------------------------------------
+  # Default: nothing mounted, nothing trusted beyond the public roots.
+  # ---------------------------------------------------------------------------
+  - it: should render no CA ConfigMap and mount nothing by default
+    set:
+      join_token: "test-token"
+      mcp.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: trusted-ca.yaml
+      - notContains:
+          path: spec.template.spec.volumes
+          content:
+            name: trusted-ca
+            configMap:
+              name: RELEASE-NAME-trusted-ca
+              items:
+                - key: ca.crt
+                  path: ca.crt
+        template: agent/deployment.yaml
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SSL_CERT_DIR
+            value: "/etc/ssl/certs:/var/run/diagrid.io/trusted-ca"
+        template: agent/deployment.yaml
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SSL_CERT_DIR
+            value: "/etc/ssl/certs:/var/run/diagrid.io/trusted-ca"
+        template: management/deployment.yaml
+
+  # ---------------------------------------------------------------------------
+  # Inline PEM: the chart owns the ConfigMap.
+  # ---------------------------------------------------------------------------
+  - it: should render a CA ConfigMap from an inline bundle
+    set:
+      join_token: "test-token"
+      global.trustedCA.certs: |
+        -----BEGIN CERTIFICATE-----
+        dpi
+        -----END CERTIFICATE-----
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: trusted-ca.yaml
+      - isKind:
+          of: ConfigMap
+        template: trusted-ca.yaml
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-trusted-ca
+        template: trusted-ca.yaml
+      - matchRegex:
+          path: data["ca.crt"]
+          pattern: "BEGIN CERTIFICATE"
+        template: trusted-ca.yaml
+
+  - it: should honour a custom ConfigMap key for the inline bundle
+    set:
+      join_token: "test-token"
+      global.trustedCA.certs: "pem"
+      global.trustedCA.existingConfigMap.key: "dpi.pem"
+    asserts:
+      - isNotNull:
+          path: data["dpi.pem"]
+        template: trusted-ca.yaml
+
+  # ---------------------------------------------------------------------------
+  # The bundle reaches every dataplane workload that dials out over server TLS.
+  # ---------------------------------------------------------------------------
+  - it: should mount the bundle and set SSL_CERT_DIR on the agent
+    set:
+      join_token: "test-token"
+      global.trustedCA.certs: "pem"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SSL_CERT_DIR
+            value: "/etc/ssl/certs:/var/run/diagrid.io/trusted-ca"
+        template: agent/deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: trusted-ca
+            mountPath: /var/run/diagrid.io/trusted-ca
+            readOnly: true
+        template: agent/deployment.yaml
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: trusted-ca
+            configMap:
+              name: RELEASE-NAME-trusted-ca
+              items:
+                - key: ca.crt
+                  path: ca.crt
+        template: agent/deployment.yaml
+      - isNotNull:
+          path: spec.template.metadata.annotations["checksum/trusted-ca"]
+        template: agent/deployment.yaml
+
+  - it: should mount the bundle and set SSL_CERT_DIR on management
+    set:
+      join_token: "test-token"
+      global.trustedCA.certs: "pem"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SSL_CERT_DIR
+            value: "/etc/ssl/certs:/var/run/diagrid.io/trusted-ca"
+        template: management/deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: trusted-ca
+            mountPath: /var/run/diagrid.io/trusted-ca
+            readOnly: true
+        template: management/deployment.yaml
+
+  - it: should mount the bundle and set SSL_CERT_DIR on mcp
+    set:
+      join_token: "test-token"
+      mcp.enabled: true
+      global.trustedCA.certs: "pem"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SSL_CERT_DIR
+            value: "/etc/ssl/certs:/var/run/diagrid.io/trusted-ca"
+        template: mcp/deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: trusted-ca
+            mountPath: /var/run/diagrid.io/trusted-ca
+            readOnly: true
+        template: mcp/deployment.yaml
+
+  # Second document, and its own container second in the pod (identity-injector
+  # is first).
+  - it: should mount the bundle and set SSL_CERT_DIR on gateway-controlplane
+    set:
+      join_token: "test-token"
+      global.trustedCA.certs: "pem"
+    documentIndex: 1
+    asserts:
+      - equal:
+          path: metadata.name
+          value: catalyst-gateway-controlplane
+        template: gateway/deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[1].env
+          content:
+            name: SSL_CERT_DIR
+            value: "/etc/ssl/certs:/var/run/diagrid.io/trusted-ca"
+        template: gateway/deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[1].volumeMounts
+          content:
+            name: trusted-ca
+            mountPath: /var/run/diagrid.io/trusted-ca
+            readOnly: true
+        template: gateway/deployment.yaml
+
+  # Left out deliberately: Envoy reaches the control plane only over SPIFFE
+  # mTLS, which no proxy can re-sign, and Piko's only HTTP dependency is
+  # in-cluster. Neither has a server-TLS outbound needing the CA.
+  - it: should not mount the bundle into envoy
+    set:
+      join_token: "test-token"
+      global.trustedCA.certs: "pem"
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: metadata.name
+          value: catalyst-gateway
+        template: gateway/deployment.yaml
+      - notContains:
+          path: spec.template.spec.containers[1].volumeMounts
+          content:
+            name: trusted-ca
+            mountPath: /var/run/diagrid.io/trusted-ca
+            readOnly: true
+        template: gateway/deployment.yaml
+
+  - it: should not mount the bundle into piko
+    set:
+      join_token: "test-token"
+      global.trustedCA.certs: "pem"
+    asserts:
+      - equal:
+          path: metadata.name
+          value: diagrid-piko
+        template: piko/statefulset.yaml
+      - notContains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: trusted-ca
+            mountPath: /var/run/diagrid.io/trusted-ca
+            readOnly: true
+        template: piko/statefulset.yaml
+
+  # ---------------------------------------------------------------------------
+  # The agent forwards the bundle to the workloads it provisions itself.
+  # ---------------------------------------------------------------------------
+  - it: should point the agent at the CA ConfigMap so sidecars and collectors inherit it
+    set:
+      join_token: "test-token"
+      global.trustedCA.certs: "pem"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "trusted_ca:"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "name: RELEASE-NAME-trusted-ca"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "namespace: NAMESPACE"
+        template: agent/configmap.yaml
+
+  # ---------------------------------------------------------------------------
+  # An operator-owned ConfigMap is mounted as-is; the chart renders none.
+  # ---------------------------------------------------------------------------
+  - it: should mount an existing ConfigMap without rendering one
+    set:
+      join_token: "test-token"
+      global.trustedCA.existingConfigMap.name: corp-dpi-ca
+      global.trustedCA.existingConfigMap.key: dpi.pem
+    asserts:
+      - hasDocuments:
+          count: 0
+        template: trusted-ca.yaml
+      # Only the selected key is projected: SSL_CERT_DIR reads every file in the
+      # mount, so an unrelated key in an operator-owned ConfigMap must not be
+      # trusted.
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: trusted-ca
+            configMap:
+              name: corp-dpi-ca
+              items:
+                - key: dpi.pem
+                  path: dpi.pem
+        template: agent/deployment.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "name: corp-dpi-ca"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "key: dpi.pem"
+        template: agent/configmap.yaml
+      # Nothing to checksum: rolling out an operator-owned ConfigMap is theirs.
+      - isNull:
+          path: spec.template.metadata.annotations["checksum/trusted-ca"]
+        template: agent/deployment.yaml
+
+  # Setting both sources at once is refused by catalyst.trustedCA.configMapName.
+  # There is deliberately no test for it here: helm-unittest does not surface a
+  # `fail` raised inside a `define`, reporting "No failed document" even though
+  # `helm template` aborts with the message. Verified by hand instead:
+  #   helm template t . --set join_token=x \
+  #     --set global.trustedCA.certs=pem \
+  #     --set global.trustedCA.existingConfigMap.name=corp
+
+  # ---------------------------------------------------------------------------
+  # global.tls.insecureSkipVerify fans out to every per-endpoint flag.
+  # ---------------------------------------------------------------------------
+  - it: should leave every per-endpoint skip-verify flag off by default
+    set:
+      join_token: "test-token"
+      mcp.enabled: true
+    asserts:
+      # Unset renders as null, exactly as it did before global.tls existed, so
+      # an upgrade does not rewrite the ConfigMap and roll the pods.
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "control_plane_http_insecure: null"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "trust_anchors_endpoint_insecure: false"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "metrics_tls_insecure: false"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "loki_tls_insecure: false"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "insecure_skip_verify: false"
+        template: agent/configmap.yaml
+      - notContains:
+          path: spec.template.spec.containers[0].args
+          content: "--insecure-skip-verify"
+        template: mcp/deployment.yaml
+
+  - it: should turn every per-endpoint skip-verify flag on from the one switch
+    set:
+      join_token: "test-token"
+      mcp.enabled: true
+      global.tls.insecureSkipVerify: true
+      management.config.tunnel.enabled: true
+      management.config.tunnel.piko.upstream_url: "https://tunnel-upstream.example.com"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "control_plane_http_insecure: true"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "trust_anchors_endpoint_insecure: true"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "metrics_tls_insecure: true"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "loki_tls_insecure: true"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "insecure_skip_verify: true"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "control_plane_http_insecure: true"
+        template: management/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "trust_anchors_endpoint_insecure: true"
+        template: management/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "insecure: true"
+        template: management/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "trust_anchors_endpoint_insecure: true"
+        template: gateway/gateway-controlplane-configmap.yaml
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: "--insecure-skip-verify"
+        template: mcp/deployment.yaml
+
+  - it: should keep a per-endpoint flag effective on its own
+    set:
+      join_token: "test-token"
+      global.control_plane_http_insecure: true
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "control_plane_http_insecure: true"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "trust_anchors_endpoint_insecure: false"
+        template: agent/configmap.yaml
+
+  - it: should not loosen the private metrics export, which is not a Diagrid endpoint
+    set:
+      join_token: "test-token"
+      global.tls.insecureSkipVerify: true
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "tls_insecure: false"
+        template: agent/configmap.yaml

@@ -19,9 +19,13 @@ spec:
       {{- include "mcp.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      {{- with .Values.mcp.podAnnotations }}
+      {{- $trustedCAAnn := include "catalyst.trustedCA.podAnnotation" . }}
+      {{- if or .Values.mcp.podAnnotations $trustedCAAnn }}
       annotations:
+        {{- with .Values.mcp.podAnnotations }}
         {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with $trustedCAAnn }}{{- . | nindent 8 }}{{- end }}
       {{- end }}
       labels:
         {{- include "mcp.selectorLabels" . | nindent 8 }}
@@ -71,7 +75,7 @@ spec:
             - "--expose-raw-operations=false"
             {{- end }}
             - "--timeout={{ .Values.mcp.upstreamTimeout }}"
-            {{- if .Values.mcp.insecureSkipVerify }}
+            {{- if or (eq (include "catalyst.tls.insecureSkipVerify" .) "true") .Values.mcp.insecureSkipVerify }}
             - "--insecure-skip-verify"
             {{- end }}
             {{- with .Values.mcp.extraArgs }}
@@ -86,6 +90,7 @@ spec:
             - name: GOMEMLIMIT
               value: {{ $gomemlimit }}
             {{- end }}
+            {{- with include "catalyst.trustedCA.env" . }}{{- . | nindent 12 }}{{- end }}
             {{- with .Values.mcp.extraEnvs }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -103,6 +108,14 @@ spec:
           {{- end }}
           resources:
             {{- toYaml .Values.mcp.resources | nindent 12 }}
+          {{- with include "catalyst.trustedCA.volumeMount" . }}
+          volumeMounts:
+            {{- . | nindent 12 }}
+          {{- end }}
+      {{- with include "catalyst.trustedCA.volume" . }}
+      volumes:
+        {{- . | nindent 8 }}
+      {{- end }}
       nodeSelector:
         {{- include "catalyst.nodeSelector" (dict "shared" .Values.shared.scheduling "component" .Values.mcp) | nindent 8 }}
       affinity:

@@ -99,8 +99,28 @@
 {{- $_ := set $agentConfig "control_plane_namespace" .Values.global.control_plane_namespace -}}
 {{- $_ := set $agentConfig "control_plane_url" .Values.global.control_plane_url -}}
 {{- $_ := set $agentConfig "control_plane_http_url" .Values.global.control_plane_http_url -}}
-{{- $_ := set $agentConfig "control_plane_http_insecure" .Values.global.control_plane_http_insecure -}}
-{{- $_ := set $agentConfig "sentry" .Values.global.sentry -}}
+{{- /* The deployment-wide skip-verify switch only ever loosens a per-endpoint flag. */ -}}
+{{- $insecureSkipVerify := eq (include "catalyst.tls.insecureSkipVerify" .) "true" -}}
+{{- $_ := set $agentConfig "control_plane_http_insecure" (or $insecureSkipVerify .Values.global.control_plane_http_insecure) -}}
+{{- $_ := set $agentConfig "sentry" (include "catalyst.sentryConfig" . | fromYaml) -}}
+{{- /* Passed on to the workloads the agent provisions. The namespace is
+       explicit: the agent would otherwise default to control_plane_namespace,
+       which names a namespace in the control plane, not this release's. */ -}}
+{{- with include "catalyst.trustedCA.configMapName" . -}}
+  {{- $_ := set $agentConfig "trusted_ca" (dict "existing_config_map" (dict
+        "name" .
+        "namespace" $.Release.Namespace
+        "key" (include "catalyst.trustedCA.key" $))) -}}
+{{- end -}}
+{{- /* Remaining endpoints the switch covers. */ -}}
+{{- if $insecureSkipVerify -}}
+  {{- if not $agentConfig.otel -}}{{- $_ := set $agentConfig "otel" dict -}}{{- end -}}
+  {{- $_ := set $agentConfig.otel "metrics_tls_insecure" true -}}
+  {{- $_ := set $agentConfig.otel "loki_tls_insecure" true -}}
+  {{- if not $agentConfig.oidc -}}{{- $_ := set $agentConfig "oidc" dict -}}{{- end -}}
+  {{- if not $agentConfig.oidc.collector -}}{{- $_ := set $agentConfig.oidc "collector" dict -}}{{- end -}}
+  {{- $_ := set $agentConfig.oidc.collector "insecure_skip_verify" true -}}
+{{- end -}}
 {{- $_ := set $agentConfig "nats" .Values.global.nats -}}
 {{- $_ := set $agentConfig "secretsprovider" .Values.global.secrets.provider -}}
 {{- $_ := set $agentConfig "secrets_redis" .Values.global.secrets.redis -}}

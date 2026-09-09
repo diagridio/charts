@@ -180,6 +180,7 @@ spec:
         dapr.io/app-id: gateway-controlplane
         dapr.io/config: catalyst
         kubectl.kubernetes.io/default-container: catalyst-gateway-controlplane
+        {{- with include "catalyst.trustedCA.podAnnotation" . }}{{- . | nindent 8 }}{{- end }}
       labels:
         {{- include "merge.maps" (dict "base" (include "gateway.controlplane.selectorLabels" . | fromYaml) "overrides" (merge (dict) (.Values.gateway.controlplane.merge.selectorLabels | default dict) (.Values.gateway.controlplane.podLabels | default dict))) | nindent 8 }}
     spec:
@@ -343,6 +344,7 @@ spec:
                   key: {{ $pgKeys.timeout | default "timeout" }}
                   optional: true
           {{- end }}
+            {{- with include "catalyst.trustedCA.env" . }}{{- . | nindent 12 }}{{- end }}
           securityContext:
             {{- toYaml .Values.gateway.controlplane.securityContext | nindent 12 }}
           image: {{ include "catalyst.image" (dict "image" .Values.gateway.controlplane.image "consolidated" .Values.global.consolidated_image "global" .Values.global.image "context" .) }}
@@ -370,7 +372,9 @@ spec:
               name: trust-bundle
               subPath: ca.crt
           {{- end }}
+            {{- with include "catalyst.trustedCA.volumeMount" . }}{{- . | nindent 12 }}{{- end }}
       volumes:
+        {{- with include "catalyst.trustedCA.volume" . }}{{- . | nindent 8 }}{{- end }}
         - name: gateway-controlplane-config
           configMap:
             name: catalyst-gateway-controlplane-config

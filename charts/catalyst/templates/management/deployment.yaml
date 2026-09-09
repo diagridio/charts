@@ -20,6 +20,9 @@ spec:
   template:
     metadata:
       {{ $baseAnns := dict "checksum/management-config" (include (print $.Template.BasePath "/management/configmap.yaml") . | sha256sum) "dapr.io/app-id" "management" "dapr.io/config" "management" }}
+      {{- /* Merged into the dict, not appended: merge.maps renders the whole map
+             at one indent, so a key beside it lands at the wrong level. */}}
+      {{- with include "catalyst.trustedCA.checksum" . }}{{ $_ := set $baseAnns "checksum/trusted-ca" . }}{{ end }}
       {{ $overrideAnns := .Values.management.podAnnotations | default dict }}
       annotations:
         {{ include "merge.maps" (dict "base" $baseAnns "overrides" $overrideAnns) | nindent 8 }}
@@ -146,6 +149,7 @@ spec:
                 key: {{ $pgKeys.timeout | default "timeout" }}
                 optional: true
           {{- end }}
+          {{- with include "catalyst.trustedCA.env" . }}{{- . | nindent 10 }}{{- end }}
           {{- if .Values.management.extraEnvs }}
           {{- toYaml .Values.management.extraEnvs | nindent 10 }}
           {{- end }}
@@ -177,9 +181,11 @@ spec:
           - name: trust-bundle
             mountPath: /var/run/secrets/diagrid.io/trust
             readOnly: true
+          {{- with include "catalyst.trustedCA.volumeMount" . }}{{- . | nindent 10 }}{{- end }}
           {{- include "inject.patch" (dict "patch" .Values.management.patch.volumeMounts "indent" 10) }}
         {{- include "inject.patch" (dict "patch" .Values.management.patch.containers "indent" 6) }}
       volumes:
+      {{- with include "catalyst.trustedCA.volume" . }}{{- . | nindent 6 }}{{- end }}
       - name: management-config
         configMap:
           name: {{ include "management.name" . }}-config
