@@ -15,5 +15,14 @@ spec:
       port: {{ .Values.agent.service.port }}
       protocol: TCP
       targetPort: {{ .Values.agent.metrics.port }}
+    # The agent's probe port. The gateway routes only "/writable" here; the
+    # other probes on this port stay private to the cluster. Fixed rather than
+    # configurable, and must match DefaultCatalystAgentProbesPort in
+    # services/catalyst/gateway/main.go — that constant is what the gateway
+    # dials, so an override here would silently be unroutable.
+    - name: cra-agent-probes
+      port: 8080
+      protocol: TCP
+      targetPort: probes
   selector:
     {{- include "agent.selectorLabels" . | nindent 6 }}

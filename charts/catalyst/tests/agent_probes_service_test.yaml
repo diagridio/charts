@@ -1,0 +1,30 @@
+suite: Test the agent Service exposes the probe port the gateway dials
+templates:
+  - agent/service.yaml
+  - agent/deployment.yaml
+  # deployment.yaml includes configmap.yaml for its checksum annotation.
+  - agent/configmap.yaml
+
+tests:
+  # Rationale lives at DefaultCatalystAgentProbesPort in
+  # services/catalyst/gateway/main.go. Asserted here: the Service carries that
+  # port, and targetPort stays the named container port rather than a repeated
+  # number, so the container port is free to move.
+  - it: should expose the probes container port on the agent Service
+    set:
+      join_token: "test-token"
+    asserts:
+      - contains:
+          path: spec.ports
+          content:
+            name: cra-agent-probes
+            port: 8080
+            protocol: TCP
+            targetPort: probes
+        template: agent/service.yaml
+      - contains:
+          path: spec.template.spec.containers[0].ports
+          content:
+            name: probes
+          any: true
+        template: agent/deployment.yaml
