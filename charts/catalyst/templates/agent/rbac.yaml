@@ -125,7 +125,7 @@ rules:
   resources: ["horizontalpodautoscalers"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 
-# PodDisruptionBudget for the Dapr chart.
+# PodDisruptionBudget for the Dapr chart and the per-App-ID sidecar chart.
 - apiGroups: ["policy"]
   resources: ["poddisruptionbudgets"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]

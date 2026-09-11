@@ -1,3 +1,35 @@
+# The worker node group spans at most two AZs, and never more than it is
+# guaranteed to have nodes.
+#
+# EKS balances a managed node group across every subnet it is handed, so more
+# subnets than nodes always leaves an AZ empty. An EBS volume already in that AZ
+# can then never be mounted again, because a volume cannot cross an AZ, and every
+# pod holding one is permanently unschedulable. That took a Diagrid-managed
+# region offline.
+#
+# A constant cap rather than the node count alone, so the set only ever grows: a
+# per-tier count would narrow it on a downgrade and strand every volume in the
+# dropped AZ, which is the same bug in the other direction.
+#
+# The VPC still creates all three private subnets. The EKS control plane, the RDS
+# subnet group and the ingress NLB all continue to span them, and the NLB has
+# cross-zone load balancing on, so an AZ with no workers does not blackhole
+# ingress.
+#
+# UPGRADING AN EXISTING CLUSTER: subnet_ids cannot be changed on an EKS managed
+# node group, so terraform plans a REPLACEMENT of the workers node group. Check
+# which AZs your PersistentVolumes are in first - any volume outside the
+# remaining subnets cannot be mounted by the replacement nodes, and its pod stays
+# Pending for good. Migrate or recreate those volumes before applying.
+#
+# Mirrors workerAZs in the Diagrid provisioner, so a self-managed cluster and a
+# Diagrid-managed region end up the same shape.
+locals {
+  max_worker_azs      = 2
+  worker_subnet_count = max(1, min(var.node_min_capacity, local.max_worker_azs))
+  worker_subnet_ids   = slice(module.vpc.private_subnets, 0, local.worker_subnet_count)
+}
+
 resource "aws_iam_role_policy_attachments_exclusive" "cluster" {
   role_name = module.eks.eks_managed_node_groups["workers"].iam_role_name
   policy_arns = [
@@ -122,7 +154,9 @@ module "eks" {
   # Node groups configuration
   eks_managed_node_groups = {
     workers = {
-      subnet_ids = module.vpc.private_subnets
+      # local.worker_subnet_ids, not every private subnet - see the locals block
+      # at the top of this file for why an empty AZ strands EBS volumes.
+      subnet_ids = local.worker_subnet_ids
 
       min_size     = var.node_min_capacity
       max_size     = var.node_max_capacity
