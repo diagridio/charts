@@ -259,7 +259,9 @@ public overlay:
 - **PostgreSQL connection details** — host, credentials, TLS. See
   [Managed infrastructure](#managed-infrastructure) above.
 - **Image registries** — `global.image.registry` and the various
-  per-component `image_registry` knobs. 
+  per-component `image_registry` knobs. A mirror must be a digest-preserving
+  copy (`crane copy`, `skopeo copy --all`): released charts pin every Diagrid
+  image by digest, and the override changes only the registry.
 - **NATS endpoints, Sentry trust anchors** — region-specific.
 - **Secrets provider** — `global.secrets.provider`. See the Secrets section
   of the chart README.

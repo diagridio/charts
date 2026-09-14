@@ -7,6 +7,12 @@
 # registries and pushes them to a target registry with the same repository paths
 # and tags preserved.
 #
+# Released Catalyst charts pin every Diagrid image by digest, so the mirror has
+# to hold the same manifests as the source registry. crane is preferred when it
+# is installed because `crane copy` preserves digests; docker and podman re-push
+# through the local daemon, which can re-encode layers and change digests, and a
+# digest-pinned chart then fails to pull from the mirror.
+#
 # Usage:
 #   ./mirror-images.sh <target-registry> [OPTIONS]
 #
@@ -116,19 +122,34 @@ fi
 # Remove trailing slash from registry if present
 TARGET_REGISTRY="${TARGET_REGISTRY%/}"
 
-# Detect container runtime
-if command -v docker &> /dev/null; then
+# Detect container runtime. crane first: it copies manifests as they are, so the
+# digests a released chart pins exist in the mirror.
+if command -v crane &> /dev/null; then
+  RUNTIME="crane"
+elif command -v docker &> /dev/null; then
   RUNTIME="docker"
 elif command -v podman &> /dev/null; then
   RUNTIME="podman"
-elif command -v crane &> /dev/null; then
-  RUNTIME="crane"
 else
-  echo -e "${RED}Error: No container runtime found. Please install docker, podman, or crane.${NC}" >&2
+  echo -e "${RED}Error: No container runtime found. Please install crane, docker, or podman.${NC}" >&2
+  exit 1
+fi
+
+# crane copies registry to registry, so there is no locally pulled image for
+# --skip-pull to reuse. The combination used to skip the copy and the push
+# alike and still count every image as mirrored, reporting a complete mirror
+# that holds nothing.
+if [[ "$RUNTIME" == "crane" && "$SKIP_PULL" == "true" ]]; then
+  echo -e "${RED}Error: --skip-pull cannot be used with crane, which copies directly between registries.${NC}" >&2
+  echo -e "${RED}Drop the flag, or install docker or podman if you meant to push images you already pulled.${NC}" >&2
   exit 1
 fi
 
 echo -e "${BLUE}Using container runtime: ${RUNTIME}${NC}"
+if [[ "$RUNTIME" != "crane" ]]; then
+  echo -e "${YELLOW}Warning: ${RUNTIME} re-pushes images through the local daemon, which can change their digests.${NC}"
+  echo -e "${YELLOW}Released Catalyst charts pin Diagrid images by digest; install crane for a digest-preserving mirror.${NC}"
+fi
 echo -e "${BLUE}Target registry: ${TARGET_REGISTRY}${NC}"
 echo -e "${BLUE}Catalyst version: ${CATALYST_VERSION}${NC}"
 echo -e "${BLUE}Dapr version: ${DAPR_VERSION}${NC}"
@@ -137,12 +158,18 @@ echo -e "${BLUE}OpenTelemetry Collector version: ${OTEL_VERSION}${NC}"
 
 # Define all images from the Catalyst Helm chart
 # Format: "SOURCE_IMAGE"
+#
+# The Diagrid-built entries must stay aligned with the release image table in
+# deploy/tools/pkg/catalystimages, which is what the release pipeline pins by
+# digest. An image in that table and missing here mirrors to nothing, and the
+# released chart then fails against the mirror with "manifest unknown".
 declare -a IMAGES=(
   # Primary Component Images (Default Mode)
   "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/cra-agent:${CATALYST_VERSION}"
   "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-management:${CATALYST_VERSION}"
   "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-gateway:${CATALYST_VERSION}"
   "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/identity-injector:${CATALYST_VERSION}"
+  "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-mcp:${CATALYST_VERSION}"
 
   # Consolidated Image (Alternative Mode)
   "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-all:${CATALYST_VERSION}"
@@ -157,6 +184,7 @@ declare -a IMAGES=(
   # Agent Nested Images
   "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/sidecar:${CATALYST_VERSION}"
   "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-otel-collector:${CATALYST_VERSION}"
+  "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/private-sentry:${CATALYST_VERSION}"
   
   # Upstream Dapr Images
   "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/daprio/dapr:${DAPR_VERSION}"
@@ -194,7 +222,7 @@ mirror_image() {
     echo -e "${GREEN}Pulling: ${source_image}${NC}"
     case $RUNTIME in
       crane)
-        crane pull "$source_image" - | crane push - "$target_image"
+        crane copy "$source_image" "$target_image"
         echo -e "${GREEN}✓ Mirrored successfully${NC}"
         return 0
         ;;

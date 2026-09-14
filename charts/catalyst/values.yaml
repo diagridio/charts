@@ -20,6 +20,11 @@ global:
     # registry is the global default image registry for all container images in the chart.
     # When set, this overrides all component-specific registry values.
     # This is useful when using a private registry or mirror.
+    # A released chart pins every Diagrid image by digest and this override
+    # changes only the registry, so the mirror has to serve the same manifests
+    # as the source registry: copy with a digest-preserving tool (crane copy,
+    # skopeo copy --all). A docker pull and push can re-encode layers, and the
+    # pinned digests then do not exist in the mirror.
     # Example: "my-registry.example.com" or "gcr.io/my-project"
     registry: ""
     # pullPolicy is the global default image pull policy for all container images.

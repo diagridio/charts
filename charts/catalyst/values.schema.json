@@ -25,7 +25,7 @@
                     "properties": {
                         "registry": {
                             "type": "string",
-                            "description": "Global default image registry for all container images. Overrides component-specific registries."
+                            "description": "Global default image registry for all container images. Overrides component-specific registries. Released charts pin Diagrid images by digest, so a mirror must be a digest-preserving copy (crane copy, skopeo copy --all)."
                         },
                         "pullPolicy": {
                             "type": "string",

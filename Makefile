@@ -132,8 +132,19 @@ check-channel: ## Fail unless CHANNEL names a valid publication channel
 		*) echo "CHANNEL must be one of: $(VALID_CHANNELS) (got '$(CHANNEL)')"; exit 1 ;; \
 	esac
 
+# helm-push pushes the package helm-package built and does not rebuild it. The
+# release workflow checks that package between the two steps (every Diagrid
+# image rendered by digest and, for a promotion, equivalence with the candidate
+# package), and a rebuild here would push bytes the check never saw.
+.PHONY: helm-package-exists
+helm-package-exists:
+	@test -f $(CHART_DIR)/dist/$(CHART_NAME)-$(VERSION).tgz || { \
+		echo "$(CHART_DIR)/dist/$(CHART_NAME)-$(VERSION).tgz not found; run 'make helm-package' first"; \
+		exit 1; \
+	}
+
 .PHONY: helm-push
-helm-push: check-channel helm-package ## Push the Helm chart to the OCI registry for CHANNEL
+helm-push: check-channel helm-package-exists ## Push the packaged Helm chart to the OCI registry for CHANNEL (run helm-package first)
 	cd $(CHART_DIR) && \
 	helm push ./dist/$(CHART_NAME)-$(VERSION).tgz oci://$(REGISTRY)/$(REPO)/$(CHANNEL)
 ifneq ($(filter $(CHANNEL),$(COMPAT_MIRROR_CHANNELS)),)
@@ -183,7 +194,34 @@ validate-no-edge-images: ## Validate no edge image tags remain in the chart valu
 	fi
 	@echo "Validation passed: no edge image tags found."
 
-# NOTICE: we need to update this function every time we use a new diagrid image
+# The release tooling lives in the root Go module.
+REPO_ROOT := $(abspath $(dir $(lastword $(MAKEFILE_LIST)))/..)
+
+# Resolve every Diagrid image's digest from the registry values.yaml names it
+# at (after update-catalyst-tags and update-catalyst-registry) and stamp it into
+# the matching digest key, so the published package pulls by digest. Every
+# image or none: a registry that cannot be reached fails the run and writes
+# nothing. The committed values.yaml keeps every digest empty; run this only on
+# the copy that is about to be packaged.
+#
+# WAIT sets how long to wait for an image that is still building. It is unset by
+# default, so running this by hand against a tag that was never built fails at
+# once instead of blocking; the release workflow passes a budget because the tag
+# it publishes starts the image builds at the same moment.
+.PHONY: update-catalyst-digests
+update-catalyst-digests: ## Stamp every Diagrid image's registry digest into values.yaml (release only; WAIT=35m to wait for builds)
+	cd $(REPO_ROOT) && go run ./deploy/tools/cmd/release/image-digests resolve -chart $(abspath $(CHART_DIR)) $(if $(WAIT),-wait $(WAIT))
+
+.PHONY: validate-image-digests
+validate-image-digests: ## Fail unless every Diagrid image in values.yaml carries a digest
+	cd $(REPO_ROOT) && go run ./deploy/tools/cmd/release/image-digests check -chart $(abspath $(CHART_DIR))
+
+# The keys below are held to the table of Diagrid images in
+# deploy/tools/pkg/catalystimages by a test there
+# (TestUpdateCatalystTagsRecipeMatchesTable): a new image added to the chart is
+# one row in that table, and the test names this recipe until it stamps the
+# new tag too. Piko is not here on purpose; it has its own version line.
+.PHONY: update-catalyst-tags
 update-catalyst-tags:
 	@if [ -z "$(IMAGES_TAG)" ]; then \
 		echo "IMAGES_TAG is not set"; \
@@ -201,6 +239,11 @@ update-catalyst-tags:
 update-catalyst-chart-version:
 	yq -i '.version="$(VERSION)"' ./charts/catalyst/Chart.yaml
 
+# Held to the same table (TestUpdateCatalystRegistryRecipeCoversTable): every
+# registry the digest stamper resolves against must be one this recipe sets, or
+# a digest would be resolved against a registry the published chart does not
+# pull from.
+.PHONY: update-catalyst-registry
 update-catalyst-registry:
 	@if [ -z "$(REGISTRY)" ]; then \
 		echo "REGISTRY is not set"; \
@@ -216,3 +259,4 @@ update-catalyst-registry:
 	yq -i '.mcp.image.registry="$(REGISTRY)"' $(CHART_DIR)/values.yaml
 	yq -i '.piko.image.registry="$(REGISTRY)"' $(CHART_DIR)/values.yaml
 	yq -i '.agent.config.internal_dapr.container_registry="$(REGISTRY)"' $(CHART_DIR)/values.yaml
+	yq -i '.agent.config.internal_dapr.sentry.image.registry="$(REGISTRY)"' $(CHART_DIR)/values.yaml

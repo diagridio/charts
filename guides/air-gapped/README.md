@@ -6,7 +6,7 @@ For the full image list that the chart depends on, see the [Images reference](..
 
 ## 1. Mirror Container Images
 
-Use the provided script to mirror every image Catalyst needs:
+Use the provided script to mirror every image Catalyst needs. Released charts pin every Diagrid image by digest, so the mirror has to serve the same manifests as the source registry: the script uses `crane copy` when crane is installed, which preserves digests. A `docker pull` followed by `docker push` can re-encode layers and change digests, and a digest-pinned chart then fails to pull from the mirror.
 
 ```bash
 ./scripts/catalyst/mirror-images.sh my-registry.example.com \
@@ -18,7 +18,7 @@ Use the provided script to mirror every image Catalyst needs:
   --otel-version 0.112.0
 ```
 
-Then point the chart at your registry:
+Then point the chart at your registry. The override changes only the registry part of each image reference; the digest the chart pins stays the same, which is why the copy above has to preserve it:
 
 ```yaml
 global:

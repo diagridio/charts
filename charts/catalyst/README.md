@@ -233,6 +233,8 @@ global:
     registry: my-registry.example.com
 ```
 
+Released charts pin every Diagrid image by digest (`<registry>/<repository>@sha256:…`) and this override changes only the registry part, so the mirror has to serve the same manifests as the source registry. Copy images with a digest-preserving tool such as `crane copy` or `skopeo copy --all`. A `docker pull` followed by `docker push` can re-encode layers, and the chart then references digests the mirror does not have, which fails the pull with a manifest-unknown error.
+
 If using OpenTelemetry addons:
 
 ```yaml
