@@ -453,6 +453,12 @@ agent:
   config:
     host:
       private_region: true
+      # dedicated_region marks a region whose dataplane Diagrid delivers through
+      # its own GitOps. It is set by the rendered values a Diagrid-managed
+      # dedicated region installs from, and stays false here: a self-managed
+      # install is not GitOps-delivered by Diagrid, so it reports no delivery
+      # evidence even if the cluster happens to run Argo CD of its own.
+      dedicated_region: false
       egress_addresses: []
       ingress:
         ip_addr: ""
@@ -471,6 +477,17 @@ agent:
             # this can be left empty and no CA will be distributed to sidecars.
             # Defaults to "ca.crt" when set.
             ca_file: ""
+    # gateway_probe asks the region's own gateway for a response on an interval
+    # so a region with no customer traffic still produces an availability
+    # signal. Emits cra_gateway_probe_total and cra_gateway_probe_up on the
+    # agent's /metrics.
+    #
+    # There is deliberately no `port` here: it is derived from
+    # gateway.envoy.service.port so the probe cannot target a port the gateway
+    # does not serve. Setting one explicitly overrides that.
+    gateway_probe:
+      enabled: true
+      interval_in_sec: 30
     placement:
       # max_project_count configures the maximum number of projects that can be handled by the agent.
       # this is a limit internal to this catalyst installation that helps prevent resource exhaustion.

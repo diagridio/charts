@@ -1,0 +1,48 @@
+suite: Test agent delivery-observation RBAC
+templates:
+  - agent/rbac.yaml
+
+tests:
+  # The delivery observation collector (RFC 0033 §12.1) lists Argo CD Applications
+  # in the region's argocd namespace and reports them on the agent's outbound
+  # status channel. Without this grant the list is refused and every report
+  # carries an error instead of the region's delivery evidence.
+  #
+  # Ungated: a region with no Argo CD installed reports an empty list and no
+  # error, so there is no flag to hang the rule on.
+  - it: grants read-only access to Argo CD Applications
+    documentIndex: 0
+    set:
+      join_token: "test-token"
+    asserts:
+      - isKind:
+          of: ClusterRole
+      - contains:
+          path: rules
+          content:
+            apiGroups: ["argoproj.io"]
+            resources: ["applications"]
+            verbs: ["get", "list", "watch"]
+
+  # The agent reads Applications and never writes one. A write verb creeping
+  # into this rule would let a compromised agent rewrite the region's own
+  # delivery, which is the evidence the control plane trusts it for.
+  - it: grants no write verbs on Argo CD Applications
+    documentIndex: 0
+    set:
+      join_token: "test-token"
+    asserts:
+      - isKind:
+          of: ClusterRole
+      - notContains:
+          path: rules[?(@.apiGroups[0] == 'argoproj.io')].verbs
+          content: create
+      - notContains:
+          path: rules[?(@.apiGroups[0] == 'argoproj.io')].verbs
+          content: update
+      - notContains:
+          path: rules[?(@.apiGroups[0] == 'argoproj.io')].verbs
+          content: patch
+      - notContains:
+          path: rules[?(@.apiGroups[0] == 'argoproj.io')].verbs
+          content: delete

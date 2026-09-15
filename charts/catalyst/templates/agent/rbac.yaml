@@ -181,6 +181,17 @@ rules:
   resources: ["sandboxes"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 
+# Argo CD Applications, read-only (internal/deliveryobservation). The agent
+# reports what the region's Argo CD says it delivered (RFC 0033 §12.1) on its
+# outbound status channel, because the control plane cannot dial into a BYOC or
+# private dedicated region to read it itself. The collector lists; get and watch
+# complete the standard read-only set and expose nothing a list does not
+# already. Nothing in the agent writes an Application. A region with no Argo CD
+# has no Applications and the rule is inert there, so it is ungated.
+- apiGroups: ["argoproj.io"]
+  resources: ["applications"]
+  verbs: ["get", "list", "watch"]
+
 # Cluster-scoped RuntimeClass read access — the gVisor sandbox Provider's
 # Preflight check verifies the configured RuntimeClass is registered
 # before any Sandbox is created. Granted with `get` only (no list/watch)

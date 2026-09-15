@@ -184,7 +184,7 @@ By default, this is the full list of images that are installed in your cluster:
 | **Envoy Proxy** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy/envoyproxy/envoy:distroless-v1.38.0` | Envoy proxy for gateway |
 | **Catalyst** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.111.0` | Consolidated Catalyst services image |
 | **Piko** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/diagrid-piko:v1.0.1` | Piko reverse tunneling service |
-| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.19.0-20260911-catalyst.1` | Catalyst Dapr control plane services |
+| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.19.0-20260914-catalyst.1` | Catalyst Dapr control plane services |
 | **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.111.0` | Catalyst dapr server |
 | **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.111.0` | OTel collector for telemetry |
 
@@ -213,7 +213,7 @@ The Agent provisions these at runtime:
 |-----------|--------------|-------------|
 | **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/sidecar:1.111.0` | Catalyst dapr server |
 | **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-otel-collector:1.111.0` | OTel collector for telemetry |
-| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.19.0-20260911-catalyst.1` | Catalyst Dapr control plane services |
+| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.19.0-20260914-catalyst.1` | Catalyst Dapr control plane services |
 
 #### Optional Images
 
@@ -437,6 +437,22 @@ shared:
 ```
 
 The gateway Envoy also serves `/ready` and `/stats/prometheus` on a pod-IP `health` port (`gateway.envoy.health`, default 9091) in front of its loopback admin API. The readiness probe on it keeps a new pod out of service until Envoy has loaded its routes.
+
+#### Gateway probe
+
+The agent asks the region's own gateway for a response on an interval, so a region with no customer traffic still produces an availability signal. It emits `cra_gateway_probe_total{result}` and `cra_gateway_probe_up` on the agent's `/metrics`.
+
+```yaml
+agent:
+  config:
+    gateway_probe:
+      enabled: true
+      interval_in_sec: 30
+```
+
+There is deliberately no `port` here: it is derived from `gateway.envoy.service.port`, so the probe cannot target a port the gateway does not serve. Set `agent.config.gateway_probe.port` to override that.
+
+The probe is skipped, with a warning in the agent log, when `agent.config.host.ingress.service.name` is unset or the port is outside 1-65535. A skipped probe publishes no series at all rather than a `cra_gateway_probe_up` of 0, which would read as a gateway outage.
 
 ### Data backends (PostgreSQL, Kafka, Redis)
 

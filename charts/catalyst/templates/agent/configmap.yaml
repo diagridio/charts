@@ -9,6 +9,15 @@
 {{- if and $agentConfig.host.ingress.service.name (not $agentConfig.host.ingress.service.namespace) -}}
   {{- $_ := set $agentConfig.host.ingress.service "namespace" .Release.Namespace -}}
 {{- end -}}
+{{- /* The gateway probe asks the gateway service for a response, so its port has
+       to be the one that service listens on. Derived rather than restated so the
+       two cannot drift; an explicit agent.config.gateway_probe.port still wins. */ -}}
+{{- if not $agentConfig.gateway_probe -}}
+  {{- $_ := set $agentConfig "gateway_probe" dict -}}
+{{- end -}}
+{{- if not (hasKey $agentConfig.gateway_probe "port") -}}
+  {{- $_ := set $agentConfig.gateway_probe "port" (int .Values.gateway.envoy.service.port) -}}
+{{- end -}}
 {{- /* Resolve the managed data backends (Postgres state store, Dapr scheduler,
        Kafka pubsub) from the friendly global.postgresql / global.kafka /
        scheduler surface into the agent's canonical config fields. The shared
