@@ -619,7 +619,7 @@ agent:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       image_name: "{{ ternary .Values.global.consolidated_image.repository \"sidecar\" .Values.global.consolidated_image.enabled }}"
       # image_tag is the sidecar image version
-      image_tag: "1.111.0"
+      image_tag: "1.112.0"
       # image_digest pins the sidecar to an immutable content digest
       # ("sha256:<64 hex>"), which wins over image_tag. Empty = pin by tag.
       # global.consolidated_image.digest, when set, overrides this.
@@ -708,7 +708,7 @@ agent:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       image_name: "{{ ternary .Values.global.consolidated_image.repository \"catalyst-otel-collector\" .Values.global.consolidated_image.enabled }}"
       # image_tag is the otel collector image version
-      image_tag: "1.111.0"
+      image_tag: "1.112.0"
       # image_digest pins the otel collector to an immutable content digest
       # ("sha256:<64 hex>"), which wins over image_tag. Empty = pin by tag.
       # global.consolidated_image.digest, when set, overrides this.
@@ -825,7 +825,7 @@ agent:
           registry: us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public
           # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
           name: "{{ ternary .Values.global.consolidated_image.repository \"private-sentry\" .Values.global.consolidated_image.enabled }}"
-          tag: "1.111.0"
+          tag: "1.112.0"
           # digest pins the private sentry to an immutable content digest
           # ("sha256:<64 hex>"), which wins over tag. Empty = pin by tag.
           # global.consolidated_image.digest, when set, overrides this.
@@ -925,7 +925,7 @@ agent:
     # Example: "diagrid/cra-agent" or "cra-agent"
     repository: cra-agent
     # tag is the image tag/version to use
-    tag: "1.111.0"
+    tag: "1.112.0"
     # digest, if set, wins over tag (see global.consolidated_image.digest above).
     digest: ""
     # pullPolicy is the image pull policy for this specific image.
@@ -1022,7 +1022,7 @@ gateway:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       repository: identity-injector
       # tag is the image tag/version to use
-      tag: "1.111.0"
+      tag: "1.112.0"
       # digest, if set, wins over tag (see global.consolidated_image.digest above).
       digest: ""
       # pullPolicy is the image pull policy for this specific image.
@@ -1166,7 +1166,7 @@ gateway:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       repository: catalyst-gateway
       # tag is the image tag/version to use
-      tag: "1.111.0"
+      tag: "1.112.0"
       # digest, if set, wins over tag (see global.consolidated_image.digest above).
       digest: ""
       # pullPolicy is the image pull policy for this specific image.
@@ -1280,7 +1280,7 @@ management:
     # Deprecated: This field supports template evaluation for backwards compatibility.
     repository: "{{ ternary .Values.global.consolidated_image.repository \"catalyst-management\" .Values.global.consolidated_image.enabled }}"
     # tag is the image tag/version to use
-    tag: "1.111.0"
+    tag: "1.112.0"
     # digest, if set, wins over tag (see global.consolidated_image.digest above).
     digest: ""
     # pullPolicy is the image pull policy for this specific image.
@@ -1512,7 +1512,7 @@ mcp:
     # OpenAPI spec, so this component never uses global.consolidated_image.
     repository: catalyst-mcp
     # tag is the image tag/version to use
-    tag: "1.111.0"
+    tag: "1.112.0"
     # digest, if set, wins over tag (see global.consolidated_image.digest above).
     digest: ""
     # pullPolicy is the image pull policy for this specific image.
