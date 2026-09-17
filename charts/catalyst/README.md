@@ -182,20 +182,20 @@ By default, this is the full list of images that are installed in your cluster:
 |-----------|--------------|-------------|
 | **Alpine k8s** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy/alpine/k8s:1.36.0` | Utility image used by Helm install and cleanup hooks |
 | **Envoy Proxy** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy/envoyproxy/envoy:distroless-v1.38.0` | Envoy proxy for gateway |
-| **Catalyst** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.114.0` | Consolidated Catalyst services image |
+| **Catalyst** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.115.0` | Consolidated Catalyst services image |
 | **Piko** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/diagrid-piko:v1.0.1` | Piko reverse tunneling service |
 | **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.19.0-20260914-catalyst.1` | Catalyst Dapr control plane services |
-| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.114.0` | Catalyst dapr server |
-| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.114.0` | OTel collector for telemetry |
+| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.115.0` | Catalyst dapr server |
+| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.115.0` | OTel collector for telemetry |
 
 Alternatively, separate images can be used:
 
 | Component | Default Image | Description |
 |-----------|--------------|-------------|
-| **Catalyst Agent** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/cra-agent:1.114.0` | Catalyst agent service |
-| **Catalyst Management** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-management:1.114.0` | Catalyst management service |
-| **Gateway Control Plane** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-gateway:1.114.0` | Gateway control plane service |
-| **Gateway Identity Injector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/identity-injector:1.114.0` | Identity injection service |
+| **Catalyst Agent** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/cra-agent:1.115.0` | Catalyst agent service |
+| **Catalyst Management** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-management:1.115.0` | Catalyst management service |
+| **Gateway Control Plane** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-gateway:1.115.0` | Gateway control plane service |
+| **Gateway Identity Injector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/identity-injector:1.115.0` | Identity injection service |
 
 Dependencies:
 
@@ -211,8 +211,8 @@ The Agent provisions these at runtime:
 
 | Component | Default Image | Description |
 |-----------|--------------|-------------|
-| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/sidecar:1.114.0` | Catalyst dapr server |
-| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-otel-collector:1.114.0` | OTel collector for telemetry |
+| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/sidecar:1.115.0` | Catalyst dapr server |
+| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-otel-collector:1.115.0` | OTel collector for telemetry |
 | **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.19.0-20260914-catalyst.1` | Catalyst Dapr control plane services |
 
 #### Optional Images
@@ -886,6 +886,27 @@ the assistant's workload rather than waiting:
 ```bash
 kubectl rollout restart deployment -n <the assistant's project namespace> -l dapr.io/app-id=reagent
 ```
+
+### Enterprise Identity (dp Sentry IdP Federation + OBO)
+
+Catalyst can propagate the invoking user's identity from an upstream IdP through to downstream MCP calls via on-behalf-of (OBO) tokens minted by dp Sentry. The three values that govern this live under `agent.config.internal_dapr.sentry.oidc`:
+
+| Path | Type | Default | Purpose |
+|---|---|---|---|
+| `agent.config.internal_dapr.sentry.oidc.idp_federation_enabled` | boolean | `false` | Whether dp Sentry validates inbound user JWTs against `IDPFederation` resources. |
+| `agent.config.internal_dapr.sentry.oidc.bootstrap_issuers` | array of strings | `[]` | Issuers dp Sentry pre-warms JWKS for on startup. Each entry must exactly match an `IDPFederation`'s `iss` (e.g. `https://<tenant>.auth0.com/`). Empty means no pre-warm; federations still work but the first request per issuer pays a cold-fetch. |
+| `agent.config.internal_dapr.sentry.oidc.mtls.enabled` | boolean | `false` | Whether dp Sentry serves its SPIFFE-mTLS `/token` listener. Sidecars reach the identity-assertion and OBO delegation grants over this listener. |
+
+**Activation rule (enforced by the JSON schema):** `idp_federation_enabled` and `mtls.enabled` must move together. Enabling federation without the mTLS listener leaves policied MCP calls failing closed at `503 oauth.verifier_unavailable`; enabling the listener without federation advertises an endpoint no federation resolves against. `helm install` / `helm upgrade` rejects the mismatch.
+
+**When to enable:**
+- Only in environments that federate at least one IdP tenant. For onebox and cloud envs where Diagrid ships a bootstrap federation via ConfigMap (`catalyst-idp-federation-*`), the values are pre-set; overlays should not override them.
+- BYOC / self-hosted operators enable both flags together after creating their first `IDPFederation` resource via `diagrid idp create`.
+
+**What breaks with a partial config:**
+- `idp_federation_enabled: true` + `mtls.enabled: false` → inbound sidecar middleware validates the user token but cannot reach the delegation grant → outbound OBO mint fails closed at 503.
+- `idp_federation_enabled: false` + `mtls.enabled: true` → dp Sentry advertises the mTLS listener but has no federation to validate against → tokens are rejected as untrusted.
+
 
 ### Production Tuning
 

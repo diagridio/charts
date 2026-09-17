@@ -730,6 +730,53 @@
                                                     "$ref": "#/definitions/imageDigest"
                                                 }
                                             }
+                                        },
+                                        "oidc": {
+                                            "type": "object",
+                                            "description": "dp Sentry OIDC/JWT configuration for the agent's internal dapr Sentry.",
+                                            "properties": {
+                                                "enabled": {
+                                                    "type": "boolean",
+                                                    "default": true,
+                                                    "description": "Enable dp Sentry's OIDC discovery + JWT-signing key surface."
+                                                },
+                                                "idp_federation_enabled": {
+                                                    "type": "boolean",
+                                                    "default": false,
+                                                    "description": "Whether dp Sentry validates inbound user JWTs against IDPFederation resources. Must move together with mtls.enabled: without the mTLS /token listener a sidecar cannot reach the identity-assertion or OBO grant."
+                                                },
+                                                "bootstrap_issuers": {
+                                                    "type": "array",
+                                                    "items": {"type": "string"},
+                                                    "default": [],
+                                                    "description": "Issuers dp Sentry pre-warms JWKS for on startup; each must exactly match an IDPFederation's iss. Empty = no pre-warm; federations still work, first-request cold."
+                                                },
+                                                "mtls": {
+                                                    "type": "object",
+                                                    "description": "SPIFFE-mTLS listener serving /token grants.",
+                                                    "properties": {
+                                                        "enabled": {
+                                                            "type": "boolean",
+                                                            "default": false
+                                                        },
+                                                        "port": {
+                                                            "type": "integer",
+                                                            "default": 9081
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            "allOf": [
+                                                {
+                                                    "description": "idp_federation_enabled and mtls.enabled must move together. Enabling federation without the mTLS /token listener leaves policied MCP calls failing closed at 503; enabling the listener without federation advertises an endpoint no federation resolves against.",
+                                                    "if": {"properties": {"idp_federation_enabled": {"const": true}}, "required": ["idp_federation_enabled"]},
+                                                    "then": {"properties": {"mtls": {"properties": {"enabled": {"const": true}}, "required": ["enabled"]}}, "required": ["mtls"]}
+                                                },
+                                                {
+                                                    "if": {"properties": {"mtls": {"properties": {"enabled": {"const": true}}, "required": ["enabled"]}}, "required": ["mtls"]},
+                                                    "then": {"properties": {"idp_federation_enabled": {"const": true}}, "required": ["idp_federation_enabled"]}
+                                                }
+                                            ]
                                         }
                                     }
                                 }

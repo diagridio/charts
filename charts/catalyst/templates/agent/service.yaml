@@ -15,7 +15,8 @@ spec:
       port: {{ .Values.agent.service.port }}
       protocol: TCP
       targetPort: {{ .Values.agent.metrics.port }}
-    # The agent's probe port. The gateway routes only "/writable" here; the
+    # The agent's probe port. The gateway publishes one path to it,
+    # "/diagrid/region/writable", rewritten to this port's "/writable"; the
     # other probes on this port stay private to the cluster. Fixed rather than
     # configurable, and must match DefaultCatalystAgentProbesPort in
     # services/catalyst/gateway/main.go — that constant is what the gateway

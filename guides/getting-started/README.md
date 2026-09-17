@@ -50,6 +50,16 @@ reports as highest. That is a convenience for a first look, not a guarantee of
 what you get — pin `--version <version>` for anything you intend to keep, and
 for every environment you want to reproduce.
 
+> **Level 1 limit.** Installing from a channel repository is a registry path,
+> not policy enforcement. It carries no channel head enforcement, no release
+> block, no freeze window and no tested upgrade path — the registry simply
+> reports the newest chart it holds, and auto-sync applies a new release the
+> moment it appears. Pinning `--version` narrows what you get but does not
+> change any of that.
+>
+> To have those policies apply, ask the resolver instead: see
+> [Release Channels and Upgrades](../release-channels/README.md).
+
 To try a release candidate, install it from the candidate channel with an
 explicit version:
 
@@ -87,5 +97,6 @@ helm uninstall catalyst -n cra-agent
 ## Next Steps
 
 - [Catalyst chart reference](../../charts/catalyst/README.md) — all configurable Helm values
+- [Release Channels and Upgrades](../release-channels/README.md) — deciding what to install next, and automating it
 - Environment-specific install guides: [KinD](../kind/README.md) · [AKS](../azure/README.md) · [EKS](../aws/README.md)
 - [Catalyst Documentation](https://docs.diagrid.io/catalyst)

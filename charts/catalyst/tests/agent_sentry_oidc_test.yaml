@@ -1,0 +1,49 @@
+suite: Test agent-config surfaces the dp Sentry OIDC + mTLS listener fields
+# Chart defaults must always render the fields,
+# so an overlay that only flips the toggles cannot silently drop them.
+templates:
+  - agent/configmap.yaml
+
+tests:
+  - it: declares the OIDC listener + IdP federation fields off by default
+    set:
+      join_token: "test-token"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "idp_federation_enabled: false"
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "mtls:\\s*\\n\\s*enabled: false\\s*\\n\\s*port: 9081"
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "bootstrap_issuers: \\[\\]"
+
+  - it: propagates an overlay that enables mTLS + IdP federation together
+    set:
+      join_token: "test-token"
+      agent.config.internal_dapr.sentry.oidc.idp_federation_enabled: true
+      agent.config.internal_dapr.sentry.oidc.mtls.enabled: true
+      agent.config.internal_dapr.sentry.oidc.bootstrap_issuers:
+        - https://example.auth0.com/
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "idp_federation_enabled: true"
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "mtls:\\s*\\n\\s*enabled: true"
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "- https://example.auth0.com/"
+
+  - it: honors a non-default mTLS listener port from the overlay
+    set:
+      join_token: "test-token"
+      agent.config.internal_dapr.sentry.oidc.idp_federation_enabled: true
+      agent.config.internal_dapr.sentry.oidc.mtls.enabled: true
+      agent.config.internal_dapr.sentry.oidc.mtls.port: 9091
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "port: 9091"
