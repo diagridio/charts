@@ -1,0 +1,38 @@
+suite: Test Gateway MCP Public Route
+templates:
+  - gateway/deployment.yaml
+  - gateway/configmap.yaml
+tests:
+  # Absence is the safe state and the default. The gateway reads this variable once
+  # at startup, and empty generates no virtual host and no cluster — the route does
+  # not exist rather than existing unreachable. Asserted on its own so a template
+  # that started emitting the variable unconditionally would fail here rather than
+  # publish an endpoint nobody asked for.
+  - it: publishes no MCP route by default
+    set:
+      join_token: "test-token"
+    documentIndex: 1
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[1].env
+          content:
+            name: CATALYST_MCP_PUBLIC_DOMAIN
+        template: gateway/deployment.yaml
+
+  # The hostname reaches the container verbatim. RFC 8707 makes this exact string
+  # the OAuth token audience and RFC 9728 metadata repeats it byte for byte, so a
+  # template that trimmed, lower-cased or suffixed it would invalidate every token
+  # already issued against the old spelling — and would do it silently, since the
+  # endpoint would still serve and only the tokens would stop verifying.
+  - it: passes the configured hostname through unaltered
+    set:
+      join_token: "test-token"
+      gateway.mcpPublicDomain: "mcp.cloud.staging.diagrid.dev"
+    documentIndex: 1
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[1].env
+          content:
+            name: CATALYST_MCP_PUBLIC_DOMAIN
+            value: "mcp.cloud.staging.diagrid.dev"
+        template: gateway/deployment.yaml

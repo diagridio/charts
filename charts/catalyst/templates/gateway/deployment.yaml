@@ -248,6 +248,10 @@ spec:
               value: {{ .Values.gateway.tls.enabled | quote }}
             - name: ALLOW_LOCAL_DEV_ORIGIN
               value: {{ .Values.gateway.allowLocalDevOrigin | default false | quote }}
+          {{- with .Values.gateway.mcpPublicDomain }}
+            - name: CATALYST_MCP_PUBLIC_DOMAIN
+              value: {{ . | quote }}
+          {{- end }}
           {{- if .Values.gateway.controlplane.xds.mtls.enabled }}
             - name: XDS_SERVER_TLS_CERT
               value: "/var/run/secrets/diagrid.io/tls/tls.crt"
