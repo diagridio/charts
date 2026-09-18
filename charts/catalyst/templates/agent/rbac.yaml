@@ -42,6 +42,11 @@ rules:
 # PostgreSQL, Redis, CRA sidecar, component, and namespace charts. The
 # agent also reads pull secrets / infra passwords from arbitrary namespaces
 # and syncs pull secrets to project namespaces.
+#
+# The release-availability publisher's ConfigMap write rides on this rule too
+# (as the region-details ConfigMap already does). It needs no grant of its own,
+# and adding one gated on the feature would be a second rule saying what this
+# one already says.
 - apiGroups: [""]
   resources: ["configmaps", "secrets", "services", "serviceaccounts"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
@@ -199,6 +204,63 @@ rules:
 - apiGroups: ["node.k8s.io"]
   resources: ["runtimeclasses"]
   verbs: ["get"]
+
+{{- $releaseAvailabilityReaders := dig "release_availability" "readers" (list) .Values.agent.config }}
+{{- /* Gated on the publisher being enabled as well as on a reader being named:
+       a reader named while the publisher is off would be granted access to a
+       ConfigMap that is never written. */ -}}
+{{- if and $releaseAvailabilityReaders (dig "release_availability" "enabled" false .Values.agent.config) }}
+---
+# Read access to the one ConfigMap the release-availability publisher writes,
+# for the region operator's own tooling.
+#
+# This is NOT for the agent — the agent writes the ConfigMap through the
+# ClusterRole above. It exists because the whole point of publishing the answer
+# is that tooling holding no Diagrid credential can read it, and the least
+# privilege that allows is `get` on a single named object in a single
+# namespace. `list` and `watch` are deliberately absent: neither can be
+# restricted to a resource name, so granting them would widen this to every
+# ConfigMap in the namespace, which is where the agent keeps the region's join
+# details.
+#
+# The Role and its binding are rendered TOGETHER, from agent.config
+# .release_availability.readers, and neither is rendered when no reader is
+# named. A Role nothing binds grants nothing, and leaving one behind would mean
+# an operator had to look up its generated name to bind it themselves — which
+# is the moment somebody grants `list` on the whole namespace instead because
+# it is easier. Naming the reader here is the narrow path AND the short one.
+#
+# An operator who keeps RBAC out of this chart names nobody and writes both
+# halves; the release channels guide carries the YAML.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "agent.serviceAccountName" . }}-release-availability-reader
+  namespace: {{ .Release.Namespace }}
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  resourceNames: ["catalyst-release-availability"]
+  verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "agent.serviceAccountName" . }}-release-availability-reader
+  namespace: {{ .Release.Namespace }}
+subjects:
+{{- range $releaseAvailabilityReaders }}
+  - kind: {{ .kind | default "ServiceAccount" }}
+    name: {{ required "a release_availability reader needs a name" .name }}
+    {{- if or (eq (.kind | default "ServiceAccount") "ServiceAccount") .namespace }}
+    namespace: {{ .namespace | default $.Release.Namespace }}
+    {{- end }}
+{{- end }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "agent.serviceAccountName" . }}-release-availability-reader
+{{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

@@ -57,8 +57,11 @@ for every environment you want to reproduce.
 > moment it appears. Pinning `--version` narrows what you get but does not
 > change any of that.
 >
-> To have those policies apply, ask the resolver instead: see
-> [Release Channels and Upgrades](../release-channels/README.md).
+> Those policies are applied by Diagrid's release resolver, which your region's
+> agent calls on your behalf and publishes the answer to as a ConfigMap in your
+> cluster — you never call it yourself. See
+> [Release Channels and Upgrades](../release-channels/README.md) for what is
+> available now and what each pattern does and does not enforce.
 
 To try a release candidate, install it from the candidate channel with an
 explicit version:

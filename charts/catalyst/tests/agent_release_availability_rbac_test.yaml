@@ -1,0 +1,225 @@
+suite: Test agent release-availability RBAC
+templates:
+  - agent/rbac.yaml
+  - agent/configmap.yaml
+
+tests:
+  # The publisher writes one ConfigMap; the point of writing it is that the
+  # region operator's own tooling — holding no Diagrid credential — can read
+  # it. Naming a reader renders the Role AND its binding together, so the
+  # narrow grant is also the short path. Nothing is rendered for a reader
+  # nobody named: see the case below.
+  - it: grants a named reader least privilege on the published answer
+    template: agent/rbac.yaml
+    set:
+      join_token: "test-token"
+      agent.config.release_availability.enabled: true
+      agent.config.release_availability.readers:
+        - name: catalyst-upgrade
+          namespace: ci
+    asserts:
+      # ClusterRole, ClusterRoleBinding, the reader Role and its RoleBinding.
+      - hasDocuments:
+          count: 4
+      - equal:
+          path: subjects
+          value:
+            - kind: ServiceAccount
+              name: catalyst-upgrade
+              namespace: ci
+        documentSelector:
+          path: kind
+          value: RoleBinding
+      - equal:
+          path: roleRef.name
+          value: RELEASE-NAME-agent-sa-release-availability-reader
+        documentSelector:
+          path: kind
+          value: RoleBinding
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-agent-sa-release-availability-reader
+        documentSelector:
+          path: kind
+          value: Role
+      - equal:
+          path: apiVersion
+          value: rbac.authorization.k8s.io/v1
+        documentSelector:
+          path: kind
+          value: Role
+      # Namespaced, not cluster-wide: the answer is published into the agent's
+      # own namespace and nothing outside it needs reading.
+      - equal:
+          path: metadata.namespace
+          value: NAMESPACE
+        documentSelector:
+          path: kind
+          value: Role
+      - equal:
+          path: rules
+          value:
+            - apiGroups: [""]
+              resources: ["configmaps"]
+              resourceNames: ["catalyst-release-availability"]
+              verbs: ["get"]
+        documentSelector:
+          path: kind
+          value: Role
+
+  # Off by default, like the publisher itself. A region that has not asked for
+  # the integration should not acquire an RBAC object for it by upgrading — so
+  # the template renders the ClusterRole and its binding and nothing else.
+  - it: offers no reader Role by default
+    template: agent/rbac.yaml
+    set:
+      join_token: "test-token"
+    asserts:
+      - hasDocuments:
+          count: 2
+      - isKind:
+          of: ClusterRole
+        documentIndex: 0
+      - isKind:
+          of: ClusterRoleBinding
+        documentIndex: 1
+
+  # `list` and `watch` cannot be restricted to a resource name: granting either
+  # would widen this from one named ConfigMap to every ConfigMap in the
+  # namespace, which is where the agent keeps the region's join details. And
+  # nothing reading the answer has any business writing it.
+  - it: grants no verb beyond get, and no resource beyond the one ConfigMap
+    template: agent/rbac.yaml
+    set:
+      join_token: "test-token"
+      agent.config.release_availability.enabled: true
+      agent.config.release_availability.readers:
+        - name: catalyst-upgrade
+          namespace: ci
+    asserts:
+      - lengthEqual:
+          path: rules
+          count: 1
+        documentSelector:
+          path: kind
+          value: Role
+      - equal:
+          path: rules[0].verbs
+          value: ["get"]
+        documentSelector:
+          path: kind
+          value: Role
+      - equal:
+          path: rules[0].resourceNames
+          value: ["catalyst-release-availability"]
+        documentSelector:
+          path: kind
+          value: Role
+
+  # The agent itself needs no new grant: it writes the ConfigMap through the
+  # ClusterRole's existing cluster-wide configmaps rule, the same one the
+  # region-details ConfigMap already rides on. This pins that, so nobody adds a
+  # second, feature-gated rule saying what this one already says.
+  - it: needs no extra ClusterRole grant for the write
+    template: agent/rbac.yaml
+    documentIndex: 0
+    set:
+      join_token: "test-token"
+      agent.config.release_availability.enabled: true
+      agent.config.release_availability.readers:
+        - name: catalyst-upgrade
+          namespace: ci
+    asserts:
+      - isKind:
+          of: ClusterRole
+      - contains:
+          path: rules
+          content:
+            apiGroups: [""]
+            resources: ["configmaps", "secrets", "services", "serviceaccounts"]
+            verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+      # Exactly one replica publishes, elected by a Kubernetes Lease, and the
+      # existing ungated leases rule already covers get/create/update — the
+      # same rule the partition coordinator and the infra locks use. Pinned
+      # here so narrowing it does not silently leave the region with no
+      # publisher.
+      - contains:
+          path: rules
+          content:
+            apiGroups: ["coordination.k8s.io"]
+            resources: ["leases"]
+            verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # The grant needs BOTH halves: the publisher enabled and a reader named.
+  #
+  # Naming nobody would leave a Role nothing binds, which grants nothing and
+  # makes an operator look up its generated name to bind it themselves — the
+  # moment somebody grants list on the whole namespace instead. Naming a reader
+  # while the publisher is off would grant access to a ConfigMap that is never
+  # written. The two cases below pin one half each.
+  - it: renders no reader grant when nobody is named
+    template: agent/rbac.yaml
+    set:
+      join_token: "test-token"
+      agent.config.release_availability.enabled: true
+    asserts:
+      # Only the agent's own two cluster-scoped documents. No namespaced Role
+      # and no RoleBinding: the count is the assertion, because a third
+      # document here could only be the unbound grant this case exists to
+      # forbid.
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: kind
+          value: ClusterRole
+        documentIndex: 0
+      - equal:
+          path: kind
+          value: ClusterRoleBinding
+        documentIndex: 1
+
+  # The other half of the same rule. A reader named while the publisher is off
+  # would be handed read access to a ConfigMap nothing ever writes, so the
+  # grant waits for the feature to be switched on.
+  - it: renders no reader grant while the publisher is off
+    template: agent/rbac.yaml
+    set:
+      join_token: "test-token"
+      agent.config.release_availability.readers:
+        - name: catalyst-upgrade
+          namespace: ci
+    asserts:
+      # Only the agent's own two cluster-scoped documents, as in the case
+      # above: no namespaced Role and no RoleBinding.
+      - hasDocuments:
+          count: 2
+      - equal:
+          path: kind
+          value: ClusterRole
+        documentIndex: 0
+      - equal:
+          path: kind
+          value: ClusterRoleBinding
+        documentIndex: 1
+
+  # readers is a Helm-only key: it names identities for the chart to grant, and
+  # the agent has no such setting. Leaving it in would not break the agent,
+  # which warns on a config key it does not know rather than failing, but a
+  # chart-only key has no business in the agent's config file - the same
+  # treatment the scheduler's Helm-only postgresql key gets.
+  - it: keeps the Helm-only readers key out of the agent's own config
+    template: agent/configmap.yaml
+    set:
+      join_token: "test-token"
+      agent.config.release_availability.enabled: true
+      agent.config.release_availability.readers:
+        - name: catalyst-upgrade
+          namespace: ci
+    asserts:
+      - notMatchRegex:
+          path: data["config.yaml"]
+          pattern: readers
+      # The setting the agent DOES read is still there.
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "release_availability"

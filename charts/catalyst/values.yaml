@@ -855,6 +855,14 @@ agent:
       burst: 10
     denylist:
       enabled: false
+    # Publishes the release Diagrid says this region should install next into a
+    # ConfigMap in this namespace, for your own tooling to read. Diagrid does
+    # NOT apply the upgrade; the ConfigMap is a fact to act on, and applying it
+    # stays yours. Off by default. See the release channels guide for the
+    # endpoint, the ConfigMap's contents, and `readers`, which names the
+    # identities the chart grants read access to it.
+    release_availability:
+      enabled: false
     # Feature flags for the agent. Merged over global.featureflags and wins on key collision,
     # use this to override a chart-wide flag for the agent alone.
     # e.g. featureflags: {sidecar: {graceful_config_reload: false}}

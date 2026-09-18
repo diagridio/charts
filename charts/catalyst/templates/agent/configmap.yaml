@@ -39,6 +39,16 @@
   {{- if $resolved.redis.selfhosted -}}{{- $_ := set $agentConfig.project "selfhosted_redis" $resolved.redis.selfhosted -}}{{- end -}}
   {{- if $resolved.redis.external -}}{{- $_ := set $agentConfig.project "external_redis" $resolved.redis.external -}}{{- end -}}
 {{- end -}}
+{{- /* release_availability.readers names the identities the chart grants read
+       access to the published answer (see agent/rbac.yaml). The agent has no
+       such setting, so it is dropped before the config is rendered - the same
+       treatment the scheduler's Helm-only `postgresql` key gets below. Leaving
+       it in would not break the agent, which warns on a config key it does not
+       know rather than failing, but a chart-only key has no business in the
+       agent's config file. */ -}}
+{{- if $agentConfig.release_availability -}}
+  {{- $_ := unset $agentConfig.release_availability "readers" -}}
+{{- end -}}
 {{- /* Scheduler: translate backend_type (+ postgresql.use_global) into the agent's
        backend_type + managed_postgresql/external_postgresql, and drop the
        Helm-only `postgresql` key so it never leaks into the agent config. */ -}}
