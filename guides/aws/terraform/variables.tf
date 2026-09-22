@@ -169,9 +169,22 @@ variable "eks_readonly_users" {
 
 # PostgreSQL RDS Variables
 variable "postgresql_version" {
-  description = "PostgreSQL engine version"
+  description = "PostgreSQL engine version. A region group's passive member needs 16 or later: its scheduler runs logical decoding against a read replica, and a standby cannot decode before 16."
   type        = string
   default     = "17.5"
+
+  # The Dapr scheduler reaches its database over a logical replication
+  # connection. In a single region that database is a writer, which decodes on
+  # any supported engine. A group's passive member points
+  # postgresql_replicate_source_db_arn at the other region and runs the same
+  # scheduler against a standby, and logical decoding on a standby arrived in
+  # PostgreSQL 16 - so a group pinned below it has a passive region whose
+  # scheduler never starts, three pods deep in a namespace the guide never
+  # asks anyone to look at. Fail at plan time instead.
+  validation {
+    condition     = var.postgresql_replicate_source_db_arn == "" || tonumber(split(".", var.postgresql_version)[0]) >= 16
+    error_message = "A region group's passive member needs postgresql_version 16 or later; logical decoding on a read replica is not available before it."
+  }
 }
 
 variable "postgresql_instance_class" {
@@ -205,13 +218,13 @@ variable "postgresql_username" {
 }
 
 variable "postgresql_skip_final_snapshot" {
-  description = "Whether to skip the final snapshot when deleting the PostgreSQL RDS instance"
+  description = "Whether to skip the final snapshot when deleting the PostgreSQL RDS instance. Ignored for an instance built as a read replica, which AWS never snapshots on delete."
   type        = bool
   default     = false
 }
 
 variable "postgresql_final_snapshot_identifier" {
-  description = "Identifier for the final snapshot of the PostgreSQL RDS instance, required when skip_final_snapshot is false"
+  description = "Suffix for the final snapshot of each PostgreSQL RDS instance, required when skip_final_snapshot is false. Each instance prefixes its own name, so the deployment's snapshots do not collide with one another."
   type        = string
   default     = "final-snapshot"
 }
@@ -248,9 +261,17 @@ variable "postgresql_multi_az" {
 
 # Scheduler RDS - Multiple instances support
 variable "scheduler_postgresql_instances" {
-  description = "List of scheduler PostgreSQL instance names to create"
+  description = <<-EOT
+    Names of the dedicated PostgreSQL instances to build for the Dapr scheduler, one instance per entry.
+
+    Empty by default, because the chart's scheduler default does not use them: agent.config.internal_dapr.scheduler.postgresql.use_global is true, which keeps the scheduler's jobs and actor reminders in a `sched` database on the managed state store — the instance aws_db_instance.postgresql builds. A non-empty list here with that default in place builds instances nothing ever connects to.
+
+    Set it only together with use_global: false and the chart's scheduler.postgresql.connections, which is the dedicated-database layout charts/guides/production/README.md describes. A member of a Catalyst region group must leave it empty: the group's safety rests on one replicated database with one writer, and a dedicated scheduler instance adds a second of each.
+
+    UPGRADE NOTE: this defaulted to ["pg1"] until the default was corrected to match the chart. A deployment that relied on the old default and pointed the chart at the instance it built (use_global: false) must set this variable explicitly to keep it — otherwise the next apply destroys that instance, and with it the scheduler's jobs and actor reminders. A deployment that left the chart on its default is not using the instance and loses nothing.
+  EOT
   type        = list(string)
-  default     = ["pg1"]
+  default     = []
 }
 
 variable "postgresql_scheduler_instance_class" {
@@ -269,4 +290,69 @@ variable "postgresql_scheduler_username" {
   description = "Master username for all Scheduler PostgreSQL RDS instances"
   type        = string
   default     = "postgres"
+}
+
+# Two-region variables
+#
+# All of these default to the single-region behaviour this guide has always had.
+# Set them only when the region is a member of a Catalyst region group. The
+# guide that uses them is the AWS multi-region deployment page:
+# https://docs.diagrid.io/operate/hosting/enterprise-self-hosted/aws-multi-region-deployment
+
+variable "postgresql_manage_master_user_password" {
+  description = "Let RDS manage the master password in Secrets Manager. Must be false on both regions of a two-region deployment: RDS refuses to create a read replica of a source whose credentials it manages."
+  type        = bool
+  default     = true
+}
+
+variable "postgresql_password" {
+  description = "Master password for the PostgreSQL RDS instances, used when postgresql_manage_master_user_password is false"
+  type        = string
+  default     = null
+  sensitive   = true
+}
+
+variable "postgresql_replicate_source_db_arn" {
+  description = "ARN of the shared PostgreSQL instance in the other region. When set, this region's shared PostgreSQL is created as a cross-region read replica of it instead of as a writer, and the region is the passive member of its group. Clear it and apply to promote."
+  type        = string
+  default     = ""
+}
+
+variable "scheduler_postgresql_replicate_source_db_arns" {
+  description = "ARNs of the scheduler PostgreSQL instances in the other region, keyed by the scheduler_postgresql_instances entry they replicate. Same promotion semantics as postgresql_replicate_source_db_arn. A region group's members are expected to run the Dapr scheduler on the shared database instead (scheduler_postgresql_instances = [] and the chart's default agent.config.internal_dapr.scheduler.postgresql.use_global = true), which leaves one replication stream and one writer for the group to reason about; set this only for a group that keeps separate scheduler instances anyway."
+  type        = map(string)
+  default     = {}
+}
+
+variable "route53_zone_id" {
+  description = "ID of an existing Route 53 hosted zone to put this region's records in. Empty creates a zone for region_ingress_endpoint, which is this guide's single-region behaviour. The second region of a group sets this to the zone the first region created, so both regions share one wildcard domain."
+  type        = string
+  default     = ""
+}
+
+variable "region_group_member" {
+  description = "This region is a member of a Catalyst region group. A group's two regions serve the same wildcard domain, so neither of them owns that domain's record: the group's front door does, and the region-group stack creates it. Both regions of a group set this to true."
+  type        = bool
+  default     = false
+}
+
+variable "kek_kms_enabled" {
+  description = "Create an AWS KMS key for the Catalyst secrets provider's envelope encryption, and the role the agent and management service assume to use it. A region group needs every member to resolve the same key; leave it off for a single region, which has nothing to share a key with."
+  type        = bool
+  default     = false
+}
+
+variable "kek_kms_replica_source_key_arn" {
+  description = "ARN of the other region's KEK. Empty creates a new multi-region primary key, which is what the first region of a group does. Set it to the first region's kek_kms_key_arn output and this region creates a replica of that key instead: the same key identity, its own ARN, in its own region. Ignored when kek_kms_enabled is false."
+  type        = string
+  default     = ""
+}
+
+variable "kek_kms_service_account_subjects" {
+  description = "Kubernetes service accounts allowed to assume the KEK role, as OIDC subjects. The defaults are what the Catalyst chart creates for a release named `catalyst` in the `cra-agent` namespace; change them if you install under another release name or namespace."
+  type        = list(string)
+  default = [
+    "system:serviceaccount:cra-agent:catalyst-agent-sa",
+    "system:serviceaccount:cra-agent:catalyst-management-sa",
+  ]
 }

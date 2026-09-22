@@ -29,3 +29,19 @@ module "vpc" {
     "Name" = "${var.cluster_name}-vpc"
   }
 }
+
+# The teardown in the AWS deployment guide checks that the gateway's load
+# balancer is gone before destroying anything, and that check filters by VPC:
+#
+#   aws elbv2 describe-load-balancers --region <region> \
+#     --query "LoadBalancers[?VpcId=='<vpc-id>'].LoadBalancerName"
+#
+# The load balancer and its security groups are created by the AWS Load Balancer
+# Controller rather than by Terraform, so there is no resource here to read the
+# id off — without this output the reader has to go and find it by hand at the
+# one point in the guide where skipping a step leaves a VPC that cannot be
+# deleted.
+output "vpc_id" {
+  description = "ID of this region's VPC. Used by the teardown check for load balancers Terraform does not manage."
+  value       = module.vpc.vpc_id
+}
