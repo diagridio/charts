@@ -23,14 +23,16 @@ What does not differ is who applies the upgrade. In all three it is you.
 > Flux `HelmRelease`, not a Helm release. You decide what to do with the answer
 > and you apply it. See [Who may call the resolver](#who-may-call-the-resolver).
 >
-> **Which environments serve it:** staging, at
-> `https://catalyst-releases.staging.diagrid.dev`. A region joined to staging
-> can configure that address today and will get a published answer. Production
-> is not served yet, so a production region has nothing to configure and no
-> answer to publish — that is expected and is not a certificate, network or
-> configuration fault at your end. **Pattern A works in both.** Diagrid will
-> record the production endpoint in its product release notes when it goes live,
-> and support can confirm the current status.
+> **Which environments serve it:** both. A region joined to production uses
+> `https://catalyst-releases.r1.diagrid.io`, and one joined to staging uses
+> `https://catalyst-releases.staging.diagrid.dev`. Configure the address of the
+> control plane your region actually joined; the other will refuse your
+> certificate, because the resolver answers only for regions of its own control
+> plane.
+>
+> What Diagrid does with the answer is the same in both: nothing. It publishes
+> what your region should install and never installs it. **Pattern A works in
+> both too**, and needs no endpoint at all.
 
 For the first install and the join token, start with
 [Getting Started](../getting-started/README.md).
@@ -48,8 +50,8 @@ For the first install and the join token, start with
 | Your review/approval applies | Depends on your flow | Yes, unchanged | Only what your job offers |
 | Who applies the upgrade | You | You | You |
 | Level | 1 | 2 | 2 |
-| Available today | **Yes** | No — see the note above | No — see the note above |
-| Recommended | For evaluation | **Yes, once it is available** | When you cannot run a job outside the cluster |
+| Available today | **Yes** | **Yes** | **Yes** |
+| Recommended | For evaluation | **Yes** | When you cannot run a job outside the cluster |
 
 In every pattern the last row is the same: **you apply the upgrade.** Diagrid
 tells you what release you should be on; it never reaches into your cluster to
@@ -233,8 +235,9 @@ GET https://<resolver-endpoint>/apis/cra.diagrid.io/v1beta2/region/release/next
 Your region's agent calls this; you do not. It is documented here because the
 answer it returns is exactly what lands in the ConfigMap your tooling reads, so
 the field reference below is the reference for both. The address is a property
-of the control plane your region joined — `catalyst-releases.staging.diagrid.dev`
-for staging — and you give it to the agent through one chart value, see
+of the control plane your region joined — `catalyst-releases.r1.diagrid.io` for
+production, `catalyst-releases.staging.diagrid.dev` for staging — and you give
+it to the agent through one chart value, see
 [The published answer](#the-published-answer).
 
 #### Who may call the resolver
@@ -467,8 +470,10 @@ agent:
       enabled: true
       # The address Diagrid published for the resolver, for the control plane
       # this region joined. Required: there is no default, and the publisher
-      # does not start without one.
-      endpoint: https://catalyst-releases.staging.diagrid.dev
+      # does not start without one. Use catalyst-releases.staging.diagrid.dev
+      # for a region joined to staging instead — the resolver answers only for
+      # regions of its own control plane, so the wrong one refuses you.
+      endpoint: https://catalyst-releases.r1.diagrid.io
       # Optional. How often to refresh, in seconds. Keep it well inside the
       # fifteen minutes an answer is good for, so a failed refresh or two does
       # not leave you with an expired answer. Five minutes is the default.
