@@ -29,7 +29,9 @@ crash.*.log
 # all: they are rendered from pkg/regiontier/tiers.yaml and hold only instance
 # types and counts. They have to be in version control — the sizing drift check
 # compares against them, and they are what the guide tells operators to apply.
+# One line per cloud whose guide is in tfvarsTargets (tools/gen-region-tiers).
 !guides/aws/terraform/tiers/*.tfvars
+!guides/azure/terraform/tiers/*.tfvars
 
 # Ignore override files as they are usually used to override resources locally and so
 # are not checked in

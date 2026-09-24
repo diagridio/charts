@@ -790,6 +790,8 @@ global:
 
 The PostgreSQL secrets provider stores Catalyst application secrets in a PostgreSQL database using envelope encryption (each secret is encrypted with a data encryption key, which is itself encrypted by a key encryption key). Every member of a [region group](https://docs.diagrid.io/operate/platform-operations/region-groups) must use this provider with the same key encryption key, at the same key version: the encrypted rows replicate between members, and a member holding a different key cannot decrypt them.
 
+How the members come to hold the same key depends on the cloud. `awskms` names one multi-region KMS key that each region resolves its own replica of, so no key material is copied anywhere — that is what the AWS guide's region group does. There is no Azure equivalent yet — an Azure Key Vault provider is on the roadmap — so an Azure region group uses `kek_provider: "local"` with the **same 64-hex `primary_encryption_key` configured in both regions**. Catalyst compares members on a fingerprint of the material rather than on the value, so two regions holding the same key report one identity and the group raises no mismatch warning. It is a weaker posture than the AWS one: the key sits in a Kubernetes secret in both clusters rather than in a managed KMS. Treat it as key material to be distributed and rotated like any other.
+
 **Inline configuration** (connection string and keys provided directly in values):
 
 ```yaml
