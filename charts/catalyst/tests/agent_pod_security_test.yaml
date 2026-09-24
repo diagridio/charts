@@ -1,0 +1,53 @@
+suite: Test agent project-namespace Pod Security enforce level
+templates:
+  - agent/configmap.yaml
+
+tests:
+  # Baseline is enforced on project namespaces unless the operator lowers it.
+  - it: renders baseline by default
+    set:
+      join_token: "test-token"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "pod_security_enforce_level: baseline"
+
+  # The opt-out for workloads that need what baseline forbids, such as a mesh
+  # init container that adds NET_ADMIN or NET_RAW.
+  - it: renders privileged when set
+    set:
+      join_token: "test-token"
+      agent.config.project.pod_security_enforce_level: privileged
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "pod_security_enforce_level: privileged"
+
+  # The empty string means "no enforce label" and has to reach the agent as an
+  # explicit empty value; an absent key would fall back to baseline.
+  - it: renders an explicit empty level
+    set:
+      join_token: "test-token"
+      agent.config.project.pod_security_enforce_level: ""
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "pod_security_enforce_level: \"\""
+
+  # restricted is not offered, and a typo must fail the install rather than
+  # reach the agent.
+  - it: rejects restricted
+    set:
+      join_token: "test-token"
+      agent.config.project.pod_security_enforce_level: restricted
+    asserts:
+      - failedTemplate:
+          errorMessage: "agent.config.project.pod_security_enforce_level must be \"baseline\", \"privileged\" or \"\" (no enforce label), got \"restricted\""
+
+  - it: rejects an unknown level
+    set:
+      join_token: "test-token"
+      agent.config.project.pod_security_enforce_level: Baseline
+    asserts:
+      - failedTemplate:
+          errorMessage: "agent.config.project.pod_security_enforce_level must be \"baseline\", \"privileged\" or \"\" (no enforce label), got \"Baseline\""

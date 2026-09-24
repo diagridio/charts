@@ -85,6 +85,8 @@ Catalyst is a self-managing infrastructure platform: not a static set of workloa
 
 Depending on your use case and installation, you may be able to remove some of the permissions provided in the default config but this must be done with caution on a case by case basis to avoid breaking functionality.
 
+Project namespaces also enforce the Kubernetes Pod Security `baseline` standard by default; see [Pod Security for project namespaces](#pod-security-for-project-namespaces).
+
 The Catalyst Helm chart creates 4 RBAC subjects. The tables below justify each grant so cluster operators can review the blast radius before installing.
 
 #### 1. Agent
@@ -95,10 +97,12 @@ The agent's ServiceAccount (`<release>-agent-sa`, e.g. `catalyst-agent-sa`) carr
 
 | API group | Resources | Verbs | Why it is required |
 |-----------|-----------|-------|--------------------|
-| `""` | `namespaces` | get, list, watch, create and delete | Reconcile project namespaces. `create`/`delete` are granted only when the agent owns the namespace lifecycle; set `agent.config.project.externally_managed_namespaces: true` to drop them when an external owner pre-provisions namespaces. `watch` is also needed for no-escalation against the Dapr chart. |
-| `""` | `configmaps`, `secrets`, `services`, `serviceaccounts` | full CRUD | These are created by the Dapr, vcluster, OTel, Kafka, PostgreSQL, Redis, CRA sidecar, component, and namespace charts. The agent also reads image-pull secrets / infra passwords from arbitrary namespaces and syncs pull secrets into project namespaces. |
+| `""` | `namespaces` | get, list, watch, create, patch and delete | Reconcile project namespaces. `patch` applies label changes to an existing project namespace, including the Pod Security Admission labels (see [Pod Security for project namespaces](#pod-security-for-project-namespaces)). `create`, `patch` and `delete` are granted only when the agent owns the namespace lifecycle; set `agent.config.project.externally_managed_namespaces: true` to drop them when an external owner pre-provisions namespaces. `watch` is also needed for no-escalation against the Dapr chart. |
+| `""` | `configmaps`, `secrets`, `services`, `serviceaccounts` | full CRUD | These are created by the Dapr, vcluster, OTel, Kafka, PostgreSQL, Redis, CRA sidecar, component, and namespace charts. The agent also reads image-pull secrets / infra passwords from arbitrary namespaces and syncs pull secrets into project namespaces. Cluster-wide `get`/`list`/`watch` on secrets is also required for no-escalation against `dapr-operator-admin`. |
 | `""` | `pods` | get, list, watch, delete | Helm `--wait` polls pod readiness during install/upgrade (the agent never creates pods directly). `delete` is required for no-escalation against the Dapr chart. |
 | `""` | `pods/log` | get | The on-error handler reads pod logs to surface install/upgrade failure details. |
+| metrics.k8s.io | `pods` | get, list | *(only when `agent.config.region_usage.enabled`)* The region CPU-usage collector reads pod metrics from the cluster metrics-server for Catalyst-managed namespaces. |
+| `""` | `namespaces` | patch | *(only when `agent.config.region_usage.enabled`)* Adds the `cra.diagrid.io/managed` label to the agent's own infrastructure namespaces so the collector measures them. |
 | `""` | `persistentvolumeclaims` | get, delete, deletecollection | Teardown of Dapr scheduler/placement StatefulSet PVCs (by label selector) and, on boot, detecting an orphaned `shared-postgresql` data directory so a fresh admin password is never seeded against an existing database. |
 | `""` | `events` | create, patch | Helm emits Kubernetes events during chart operations. |
 | `""` | `services/finalizers` | get, list, watch, create, update | No-escalation against the Dapr chart (`dapr-operator-admin`). |
@@ -111,9 +115,9 @@ The agent's ServiceAccount (`<release>-agent-sa`, e.g. `catalyst-agent-sa`) carr
 | batch | `cronjobs`, `jobs` | full CRUD | The Dapr JWT key-rotation chart. |
 | networking.k8s.io | `networkpolicies` | full CRUD | Per-project egress/ingress policies created by the namespace chart (see [Network Policies (Projects)](#network-policies-projects)). |
 | rbac.authorization.k8s.io | `roles`, `rolebindings`, `clusterroles`, `clusterrolebindings` | full CRUD | Per-sidecar Role/RoleBinding (CRA chart) plus the ClusterRoles/Bindings installed by the Dapr chart and the OTel collectors. |
-| dapr.io | `components`, `configurations`, `subscriptions`, `resiliencies`, `httpendpoints`, `mcpservers` | full CRUD | Per-project/per-app Dapr resources rendered by the component and resource charts, plus the agent's own bootstrap Configuration. |
-| apiextensions.k8s.io | `customresourcedefinitions` | full CRUD | The Dapr (and potentially vcluster) CRDs that Helm applies ahead of templated resources on install/upgrade. |
-| admissionregistration.k8s.io | `mutatingwebhookconfigurations`, `validatingwebhookconfigurations` | full CRUD | The Dapr sidecar-injector `MutatingWebhookConfiguration` (validating is included to stay forward-compatible with future chart versions). |
+| dapr.io | `components`, `configurations`, `subscriptions`, `resiliencies`, `httpendpoints`, `mcpservers`, `workflowaccesspolicies` | full CRUD | Per-project/per-app Dapr resources rendered by the component and resource charts, plus the agent's own bootstrap Configuration. `mcpservers` and `workflowaccesspolicies` are also required for no-escalation against the Dapr chart. |
+| apiextensions.k8s.io | `customresourcedefinitions` | get, create, patch | Helm creates the Dapr CRDs from the Dapr chart's `crds/` directory and the agent server-side applies any drift. `get` and `patch` cannot be limited to named CRDs because `dapr-operator-admin` grants them on every CRD (no-escalation). |
+| admissionregistration.k8s.io | `mutatingwebhookconfigurations` named `dapr-sidecar-injector` | get, patch, delete | The agent installs Dapr with the sidecar injector disabled. `patch` is required for no-escalation against the `dapr-injector` ClusterRole; `get` and `delete` let Helm remove a copy left by an older release. |
 | discovery.k8s.io | `endpointslices` | get | Reads the `kubernetes` service EndpointSlice in `default` to build NetworkPolicy rules that allow access to the API server. |
 | agents.x-k8s.io | `sandboxes` | full CRUD | The upstream `kubernetes-sigs/agent-sandbox` CRs the gVisor sandbox provider materializes per project. |
 | node.k8s.io | `runtimeclasses` | get | The gVisor sandbox provider's preflight check verifies the configured RuntimeClass is registered before creating any Sandbox. `get` only, read once at boot. |
@@ -182,20 +186,20 @@ By default, this is the full list of images that are installed in your cluster:
 |-----------|--------------|-------------|
 | **Alpine k8s** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy/alpine/k8s:1.36.0` | Utility image used by Helm install and cleanup hooks |
 | **Envoy Proxy** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy/envoyproxy/envoy:distroless-v1.38.0` | Envoy proxy for gateway |
-| **Catalyst** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.123.0` | Consolidated Catalyst services image |
+| **Catalyst** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.124.0` | Consolidated Catalyst services image |
 | **Piko** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/diagrid-piko:v1.0.1` | Piko reverse tunneling service |
-| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.19.0-20260922-catalyst.1` | Catalyst Dapr control plane services |
-| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.123.0` | Catalyst dapr server |
-| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.123.0` | OTel collector for telemetry |
+| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.19.0-20260924-catalyst.1` | Catalyst Dapr control plane services |
+| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.124.0` | Catalyst dapr server |
+| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.124.0` | OTel collector for telemetry |
 
 Alternatively, separate images can be used:
 
 | Component | Default Image | Description |
 |-----------|--------------|-------------|
-| **Catalyst Agent** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/cra-agent:1.123.0` | Catalyst agent service |
-| **Catalyst Management** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-management:1.123.0` | Catalyst management service |
-| **Gateway Control Plane** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-gateway:1.123.0` | Gateway control plane service |
-| **Gateway Identity Injector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/identity-injector:1.123.0` | Identity injection service |
+| **Catalyst Agent** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/cra-agent:1.124.0` | Catalyst agent service |
+| **Catalyst Management** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-management:1.124.0` | Catalyst management service |
+| **Gateway Control Plane** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-gateway:1.124.0` | Gateway control plane service |
+| **Gateway Identity Injector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/identity-injector:1.124.0` | Identity injection service |
 
 Dependencies:
 
@@ -211,9 +215,9 @@ The Agent provisions these at runtime:
 
 | Component | Default Image | Description |
 |-----------|--------------|-------------|
-| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/sidecar:1.123.0` | Catalyst dapr server |
-| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-otel-collector:1.123.0` | OTel collector for telemetry |
-| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.19.0-20260922-catalyst.1` | Catalyst Dapr control plane services |
+| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/sidecar:1.124.0` | Catalyst dapr server |
+| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-otel-collector:1.124.0` | OTel collector for telemetry |
+| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.19.0-20260924-catalyst.1` | Catalyst Dapr control plane services |
 
 #### Optional Images
 
@@ -331,6 +335,29 @@ agent:
       type: Localhost
       localhostProfile: profiles/catalyst-agent.json
 ```
+
+#### Pod Security for project namespaces
+
+Project namespaces the agent creates carry [Pod Security Admission](https://kubernetes.io/docs/concepts/security/pod-security-admission/) labels: `pod-security.kubernetes.io/enforce: baseline`, with `warn` and `audit` set to `restricted`. Every pod Catalyst runs in a project namespace meets `baseline`. Existing project namespaces pick the labels up on the agent's next reconcile.
+
+Pod Security Admission does not evict running pods. Once a namespace enforces `baseline`, the API server rejects any new pod there that does not meet it, including a pod recreated by a rollout or a node drain. Typical examples are an injected service-mesh init container that adds the `NET_ADMIN` or `NET_RAW` capability, and a `hostPath` volume. If your project workloads need either, lower the enforce level with `agent.config.project.pod_security_enforce_level`:
+
+| Value | Effect |
+|-------|--------|
+| `baseline` (default) | Enforce `baseline`. |
+| `privileged` | Enforce nothing: the `privileged` level admits every pod. |
+| `""` | Set no `enforce` label, so the cluster's default admission configuration applies. |
+
+```yaml
+agent:
+  config:
+    project:
+      pod_security_enforce_level: privileged
+```
+
+Any other value fails the install. `warn` and `audit` stay at `restricted` whatever you choose, so you still see which pods would not meet it. Changing the value relabels existing project namespaces on the agent's next reconcile.
+
+Namespaces provisioned externally (`agent.config.project.externally_managed_namespaces: true`) are not labelled by the agent, and `pod_security_enforce_level` has no effect on them; label them yourself.
 
 ### Pod Scheduling
 

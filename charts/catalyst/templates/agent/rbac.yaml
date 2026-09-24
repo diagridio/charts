@@ -47,6 +47,11 @@ rules:
 # (as the region-details ConfigMap already does). It needs no grant of its own,
 # and adding one gated on the feature would be a second rule saying what this
 # one already says.
+#
+# Cluster-wide secrets get/list/watch cannot be narrowed here while the root
+# Dapr install renders dapr-operator-admin, which grants exactly that; the
+# agent must hold it for no-escalation. Narrowing the writes needs a Role bound
+# in each project namespace.
 - apiGroups: [""]
   resources: ["configmaps", "secrets", "services", "serviceaccounts"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
@@ -161,18 +166,25 @@ rules:
   resources: ["components", "configurations", "subscriptions", "resiliencies", "httpendpoints", "mcpservers", "workflowaccesspolicies"]
   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 
-# CRDs applied by the Dapr chart (components/configurations/subscriptions/
-# resiliencies/httpendpoints) and potentially the vcluster-k0s chart. Helm
-# applies these ahead of templated resources on install/upgrade.
+# Dapr CRDs: Helm creates them from the Dapr chart's crds/ directory, and
+# ApplyDaprCRDs gets each one and server-side applies (patch) any drift.
+# Nothing in the agent lists, watches, updates or deletes a CRD. The rule
+# cannot carry resourceNames: `create` is never name-restricted, and
+# dapr-operator-admin grants get and patch on every CRD, which the agent must
+# hold unrestricted to satisfy no-escalation.
 - apiGroups: ["apiextensions.k8s.io"]
   resources: ["customresourcedefinitions"]
-  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  verbs: ["get", "create", "patch"]
 
-# Upstream Dapr chart includes MutatingWebhookConfiguration for the sidecar
-# injector; keep Validating too in case it appears in future chart versions.
+# The agent installs Dapr with the sidecar injector disabled, so no chart it
+# installs renders a webhook configuration. The dapr-injector ClusterRole still
+# grants patch on the dapr-sidecar-injector webhook, which the agent must hold
+# for no-escalation; get and delete let Helm clean up a copy an older release
+# left behind. No other webhook configuration is reachable.
 - apiGroups: ["admissionregistration.k8s.io"]
-  resources: ["mutatingwebhookconfigurations", "validatingwebhookconfigurations"]
-  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  resources: ["mutatingwebhookconfigurations"]
+  resourceNames: ["dapr-sidecar-injector"]
+  verbs: ["get", "patch", "delete"]
 
 # EndpointSlice for the "kubernetes" service in the default namespace is read
 # when building NetworkPolicy rules to allow access to the K8s API server.

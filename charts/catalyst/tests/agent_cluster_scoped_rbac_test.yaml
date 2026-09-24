@@ -1,0 +1,59 @@
+suite: Test agent cluster-scoped RBAC
+templates:
+  - agent/rbac.yaml
+
+tests:
+  # The agent creates the Dapr CRDs and server-side applies drift (get, create,
+  # patch). update and delete on every CRD in the cluster would let a
+  # compromised agent rewrite or remove any operator's API types.
+  - it: grants only get, create and patch on CRDs
+    documentIndex: 0
+    set:
+      join_token: "test-token"
+    asserts:
+      - isKind:
+          of: ClusterRole
+      - contains:
+          path: rules
+          content:
+            apiGroups: ["apiextensions.k8s.io"]
+            resources: ["customresourcedefinitions"]
+            verbs: ["get", "create", "patch"]
+      - notContains:
+          path: rules[?(@.apiGroups[0] == 'apiextensions.k8s.io')].verbs
+          content: update
+      - notContains:
+          path: rules[?(@.apiGroups[0] == 'apiextensions.k8s.io')].verbs
+          content: delete
+      - notContains:
+          path: rules[?(@.apiGroups[0] == 'apiextensions.k8s.io')].verbs
+          content: list
+      - notContains:
+          path: rules[?(@.apiGroups[0] == 'apiextensions.k8s.io')].verbs
+          content: watch
+
+  # The sidecar injector is disabled in every Dapr install the agent makes, so
+  # it needs only the one named webhook the dapr-injector ClusterRole refers to.
+  # An unnamed grant would let it register an admission webhook that sees every
+  # pod or object created in the cluster.
+  - it: limits webhook configurations to the named Dapr injector webhook
+    documentIndex: 0
+    set:
+      join_token: "test-token"
+    asserts:
+      - contains:
+          path: rules
+          content:
+            apiGroups: ["admissionregistration.k8s.io"]
+            resources: ["mutatingwebhookconfigurations"]
+            resourceNames: ["dapr-sidecar-injector"]
+            verbs: ["get", "patch", "delete"]
+      - notContains:
+          path: rules[?(@.apiGroups[0] == 'admissionregistration.k8s.io')].verbs
+          content: create
+      - notContains:
+          path: rules[?(@.apiGroups[0] == 'admissionregistration.k8s.io')].verbs
+          content: update
+      - notContains:
+          path: rules[?(@.apiGroups[0] == 'admissionregistration.k8s.io')].resources
+          content: validatingwebhookconfigurations

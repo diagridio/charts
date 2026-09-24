@@ -103,6 +103,13 @@ Validate values
     {{- if le (int .Values.agent.config.placement.max_appid_count) 0 -}}
         {{- fail "agent.config.placement.max_appid_count must be greater than 0!" -}}
     {{- end -}}
+    {{- $project := .Values.agent.config.project | default dict -}}
+    {{- if hasKey $project "pod_security_enforce_level" -}}
+        {{- $level := $project.pod_security_enforce_level -}}
+        {{- if not (has (toString $level) (list "baseline" "privileged" "")) -}}
+            {{- fail (printf "agent.config.project.pod_security_enforce_level must be \"baseline\", \"privileged\" or \"\" (no enforce label), got %q" (toString $level)) -}}
+        {{- end -}}
+    {{- end -}}
     {{- if .Values.agent.config.internal_dapr -}}
         {{- if .Values.agent.config.internal_dapr.ca -}}
             {{- if not .Values.agent.config.internal_dapr.ca.trust_anchors_config_map_name -}}
