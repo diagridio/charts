@@ -81,7 +81,7 @@ Pinning the version narrows the blast radius but does not change the level:
 
 ```bash
 helm upgrade --install catalyst oci://public.ecr.aws/diagrid/stable/catalyst \
-     --version 1.124.0 \
+     --version 1.125.0 \
      -n cra-agent \
      -f catalyst-values.yaml
 ```
@@ -792,7 +792,7 @@ test "${PUBLISHED}" = "${CHART_DIGEST}" \
   || { echo "the ${VERSION} tag no longer points at the chart Diagrid named; refusing to install"; exit 1; }
 
 helm upgrade --install catalyst oci://public.ecr.aws/diagrid/catalyst \
-     --version 1.124.0"${VERSION}" \
+     --version 1.125.0"${VERSION}" \
      -n cra-agent -f catalyst-values.yaml
 ```
 
