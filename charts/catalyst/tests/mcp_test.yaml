@@ -265,3 +265,62 @@ tests:
           path: spec.template.spec.containers[0].args
           content: "--controlplane-spec=./config/controlplane-openapi.yml"
         template: mcp/deployment.yaml
+
+  # The region identity is what --edge-auth-obo pins its accepted pair to, and it
+  # exists only in a ConfigMap the agent writes at join. Optional so the pod still
+  # starts before the region has joined; the binary refuses at startup instead.
+  - it: should project the region identity from the agent's region-details ConfigMap
+    set:
+      join_token: "test-token"
+      mcp.enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DIAGRID_REGION_OIDC_ISSUER
+            valueFrom:
+              configMapKeyRef:
+                name: region-details
+                key: oidc-issuer
+                optional: true
+        template: mcp/deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DIAGRID_REGION_HOST_ID
+            valueFrom:
+              configMapKeyRef:
+                name: region-details
+                key: host-id
+                optional: true
+        template: mcp/deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DIAGRID_REGION_ID
+            valueFrom:
+              configMapKeyRef:
+                name: region-details
+                key: region-id
+                optional: true
+        template: mcp/deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DIAGRID_REGION_ORG_ID
+            valueFrom:
+              configMapKeyRef:
+                name: region-details
+                key: org-id
+                optional: true
+        template: mcp/deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DIAGRID_REGION_TYPE
+            valueFrom:
+              configMapKeyRef:
+                name: region-details
+                key: region-type
+                optional: true
+        template: mcp/deployment.yaml

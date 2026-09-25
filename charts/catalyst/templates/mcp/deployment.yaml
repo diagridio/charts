@@ -91,6 +91,39 @@ spec:
               value: {{ $gomemlimit }}
             {{- end }}
             {{- with include "catalyst.trustedCA.env" . }}{{- . | nindent 12 }}{{- end }}
+            {{- /* The region identity the agent recorded at join. Optional so the
+                   pod still starts before the region has joined; --edge-auth-obo
+                   then refuses at startup naming the key that is missing. */}}
+            - name: DIAGRID_REGION_HOST_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: region-details
+                  key: host-id
+                  optional: true
+            - name: DIAGRID_REGION_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: region-details
+                  key: region-id
+                  optional: true
+            - name: DIAGRID_REGION_ORG_ID
+              valueFrom:
+                configMapKeyRef:
+                  name: region-details
+                  key: org-id
+                  optional: true
+            - name: DIAGRID_REGION_TYPE
+              valueFrom:
+                configMapKeyRef:
+                  name: region-details
+                  key: region-type
+                  optional: true
+            - name: DIAGRID_REGION_OIDC_ISSUER
+              valueFrom:
+                configMapKeyRef:
+                  name: region-details
+                  key: oidc-issuer
+                  optional: true
             {{- with .Values.mcp.extraEnvs }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
