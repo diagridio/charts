@@ -1,0 +1,22 @@
+suite: Test management RBAC
+templates:
+  - management/rbac.yaml
+
+tests:
+  # Management counts an App ID's ready sidecar pods from the EndpointSlices of
+  # its <app>-dapr Service, so the workflow worker pre-check only runs with a
+  # single pod. Read-only; without it the lookup is refused and the pre-check is
+  # skipped, which is safe but slower to report a missing worker.
+  - it: grants read access to EndpointSlices
+    documentIndex: 0
+    set:
+      join_token: "test-token"
+    asserts:
+      - isKind:
+          of: ClusterRole
+      - contains:
+          path: rules
+          content:
+            apiGroups: ["discovery.k8s.io"]
+            resources: ["endpointslices"]
+            verbs: ["get", "list"]

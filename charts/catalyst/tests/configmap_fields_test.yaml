@@ -354,3 +354,26 @@ tests:
           path: data["config.yaml"]
           pattern: "join_token: my-join-token-value"
         template: agent/configmap.yaml
+
+  # -------------------------------------------------------------------------
+  # Management inbound JWT audiences
+  # -------------------------------------------------------------------------
+  - it: should render no additional management audiences by default
+    set:
+      join_token: "test-token"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "additional_audiences: \\[\\]"
+        template: management/configmap.yaml
+
+  - it: should propagate additional management audiences alongside enabled auth
+    set:
+      join_token: "test-token"
+      management.config.http_server_auth.additional_audiences:
+        - catalyst-mcp-api
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "http_server_auth:\\n\\s+additional_audiences:\\n\\s+- catalyst-mcp-api\\n\\s+enabled: true"
+        template: management/configmap.yaml

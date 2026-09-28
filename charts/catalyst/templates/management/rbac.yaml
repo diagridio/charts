@@ -27,6 +27,11 @@ rules:
 - apiGroups: ["dapr.io"]
   resources: ["configurations"]
   verbs: ["get", "list", "watch"]
+# EndpointSlices — read-only: counts an App ID's ready sidecar pods, so the
+# workflow worker pre-check only runs when there is exactly one
+- apiGroups: ["discovery.k8s.io"]
+  resources: ["endpointslices"]
+  verbs: ["get", "list"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
