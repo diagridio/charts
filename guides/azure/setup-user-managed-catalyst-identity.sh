@@ -49,10 +49,11 @@ assign_cosmos_data_role() {
     fi
 }
 
-# Defaults (override with the flags below or matching env vars)
-RESOURCE_GROUP="${RESOURCE_GROUP:-rg1}"
-LOCATION="${LOCATION:-westeurope}"
-CLUSTER_NAME="${CLUSTER_NAME:-catalyst-cluster}"
+# Defaults (override with the flags below or matching env vars). They match
+# what terraform/ builds when cluster_name and location are left at theirs.
+RESOURCE_GROUP="${RESOURCE_GROUP:-catalyst-rg}"
+LOCATION="${LOCATION:-westus2}"
+CLUSTER_NAME="${CLUSTER_NAME:-catalyst}"
 
 CATALYST_PROJECT="${CATALYST_PROJECT:-prj1}"
 CATALYST_APP="${CATALYST_APP:-app1}"

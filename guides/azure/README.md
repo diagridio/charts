@@ -1,19 +1,22 @@
 # Azure
 
-There are two Azure guides in this directory. Which one you need depends on
-what you want to build:
+Both Azure guides build their regions from the reference terraform in this
+directory: `terraform/`, `Makefile` and `failover.sh`.
 
-| You want | Use | Docs |
-|---|---|---|
-| A private AKS demo behind a firewall | The **installation guide**: `install.sh`, `setup.sh`, `setup-federated-catalyst-identity.sh` and `setup-user-managed-catalyst-identity.sh` | [Installation guides](https://docs.diagrid.io/catalyst/enterprise-self-hosted/installation-guide) |
-| One production region, or two regions in a region group | The **reference terraform**: `terraform/`, `Makefile` and `failover.sh` | [Azure multi-region deployment guide](https://docs.diagrid.io/operate/hosting/enterprise-self-hosted/azure-multi-region-deployment) |
+| You want | Docs |
+|---|---|
+| One region | [Azure deployment guide](https://docs.diagrid.io/operate/hosting/enterprise-self-hosted/azure-installation-guide) |
+| Two regions in a region group | [Azure multi-region deployment guide](https://docs.diagrid.io/operate/hosting/enterprise-self-hosted/azure-multi-region-deployment) |
 
-If you only need one production region, use the reference terraform and set up
-one region. You can add the second region and the group later.
+A region that already holds projects can't join a region group, and group
+members need settings the single-region guide leaves at their defaults: the
+PostgreSQL secrets provider, a shared key encryption key, and
+`region_group_member = true`. If you plan to build a group, follow the
+multi-region guide from the start.
 
-You can't add a region built with the installation guide to a region group. Its
-gateway uses an internal load balancer, and Azure's cross-region load balancer
-only works with public ones.
+`setup-user-managed-catalyst-identity.sh` and
+`setup-federated-catalyst-identity.sh` set up Azure identities for Catalyst
+apps. Both guides use them.
 
 To switch which region takes writes, see
 [Failing a self-managed region group over on Azure](../../../docs/content/runbooks/catalyst-region-group-failover-azure.md).
