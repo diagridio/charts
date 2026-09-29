@@ -19,7 +19,7 @@ spec:
     # "/diagrid/region/writable", rewritten to this port's "/writable"; the
     # other probes on this port stay private to the cluster. Fixed rather than
     # configurable, and must match DefaultCatalystAgentProbesPort in
-    # services/catalyst/gateway/main.go — that constant is what the gateway
+    # services/catalyst/gateway/pkg/gateway/gateway.go — that constant is what the gateway
     # dials, so an override here would silently be unroutable.
     - name: cra-agent-probes
       port: 8080

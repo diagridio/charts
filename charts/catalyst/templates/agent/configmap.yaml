@@ -161,6 +161,26 @@
   {{- $_ := set $agentConfig.internal_dapr "container_registry" .Values.global.image.registry -}}
   {{- $_ := set $agentConfig.internal_dapr.sentry.image "registry" .Values.global.image.registry -}}
 {{- end -}}
+{{- /* The identity-injector sidecar the agent puts beside every workload it
+       gives an SVID: sandboxes, and the hosted quickstart runner whether or not
+       sandboxes are enabled. Resolved here, once, into agent.config.identity_injector:
+       that key if set, else the older sandbox.gvisor.identity_injector key, else
+       gateway.identityInjector.image - the same binary, released with this chart,
+       carrying the consolidated image, digest pin and registry mirror with it.
+       The pull policy comes from whichever key supplied the image and defaults
+       to IfNotPresent, not the chart-wide Always, as the container starts with
+       every app pod. */ -}}
+{{- $injector := $agentConfig.identity_injector | default dict -}}
+{{- $legacyInjector := dig "sandbox" "gvisor" "identity_injector" dict $agentConfig -}}
+{{- if not $injector.image -}}
+  {{- if $legacyInjector.image -}}
+    {{- $injector = deepCopy $legacyInjector -}}
+  {{- else -}}
+    {{- $_ := set $injector "image" (include "catalyst.image" (dict "image" .Values.gateway.identityInjector.image "consolidated" .Values.global.consolidated_image "global" .Values.global.image "context" .)) -}}
+  {{- end -}}
+{{- end -}}
+{{- $_ := set $injector "pull_policy" ($injector.pull_policy | default "IfNotPresent") -}}
+{{- $_ := set $agentConfig "identity_injector" $injector -}}
 {{- /* Resolve the digests of the three Diagrid-supplied runtime images the agent
        installs into the region: the Dapr sidecar (injected into every customer
        app pod), the Catalyst OTel collector, and the private Sentry. They reach

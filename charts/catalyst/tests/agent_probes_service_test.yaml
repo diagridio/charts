@@ -7,7 +7,7 @@ templates:
 
 tests:
   # Rationale lives at DefaultCatalystAgentProbesPort in
-  # services/catalyst/gateway/main.go. Asserted here: the Service carries that
+  # services/catalyst/gateway/pkg/gateway/gateway.go. Asserted here: the Service carries that
   # port, and targetPort stays the named container port rather than a repeated
   # number, so the container port is free to move.
   - it: should expose the probes container port on the agent Service

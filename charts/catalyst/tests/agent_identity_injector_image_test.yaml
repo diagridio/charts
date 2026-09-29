@@ -1,0 +1,66 @@
+# The chart resolves agent.config.identity_injector once, for every workload the
+# agent gives an SVID: that key, else the older sandbox.gvisor.identity_injector
+# key, else gateway.identityInjector.image. See templates/agent/configmap.yaml.
+suite: Test The Agent Identity-Injector Resolution
+templates:
+  - agent/configmap.yaml
+tests:
+  - it: should default to the consolidated image the gateway's injector runs
+    set:
+      join_token: "test-token"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "(?m)^identity_injector:\n  image: us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:[0-9][^\n]*\n  pull_policy: IfNotPresent\n"
+
+  - it: should default to the standalone injector image without the consolidated image
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: false
+      gateway.identityInjector.image.tag: "9.9.9"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "(?m)^identity_injector:\n  image: us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/identity-injector:9.9.9\n"
+
+  - it: should apply the global registry mirror to the default
+    set:
+      join_token: "test-token"
+      global.image.registry: mirror.example.com
+      global.consolidated_image.enabled: false
+      gateway.identityInjector.image.tag: "9.9.9"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "(?m)^identity_injector:\n  image: mirror.example.com/identity-injector:9.9.9\n"
+
+  - it: should carry a digest pin into the default
+    set:
+      join_token: "test-token"
+      global.consolidated_image.enabled: false
+      gateway.identityInjector.image.digest: "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "(?m)^identity_injector:\n  image: [^\n]+/identity-injector@sha256:d{64}\n"
+
+  - it: should keep an explicit identity_injector
+    set:
+      join_token: "test-token"
+      agent.config.identity_injector.image: example.com/my-injector:1.0.0
+      agent.config.identity_injector.pull_policy: Always
+      agent.config.sandbox.gvisor.identity_injector.image: example.com/legacy:1.0.0
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "(?m)^identity_injector:\n  image: example.com/my-injector:1.0.0\n  pull_policy: Always\n"
+
+  - it: should take the image and pull policy from the older sandbox key when identity_injector is unset
+    set:
+      join_token: "test-token"
+      agent.config.sandbox.gvisor.identity_injector.image: example.com/legacy:1.0.0
+      agent.config.sandbox.gvisor.identity_injector.pull_policy: Never
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "(?m)^identity_injector:\n  image: example.com/legacy:1.0.0\n  pull_policy: Never\n"
