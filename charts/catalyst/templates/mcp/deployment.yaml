@@ -75,6 +75,9 @@ spec:
             - "--expose-raw-operations=false"
             {{- end }}
             - "--timeout={{ .Values.mcp.upstreamTimeout }}"
+            {{- with .Values.mcp.consoleUrl }}
+            - "--console-url={{ . }}"
+            {{- end }}
             {{- if or (eq (include "catalyst.tls.insecureSkipVerify" .) "true") .Values.mcp.insecureSkipVerify }}
             - "--insecure-skip-verify"
             {{- end }}

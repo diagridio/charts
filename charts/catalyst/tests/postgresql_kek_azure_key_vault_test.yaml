@@ -1,0 +1,165 @@
+suite: Test Azure Key Vault KEK config for the PostgreSQL secrets provider
+# The ConfigMaps are in the suite because each deployment includes its own for
+# the checksum annotation, not only because agent/configmap.yaml is asserted on.
+templates:
+  - agent/deployment.yaml
+  - agent/configmap.yaml
+  - management/deployment.yaml
+  - management/configmap.yaml
+  - gateway/deployment.yaml
+  - gateway/configmap.yaml
+  - gateway/gateway-controlplane-configmap.yaml
+tests:
+  # The three Azure Key Vault fields reach every deployment that builds a
+  # PostgreSQL secrets client, read from the existing secret like the AWS KMS
+  # fields beside them. gateway/deployment.yaml renders envoy first and the
+  # control plane second; only the control plane builds a secrets client, and it
+  # shares its pod with the identity-injector sidecar, so its container is
+  # picked by name.
+  - it: should read the Azure Key Vault KEK config from the existing secret in every deployment
+    set:
+      join_token: "test-token"
+      global.secrets.provider: "postgresql"
+      global.secrets.postgresql.existingSecret: "catalyst-pg-secrets"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SECRETS_POSTGRESQL_AZURE_KEY_VAULT_URL
+            valueFrom:
+              secretKeyRef:
+                name: catalyst-pg-secrets
+                key: azure_key_vault_url
+                optional: true
+        template: agent/deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SECRETS_POSTGRESQL_AZURE_KEY_VAULT_KEY_NAME
+            valueFrom:
+              secretKeyRef:
+                name: catalyst-pg-secrets
+                key: azure_key_vault_key_name
+                optional: true
+        template: agent/deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SECRETS_POSTGRESQL_AZURE_KEY_VAULT_KEY_VERSION
+            valueFrom:
+              secretKeyRef:
+                name: catalyst-pg-secrets
+                key: azure_key_vault_key_version
+                optional: true
+        template: agent/deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SECRETS_POSTGRESQL_AZURE_KEY_VAULT_URL
+            valueFrom:
+              secretKeyRef:
+                name: catalyst-pg-secrets
+                key: azure_key_vault_url
+                optional: true
+        template: management/deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SECRETS_POSTGRESQL_AZURE_KEY_VAULT_KEY_NAME
+            valueFrom:
+              secretKeyRef:
+                name: catalyst-pg-secrets
+                key: azure_key_vault_key_name
+                optional: true
+        template: management/deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[?(@.name=="catalyst-gateway-controlplane")].env
+          content:
+            name: SECRETS_POSTGRESQL_AZURE_KEY_VAULT_URL
+            valueFrom:
+              secretKeyRef:
+                name: catalyst-pg-secrets
+                key: azure_key_vault_url
+                optional: true
+        template: gateway/deployment.yaml
+        documentIndex: 1
+      - contains:
+          path: spec.template.spec.containers[?(@.name=="catalyst-gateway-controlplane")].env
+          content:
+            name: SECRETS_POSTGRESQL_AZURE_KEY_VAULT_KEY_NAME
+            valueFrom:
+              secretKeyRef:
+                name: catalyst-pg-secrets
+                key: azure_key_vault_key_name
+                optional: true
+        template: gateway/deployment.yaml
+        documentIndex: 1
+
+  # existingSecretKeys renames the keys inside the secret without changing the
+  # environment variables the binaries read.
+  - it: should honour existingSecretKeys overrides for the Azure Key Vault fields
+    template: agent/deployment.yaml
+    set:
+      join_token: "test-token"
+      global.secrets.provider: "postgresql"
+      global.secrets.postgresql.existingSecret: "catalyst-pg-secrets"
+      global.secrets.postgresql.existingSecretKeys.azure_key_vault_url: "kv_url"
+      global.secrets.postgresql.existingSecretKeys.azure_key_vault_key_name: "kv_key"
+      global.secrets.postgresql.existingSecretKeys.azure_key_vault_key_version: "kv_version"
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SECRETS_POSTGRESQL_AZURE_KEY_VAULT_URL
+            valueFrom:
+              secretKeyRef:
+                name: catalyst-pg-secrets
+                key: kv_url
+                optional: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SECRETS_POSTGRESQL_AZURE_KEY_VAULT_KEY_NAME
+            valueFrom:
+              secretKeyRef:
+                name: catalyst-pg-secrets
+                key: kv_key
+                optional: true
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SECRETS_POSTGRESQL_AZURE_KEY_VAULT_KEY_VERSION
+            valueFrom:
+              secretKeyRef:
+                name: catalyst-pg-secrets
+                key: kv_version
+                optional: true
+
+  # Without existingSecret the config travels in the ConfigMap instead, so no
+  # environment variable is rendered at all.
+  - it: should carry the Azure Key Vault KEK config in the agent ConfigMap without an existing secret
+    set:
+      join_token: "test-token"
+      global.secrets.provider: "postgresql"
+      global.secrets.postgresql.kek_provider: "azurekeyvault"
+      global.secrets.postgresql.azure_key_vault_url: "https://my-vault.vault.azure.net/"
+      global.secrets.postgresql.azure_key_vault_key_name: "catalyst-kek"
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SECRETS_POSTGRESQL_AZURE_KEY_VAULT_URL
+          any: true
+        template: agent/deployment.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "kek_provider: azurekeyvault"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "azure_key_vault_url: https://my-vault.vault.azure.net/"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "azure_key_vault_key_name: catalyst-kek"
+        template: agent/configmap.yaml

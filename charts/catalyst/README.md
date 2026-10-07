@@ -186,20 +186,20 @@ By default, this is the full list of images that are installed in your cluster:
 |-----------|--------------|-------------|
 | **Alpine k8s** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy/alpine/k8s:1.36.0` | Utility image used by Helm install and cleanup hooks |
 | **Envoy Proxy** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy/envoyproxy/envoy:distroless-v1.38.0` | Envoy proxy for gateway |
-| **Catalyst** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.134.0` | Consolidated Catalyst services image |
+| **Catalyst** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.135.0` | Consolidated Catalyst services image |
 | **Piko** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/diagrid-piko:v1.0.1` | Piko reverse tunneling service |
-| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.19.0-20261001-catalyst.2` | Catalyst Dapr control plane services |
-| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.134.0` | Catalyst dapr server |
-| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.134.0` | OTel collector for telemetry |
+| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.19.0-20261005-catalyst.1` | Catalyst Dapr control plane services |
+| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.135.0` | Catalyst dapr server |
+| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.135.0` | OTel collector for telemetry |
 
 Alternatively, separate images can be used:
 
 | Component | Default Image | Description |
 |-----------|--------------|-------------|
-| **Catalyst Agent** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/cra-agent:1.134.0` | Catalyst agent service |
-| **Catalyst Management** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-management:1.134.0` | Catalyst management service |
-| **Gateway Control Plane** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-gateway:1.134.0` | Gateway control plane service |
-| **Gateway Identity Injector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/identity-injector:1.134.0` | Identity injection service |
+| **Catalyst Agent** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/cra-agent:1.135.0` | Catalyst agent service |
+| **Catalyst Management** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-management:1.135.0` | Catalyst management service |
+| **Gateway Control Plane** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-gateway:1.135.0` | Gateway control plane service |
+| **Gateway Identity Injector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/identity-injector:1.135.0` | Identity injection service |
 
 Dependencies:
 
@@ -215,9 +215,9 @@ The Agent provisions these at runtime:
 
 | Component | Default Image | Description |
 |-----------|--------------|-------------|
-| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/sidecar:1.134.0` | Catalyst dapr server |
-| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-otel-collector:1.134.0` | OTel collector for telemetry |
-| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.19.0-20261001-catalyst.2` | Catalyst Dapr control plane services |
+| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/sidecar:1.135.0` | Catalyst dapr server |
+| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-otel-collector:1.135.0` | OTel collector for telemetry |
+| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.19.0-20261005-catalyst.1` | Catalyst Dapr control plane services |
 
 #### Optional Images
 
@@ -817,7 +817,7 @@ global:
 
 The PostgreSQL secrets provider stores Catalyst application secrets in a PostgreSQL database using envelope encryption (each secret is encrypted with a data encryption key, which is itself encrypted by a key encryption key). Every member of a [region group](https://docs.diagrid.io/operate/platform-operations/region-groups) must use this provider with the same key encryption key, at the same key version: the encrypted rows replicate between members, and a member holding a different key cannot decrypt them.
 
-How the members come to hold the same key depends on the cloud. `awskms` names one multi-region KMS key that each region resolves its own replica of, so no key material is copied anywhere — that is what the AWS guide's region group does. There is no Azure equivalent yet — an Azure Key Vault provider is on the roadmap — so an Azure region group uses `kek_provider: "local"` with the **same 64-hex `primary_encryption_key` configured in both regions**. Catalyst compares members on a fingerprint of the material rather than on the value, so two regions holding the same key report one identity and the group raises no mismatch warning. It is a weaker posture than the AWS one: the key sits in a Kubernetes secret in both clusters rather than in a managed KMS. Treat it as key material to be distributed and rotated like any other.
+How the members come to hold the same key depends on the cloud. `awskms` names one multi-region KMS key that each region resolves its own replica of, so no key material is copied anywhere — that is what the AWS guide's region group does. On Azure, `azurekeyvault` can serve a group when both regions name the same vault and key (see [Holding the KEK in Azure Key Vault](#holding-the-kek-in-azure-key-vault)); Key Vault does not replicate a key into a second region the way a multi-region KMS key does, so both regions then depend on that one vault being reachable. The alternative, and what the Azure multi-region guide does today, is `kek_provider: "local"` with the **same 64-hex `primary_encryption_key` configured in both regions**. Catalyst compares members on a fingerprint of the material rather than on the value, so two regions holding the same key report one identity and the group raises no mismatch warning. It is a weaker posture than the AWS one: the key sits in a Kubernetes secret in both clusters rather than in a managed KMS. Treat it as key material to be distributed and rotated like any other.
 
 **Inline configuration** (connection string and keys provided directly in values):
 
@@ -826,11 +826,104 @@ global:
   secrets:
     provider: postgresql
     postgresql:
-      kek_provider: "local"           # "local" (AES-256) or "awskms" (AWS KMS)
+      kek_provider: "local"           # "local" (AES-256), "awskms" (AWS KMS) or "azurekeyvault"
       connection_string: "postgres://user:password@host:5432/dbname"
       primary_encryption_key: "<64 hex characters>"
       primary_key_version: 1
 ```
+
+##### Holding the KEK in Azure Key Vault
+
+`kek_provider: "azurekeyvault"` wraps each data encryption key with an RSA key
+held in a Key Vault, so no cluster ever holds the key material — the Azure
+counterpart of `awskms`:
+
+```yaml
+global:
+  secrets:
+    provider: postgresql
+    postgresql:
+      kek_provider: "azurekeyvault"
+      connection_string: "postgres://user:password@host:5432/dbname"
+      azure_key_vault_url: "https://my-vault.vault.azure.net/"
+      azure_key_vault_key_name: "catalyst-kek"
+      # Optional: the version new DEKs are wrapped with (see Rotation below)
+      azure_key_vault_key_version: ""
+```
+
+There is no credential to configure: every pod that resolves a secret — agent,
+management, gateway and each project's Dapr sidecar — authenticates with the AKS
+workload identity, the same way the `awskms` provider falls through to the
+service account's IRSA role. That takes four things from you, none of which this
+chart can do on its own:
+
+1. Workload identity enabled on the AKS cluster (`az aks update
+   --enable-oidc-issuer --enable-workload-identity`).
+2. The identity granted **Key Vault Crypto User** on the key — wrapping keys
+   is a different role from reading secrets, so `Key Vault Secrets User` alone
+   is not enough. The guide scripts under `charts/guides/azure/` grant both when
+   passed `--keyvault`, scoped to the **whole vault**: the identity can then wrap
+   and unwrap with every key in it, not only the KEK. To hold it to the one key,
+   assign the role on the key instead (`--scope <vault resource id>/keys/<key
+   name>`), or give the KEK a vault of its own.
+3. The pods pointed at that identity, via this chart's existing `podLabels` and
+   `serviceAccount.annotations`. `global.serviceAccount.annotations` reaches the
+   agent and management service accounts; the gateway's control-plane service
+   account has its own:
+
+   ```yaml
+   global:
+     serviceAccount:
+       annotations:
+         azure.workload.identity/client-id: "<the identity's client id>"
+   agent:
+     podLabels:
+       azure.workload.identity/use: "true"
+   management:
+     podLabels:
+       azure.workload.identity/use: "true"
+   gateway:
+     controlplane:
+       podLabels:
+         azure.workload.identity/use: "true"
+       serviceAccount:
+         annotations:
+           azure.workload.identity/client-id: "<the identity's client id>"
+   ```
+4. The **sidecars** pointed at it too. Every project's Dapr sidecar builds its
+   own KEK provider from the component metadata the agent publishes, so it
+   unwraps DEKs itself and needs the same identity. The sidecar pods are
+   provisioned by the agent, not by this chart's templates, so they are labelled
+   through the agent's own region-wide sidecar settings — miss this and app
+   secret reads fail with an Azure credential error while the control plane looks
+   healthy:
+
+   ```yaml
+   agent:
+     config:
+       sidecar:
+         pod_labels:
+           - key: azure.workload.identity/use
+             value: "true"
+         service_account_annotations:
+           - key: azure.workload.identity/client-id
+             value: "<the identity's client id>"
+   ```
+
+**Rotation.** Rotate the key in the vault as usual — manually or with a rotation
+policy. Every wrapped DEK records the key version that wrapped it and is always
+unwrapped with that version, so rows written before a rotation stay readable.
+`azure_key_vault_key_version` only chooses the version **new** DEKs are wrapped
+with: leave it empty to follow the key's current version, or set it to hold new
+wraps on one version. Either way, keep every version that still wraps a row
+enabled in the vault — disabling or purging an old version makes its rows
+unreadable, and existing rows are not re-wrapped onto the new version.
+
+**Region groups.** Both members of a region group must name the same vault and
+key, spelled the same way — see RFC 0003 premise 4 for why, and for what the
+control plane does when they disagree. The key version is not part of that
+comparison: each row names its own, so members may wrap new DEKs with different
+versions of the one key.
 
 **Using an existing Kubernetes secret** (recommended for production, since it keeps all sensitive config out of values files):
 
@@ -854,7 +947,7 @@ global:
       existingSecret: "catalyst-pg-secrets"
 ```
 
->NOTE: When `existingSecret` is set, **all** PostgreSQL secrets provider config is read from the referenced Kubernetes secret via environment variables. Nothing is written to the ConfigMap. All keys are read with `optional: true`, so keys that are absent from the secret are simply not set and the application uses its built-in defaults (useful for optional fields like secondary keys or AWS KMS config). By default the secret key names match the config field names. Override individual key names using `existingSecretKeys` if your secret uses different naming:
+>NOTE: When `existingSecret` is set, **all** PostgreSQL secrets provider config is read from the referenced Kubernetes secret via environment variables. Nothing is written to the ConfigMap. All keys are read with `optional: true`, so keys that are absent from the secret are simply not set and the application uses its built-in defaults (useful for optional fields like secondary keys, or AWS KMS / Azure Key Vault config). By default the secret key names match the config field names. Override individual key names using `existingSecretKeys` if your secret uses different naming:
 
 ```yaml
 global:

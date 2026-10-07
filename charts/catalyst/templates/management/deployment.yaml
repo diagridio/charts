@@ -136,6 +136,24 @@ spec:
                 name: {{ $pgSecret }}
                 key: {{ $pgKeys.aws_assume_role_arn | default "aws_assume_role_arn" }}
                 optional: true
+          - name: SECRETS_POSTGRESQL_AZURE_KEY_VAULT_URL
+            valueFrom:
+              secretKeyRef:
+                name: {{ $pgSecret }}
+                key: {{ $pgKeys.azure_key_vault_url | default "azure_key_vault_url" }}
+                optional: true
+          - name: SECRETS_POSTGRESQL_AZURE_KEY_VAULT_KEY_NAME
+            valueFrom:
+              secretKeyRef:
+                name: {{ $pgSecret }}
+                key: {{ $pgKeys.azure_key_vault_key_name | default "azure_key_vault_key_name" }}
+                optional: true
+          - name: SECRETS_POSTGRESQL_AZURE_KEY_VAULT_KEY_VERSION
+            valueFrom:
+              secretKeyRef:
+                name: {{ $pgSecret }}
+                key: {{ $pgKeys.azure_key_vault_key_version | default "azure_key_vault_key_version" }}
+                optional: true
           - name: SECRETS_POSTGRESQL_MAX_CONNS
             valueFrom:
               secretKeyRef:

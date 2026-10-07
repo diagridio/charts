@@ -99,7 +99,9 @@ Options:
   --app NAME               AppID name                   (default: ${CATALYST_APP})
   --management-namespace NAME        Management service account namespace   (default: ${MANAGEMENT_NAMESPACE})
   --management-service-account NAME  Management service account name        (default: ${MANAGEMENT_SERVICE_ACCOUNT})
-  --keyvault NAME          Grant 'Key Vault Secrets User' on this Key Vault              (optional)
+  --keyvault NAME          Grant 'Key Vault Secrets User' + 'Key Vault Crypto User'
+                           on this Key Vault, vault-wide: every key and
+                           secret in it, not only the KEK                                (optional)
   --storage-account NAME   Grant 'Storage Blob Data Contributor' on this account         (optional)
   --cosmosdb NAME          Grant 'Cosmos DB Built-in Data Contributor' on this account   (optional)
   --servicebus NAME        Grant 'Azure Service Bus Data Owner' on this namespace        (optional)
@@ -238,6 +240,11 @@ if [[ -n "${CATALYST_KEYVAULT}" ]]; then
     log "Resolving Key Vault '${CATALYST_KEYVAULT}'..."
     KEYVAULT_SCOPE="$(az keyvault show --name "${CATALYST_KEYVAULT}" --query id --output tsv)"
     assign_role "${PRINCIPAL_ID}" "Key Vault Secrets User" "${KEYVAULT_SCOPE}" "Key Vault '${CATALYST_KEYVAULT}'"
+    # Wrap/unwrap is a separate data-plane role from reading secrets, and the
+    # azurekeyvault KEK provider needs it. Granted on the whole vault, so the
+    # identity can use every key in it; assign it on <vault id>/keys/<name>
+    # instead to hold it to the KEK alone.
+    assign_role "${PRINCIPAL_ID}" "Key Vault Crypto User" "${KEYVAULT_SCOPE}" "Key Vault '${CATALYST_KEYVAULT}'"
 fi
 
 if [[ -n "${CATALYST_STORAGE_ACCOUNT}" ]]; then
