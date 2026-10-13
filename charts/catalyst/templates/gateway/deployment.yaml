@@ -257,6 +257,10 @@ spec:
               value: "/var/run/secrets/diagrid.io/tls/tls.crt"
             - name: XDS_SERVER_TLS_KEY
               value: "/var/run/secrets/diagrid.io/tls/tls.key"
+            # The name the binary reads. XDS_SERVER_CA_CERT is the old name,
+            # kept for one release for binaries that fall back to it.
+            - name: XDS_SERVER_TLS_CA
+              value: "/var/run/secrets/diagrid.io/trust/ca.crt"
             - name: XDS_SERVER_CA_CERT
               value: "/var/run/secrets/diagrid.io/trust/ca.crt"
           {{- end }}

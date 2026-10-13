@@ -11,6 +11,30 @@ data:
       address:
         socket_address: { address: {{ .Values.gateway.envoy.admin.address }}, port_value: {{ .Values.gateway.envoy.admin.port }} }
     {{- end }}
+    {{- $maxHeap := include "gateway.envoy.maxHeapSizeBytes" . }}
+    {{- if and .Values.gateway.envoy.overloadManager.enabled $maxHeap }}
+
+    # Shed load before the container's memory limit OOM-kills Envoy and every
+    # connection on it. See gateway.envoy.overloadManager in values.yaml.
+    overload_manager:
+      refresh_interval: 0.25s
+      resource_monitors:
+        - name: envoy.resource_monitors.fixed_heap
+          typed_config:
+            "@type": type.googleapis.com/envoy.extensions.resource_monitors.fixed_heap.v3.FixedHeapConfig
+            max_heap_size_bytes: {{ $maxHeap }}
+      actions:
+        - name: envoy.overload_actions.shrink_heap
+          triggers:
+            - name: envoy.resource_monitors.fixed_heap
+              threshold:
+                value: 0.95
+        - name: envoy.overload_actions.stop_accepting_requests
+          triggers:
+            - name: envoy.resource_monitors.fixed_heap
+              threshold:
+                value: 0.98
+    {{- end }}
 
     dynamic_resources:
       lds_config:

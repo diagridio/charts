@@ -488,6 +488,11 @@ agent:
       ingress:
         ip_addr: ""
         port: 443
+        # The Kubernetes Service whose LoadBalancer address the agent reports
+        # as the region's ingress. When gateway.envoy.service.type is
+        # LoadBalancer and ip_addr is empty, name defaults to
+        # gateway.envoy.service.name; namespace defaults to the release
+        # namespace whenever name is set.
         service:
           namespace: ""
           name: ""
@@ -553,6 +558,15 @@ agent:
       # PRECEDENCE: allowed_egress always beats blocked_egress. NetworkPolicy
       # rules are additive, so any destination matched by an allowed_egress
       # entry is reachable even if its CIDR also appears here.
+      #
+      # When host.private_region is false (a Diagrid-hosted region), the
+      # sidecar and management also refuse to start a project's own component
+      # whose metadata names an address in these ranges, or a host that
+      # resolves into them, plus loopback. allowed_egress does not apply to that
+      # check: it exists for Diagrid's managed services, not for components a
+      # project writes. disable_component_destination_check: true turns the
+      # check off and leaves the NetworkPolicies as they are, for test clusters
+      # whose components use backends inside the cluster.
       blocked_egress:
         # RFC1918 private address space. Blocking these by default prevents
         # sidecars from reaching internal corporate networks, other tenants'
@@ -654,7 +668,7 @@ agent:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       image_name: "{{ ternary .Values.global.consolidated_image.repository \"sidecar\" .Values.global.consolidated_image.enabled }}"
       # image_tag is the sidecar image version
-      image_tag: "1.135.0"
+      image_tag: "1.136.0"
       # image_digest pins the sidecar to an immutable content digest
       # ("sha256:<64 hex>"), which wins over image_tag. Empty = pin by tag.
       # global.consolidated_image.digest, when set, overrides this.
@@ -743,7 +757,7 @@ agent:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       image_name: "{{ ternary .Values.global.consolidated_image.repository \"catalyst-otel-collector\" .Values.global.consolidated_image.enabled }}"
       # image_tag is the otel collector image version
-      image_tag: "1.135.0"
+      image_tag: "1.136.0"
       # image_digest pins the otel collector to an immutable content digest
       # ("sha256:<64 hex>"), which wins over image_tag. Empty = pin by tag.
       # global.consolidated_image.digest, when set, overrides this.
@@ -855,12 +869,17 @@ agent:
         # etcd tuning (only used when backend_type: etcd).
         # storage_class: ""
         storage_size: 8Gi
+        # placement_enabled serves actor placement from the scheduler, and the
+        # placement service is no longer deployed. Sidecars on an older Dapr,
+        # and a passive region-group member whose PostgreSQL is a read-only
+        # standby, get no placement, so their actor and workflow APIs stall.
+        # placement_enabled: false
       sentry:
         image:
           registry: us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public
           # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
           name: "{{ ternary .Values.global.consolidated_image.repository \"private-sentry\" .Values.global.consolidated_image.enabled }}"
-          tag: "1.135.0"
+          tag: "1.136.0"
           # digest pins the private sentry to an immutable content digest
           # ("sha256:<64 hex>"), which wins over tag. Empty = pin by tag.
           # global.consolidated_image.digest, when set, overrides this.
@@ -982,7 +1001,7 @@ agent:
     # Example: "diagrid/cra-agent" or "cra-agent"
     repository: cra-agent
     # tag is the image tag/version to use
-    tag: "1.135.0"
+    tag: "1.136.0"
     # digest, if set, wins over tag (see global.consolidated_image.digest above).
     digest: ""
     # pullPolicy is the image pull policy for this specific image.
@@ -1096,7 +1115,7 @@ gateway:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       repository: identity-injector
       # tag is the image tag/version to use
-      tag: "1.135.0"
+      tag: "1.136.0"
       # digest, if set, wins over tag (see global.consolidated_image.digest above).
       digest: ""
       # pullPolicy is the image pull policy for this specific image.
@@ -1144,6 +1163,16 @@ gateway:
     # config in memory, so frequent listener updates with a long drain window
     # inflate Envoy's memory footprint.
     drainTimeSeconds: 60
+    # overloadManager makes Envoy shed load as its heap nears the container's
+    # memory limit, instead of being OOM-killed with every connection on it.
+    # max_heap_size_bytes is heapPercent of resources.limits.memory (the rest
+    # is headroom for memory outside the heap); with no memory limit, or one
+    # the chart cannot parse, nothing is rendered. Envoy frees cached memory
+    # at 95% of that heap and stops accepting new requests at 98%, answering
+    # 503 until the heap falls back; open streams are not reset.
+    overloadManager:
+      enabled: true
+      heapPercent: 90
     admin:
       enabled: true
       address: "127.0.0.1"
@@ -1240,7 +1269,7 @@ gateway:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       repository: catalyst-gateway
       # tag is the image tag/version to use
-      tag: "1.135.0"
+      tag: "1.136.0"
       # digest, if set, wins over tag (see global.consolidated_image.digest above).
       digest: ""
       # pullPolicy is the image pull policy for this specific image.
@@ -1359,7 +1388,7 @@ management:
     # Deprecated: This field supports template evaluation for backwards compatibility.
     repository: "{{ ternary .Values.global.consolidated_image.repository \"catalyst-management\" .Values.global.consolidated_image.enabled }}"
     # tag is the image tag/version to use
-    tag: "1.135.0"
+    tag: "1.136.0"
     # digest, if set, wins over tag (see global.consolidated_image.digest above).
     digest: ""
     # pullPolicy is the image pull policy for this specific image.
@@ -1594,7 +1623,7 @@ mcp:
     # OpenAPI spec, so this component never uses global.consolidated_image.
     repository: catalyst-mcp
     # tag is the image tag/version to use
-    tag: "1.135.0"
+    tag: "1.136.0"
     # digest, if set, wins over tag (see global.consolidated_image.digest above).
     digest: ""
     # pullPolicy is the image pull policy for this specific image.

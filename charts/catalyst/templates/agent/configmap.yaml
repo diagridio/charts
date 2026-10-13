@@ -3,11 +3,20 @@
 {{- if .Values.join_token -}}
   {{- $_ := set $agentConfig.host "join_token" .Values.join_token -}}
 {{- end -}}
+{{- /* Default ingress.service.name to this chart's gateway Service when that
+       Service is a LoadBalancer and no static ingress.ip_addr is set, so an
+       install only names a service when its ingress is something else. A
+       ClusterIP or NodePort gateway is left unset: the agent waits for a
+       LoadBalancer address on the named service and exits when none arrives. */ -}}
+{{- $ingress := $agentConfig.host.ingress -}}
+{{- if and (eq .Values.gateway.envoy.service.type "LoadBalancer") (not $ingress.ip_addr) (not $ingress.service.name) -}}
+  {{- $_ := set $ingress.service "name" .Values.gateway.envoy.service.name -}}
+{{- end -}}
 {{- /* Default ingress.service.namespace to the release namespace when the
        value is empty, so a buyer-side overlay can leave it blank and rely on
        render-time resolution. */ -}}
-{{- if and $agentConfig.host.ingress.service.name (not $agentConfig.host.ingress.service.namespace) -}}
-  {{- $_ := set $agentConfig.host.ingress.service "namespace" .Release.Namespace -}}
+{{- if and $ingress.service.name (not $ingress.service.namespace) -}}
+  {{- $_ := set $ingress.service "namespace" .Release.Namespace -}}
 {{- end -}}
 {{- /* The gateway probe asks the gateway service for a response, so its port has
        to be the one that service listens on. Derived rather than restated so the

@@ -132,6 +132,33 @@
       "endpoint" "shared-ratelimit-rls.shared-ratelimit-redis.svc.cluster.local:8081"
     ) -}}
 {{- end -}}
+{{- /* Derive the address ranges a customer's own state store, or the secret
+       store it reads its credentials from, may not point at. They are the
+       agent's blocked_egress list (and the deprecated blocked_cidrs), which the
+       project NetworkPolicies deny and the agent sends to every in-region
+       sidecar, so management refuses the same destinations a sidecar does.
+       This repeats EffectiveBlockedEgressCIDRs in
+       services/catalyst/agent/pkg/config/project/config.go; change both
+       together.
+
+       Only on a Diagrid-hosted region, and not when
+       project.disable_component_destination_check is set. A private region runs
+       in the customer's own network, so it gets no list and management blocks
+       nothing, as the agent does for its sidecars. An explicit
+       management.config.blocked_destination_cidrs always wins. */ -}}
+{{- $agentConfig := dig "config" dict (.Values.agent | default dict) -}}
+{{- if and (not (hasKey $configMap "blocked_destination_cidrs")) (not (dig "host" "private_region" true $agentConfig)) (not (dig "project" "disable_component_destination_check" false $agentConfig)) -}}
+  {{- $blocked := list -}}
+  {{- range (dig "project" "blocked_egress" list $agentConfig) -}}
+    {{- $blocked = concat $blocked (.cidrs | default list) -}}
+  {{- end -}}
+  {{- $blocked = concat $blocked (dig "project" "blocked_cidrs" list $agentConfig) -}}
+  {{- /* An empty list (blocked_egress: [], as on a local cluster) blocks
+         nothing, the same as no key, so none is written. */ -}}
+  {{- if $blocked -}}
+    {{- $_ := set $configMap "blocked_destination_cidrs" $blocked -}}
+  {{- end -}}
+{{- end -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:

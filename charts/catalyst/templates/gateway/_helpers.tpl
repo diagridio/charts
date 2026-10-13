@@ -125,6 +125,23 @@ minimum when HA is on, else the plain replicaCount. Drives the PDB and spread.
 {{- if .Values.gateway.envoy.autoscaling.enabled }}{{ .Values.gateway.envoy.autoscaling.minReplicas }}{{ else if .Values.gateway.ha.enabled }}{{ .Values.gateway.ha.minReplicas }}{{ else }}{{ .Values.gateway.envoy.replicaCount }}{{ end }}
 {{- end }}
 
+{{/*
+Envoy's overload-manager heap ceiling in bytes: overloadManager.heapPercent of
+gateway.envoy.resources.limits.memory. Empty when there is no memory limit or
+it is not a plain integer with an optional k/M/G/T or Ki/Mi/Gi/Ti suffix.
+*/}}
+{{- define "gateway.envoy.maxHeapSizeBytes" -}}
+{{- $limit := "" }}
+{{- with .Values.gateway.envoy.resources }}{{ with .limits }}{{ with .memory }}{{ $limit = toString . }}{{ end }}{{ end }}{{ end }}
+{{- $m := regexFindAll "^([0-9]+)(k|M|G|T|Ki|Mi|Gi|Ti)?$" $limit 1 }}
+{{- if $m }}
+{{- $num := regexFind "^[0-9]+" $limit | int64 }}
+{{- $suffix := trimPrefix (regexFind "^[0-9]+" $limit) $limit }}
+{{- $mult := index (dict "" 1 "k" 1000 "M" 1000000 "G" 1000000000 "T" 1000000000000 "Ki" 1024 "Mi" 1048576 "Gi" 1073741824 "Ti" 1099511627776) $suffix | int64 }}
+{{- div (mul $num $mult (.Values.gateway.envoy.overloadManager.heapPercent | int64)) 100 }}
+{{- end }}
+{{- end }}
+
 {{- define "gateway.controlplane.replicas" -}}
 {{- if .Values.gateway.ha.enabled }}{{ .Values.gateway.ha.minReplicas }}{{ else }}{{ .Values.gateway.controlplane.replicaCount }}{{ end }}
 {{- end }}

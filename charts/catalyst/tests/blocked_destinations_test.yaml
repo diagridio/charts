@@ -1,0 +1,87 @@
+suite: Test management blocked destination derivation
+templates:
+  - management/configmap.yaml
+
+tests:
+  - it: is absent on a private region, the chart default, so management blocks nothing
+    set:
+      join_token: "test-token"
+    asserts:
+      - notMatchRegex:
+          path: data["config.yaml"]
+          pattern: "blocked_destination_cidrs"
+
+  - it: is the agent's blocked_egress list on a Diagrid-hosted region
+    set:
+      join_token: "test-token"
+      agent:
+        config:
+          host:
+            private_region: false
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "blocked_destination_cidrs:\\n\\s*- 10\\.0\\.0\\.0/8\\n\\s*- 172\\.16\\.0\\.0/12\\n\\s*- 192\\.168\\.0\\.0/16\\n\\s*- 169\\.254\\.0\\.0/16\\n"
+
+  - it: is absent when the region blocks no egress, as a local cluster does
+    set:
+      join_token: "test-token"
+      agent:
+        config:
+          host:
+            private_region: false
+          project:
+            blocked_egress: []
+    asserts:
+      - notMatchRegex:
+          path: data["config.yaml"]
+          pattern: "blocked_destination_cidrs"
+
+  - it: is absent when the component destination check is disabled
+    set:
+      join_token: "test-token"
+      agent:
+        config:
+          host:
+            private_region: false
+          project:
+            disable_component_destination_check: true
+    asserts:
+      - notMatchRegex:
+          path: data["config.yaml"]
+          pattern: "blocked_destination_cidrs"
+
+  - it: carries the deprecated blocked_cidrs after the blocked_egress rules
+    set:
+      join_token: "test-token"
+      agent:
+        config:
+          host:
+            private_region: false
+          project:
+            blocked_egress:
+              - name: internal
+                cidrs: ["10.0.0.0/8"]
+            blocked_cidrs: ["100.64.0.0/10"]
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "blocked_destination_cidrs:\\n\\s*- 10\\.0\\.0\\.0/8\\n\\s*- 100\\.64\\.0\\.0/10\\n"
+
+  - it: an explicit management override wins over the derivation
+    set:
+      join_token: "test-token"
+      agent:
+        config:
+          host:
+            private_region: false
+      management:
+        config:
+          blocked_destination_cidrs: ["203.0.113.0/24"]
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "blocked_destination_cidrs:\\n\\s*- 203\\.0\\.113\\.0/24\\n"
+      - notMatchRegex:
+          path: data["config.yaml"]
+          pattern: "- 169\\.254\\.0\\.0/16"

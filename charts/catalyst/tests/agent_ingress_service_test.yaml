@@ -1,0 +1,70 @@
+suite: Test the agent's ingress service defaulting
+templates:
+  - agent/configmap.yaml
+
+release:
+  namespace: cra-agent
+
+tests:
+  # A LoadBalancer gateway is the region's ingress, so the agent is pointed at
+  # it without the install having to name the chart's own Service.
+  - it: should default to the gateway service when it is a LoadBalancer
+    set:
+      join_token: "test-token"
+      gateway.envoy.service.type: LoadBalancer
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "service:\\s+name: gateway-envoy\\s+namespace: cra-agent"
+
+  - it: should follow a renamed gateway service
+    set:
+      join_token: "test-token"
+      gateway.envoy.service.type: LoadBalancer
+      gateway.envoy.service.name: my-gateway
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "service:\\s+name: my-gateway\\s+namespace: cra-agent"
+
+  - it: should let an explicit ingress service win
+    set:
+      join_token: "test-token"
+      gateway.envoy.service.type: LoadBalancer
+      agent.config.host.ingress.service.name: ingress-nginx-controller
+      agent.config.host.ingress.service.namespace: ingress-nginx
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "service:\\s+name: ingress-nginx-controller\\s+namespace: ingress-nginx"
+
+  - it: should default the namespace of an explicit service to the release namespace
+    set:
+      join_token: "test-token"
+      agent.config.host.ingress.service.name: ingress-nginx-controller
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "service:\\s+name: ingress-nginx-controller\\s+namespace: cra-agent"
+
+  # A ClusterIP gateway never gets a LoadBalancer address, and the agent exits
+  # after waiting for one on a named service.
+  - it: should leave the service unset for a ClusterIP gateway
+    set:
+      join_token: "test-token"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "ingress:\\s+ip_addr: \"\"\\s+port: 443\\s+service:\\s+name: \"\"\\s+namespace: \"\""
+
+  # A static address is the ingress; the agent registers it and never looks
+  # for a LoadBalancer.
+  - it: should leave the service unset when a static ingress address is set
+    set:
+      join_token: "test-token"
+      gateway.envoy.service.type: LoadBalancer
+      agent.config.host.ingress.ip_addr: 203.0.113.10
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "ip_addr: 203.0.113.10\\s+port: 443\\s+service:\\s+name: \"\"\\s+namespace: \"\""

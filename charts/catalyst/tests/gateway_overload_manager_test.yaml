@@ -1,0 +1,81 @@
+suite: Test gateway envoy overload manager
+templates:
+  - gateway/configmap.yaml
+
+tests:
+  - it: should cap the heap at 90% of the default 2048Mi memory limit
+    set:
+      join_token: "test-token"
+    asserts:
+      - matchRegex:
+          path: data["bootstrap-envoy.yaml"]
+          pattern: "overload_manager:"
+      - matchRegex:
+          path: data["bootstrap-envoy.yaml"]
+          pattern: "max_heap_size_bytes: 1932735283\n"
+      - matchRegex:
+          path: data["bootstrap-envoy.yaml"]
+          pattern: "name: envoy.overload_actions.shrink_heap\\s+triggers:\\s+- name: envoy.resource_monitors.fixed_heap\\s+threshold:\\s+value: 0.95"
+      - matchRegex:
+          path: data["bootstrap-envoy.yaml"]
+          pattern: "name: envoy.overload_actions.stop_accepting_requests\\s+triggers:\\s+- name: envoy.resource_monitors.fixed_heap\\s+threshold:\\s+value: 0.98"
+
+  - it: should follow an overridden memory limit and heap percentage
+    set:
+      join_token: "test-token"
+      gateway.envoy.resources.limits.memory: 4G
+      gateway.envoy.overloadManager.heapPercent: 80
+    asserts:
+      - matchRegex:
+          path: data["bootstrap-envoy.yaml"]
+          pattern: "max_heap_size_bytes: 3200000000\n"
+
+  - it: should accept a memory limit in plain bytes
+    set:
+      join_token: "test-token"
+      gateway.envoy.resources.limits.memory: "1073741824"
+    asserts:
+      - matchRegex:
+          path: data["bootstrap-envoy.yaml"]
+          pattern: "max_heap_size_bytes: 966367641\n"
+
+  # Helm reads an unquoted number in a values file as a float64, which the
+  # heap-size helper's regex would not match. The schema refuses it, so the
+  # install fails rather than silently rendering no overload manager.
+  - it: should refuse a memory limit written as an unquoted number
+    set:
+      join_token: "test-token"
+    values:
+      - ./values/gateway-memory-limit-unquoted-bytes.yaml
+    asserts:
+      - failedTemplate:
+          # Helm's wording varies by version: "Invalid type. Expected:
+          # string" or "got number, want string".
+          errorPattern: "limits[./]memory.*(Expected: string|want string)"
+
+  - it: should render no overload manager without a memory limit
+    set:
+      join_token: "test-token"
+      gateway.envoy.resources.limits: null
+    asserts:
+      - notMatchRegex:
+          path: data["bootstrap-envoy.yaml"]
+          pattern: "overload_manager"
+
+  - it: should render no overload manager for a memory limit it cannot parse
+    set:
+      join_token: "test-token"
+      gateway.envoy.resources.limits.memory: 1.5Gi
+    asserts:
+      - notMatchRegex:
+          path: data["bootstrap-envoy.yaml"]
+          pattern: "overload_manager"
+
+  - it: should render no overload manager when disabled
+    set:
+      join_token: "test-token"
+      gateway.envoy.overloadManager.enabled: false
+    asserts:
+      - notMatchRegex:
+          path: data["bootstrap-envoy.yaml"]
+          pattern: "overload_manager"

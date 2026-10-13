@@ -1,0 +1,53 @@
+suite: Test gateway-controlplane xDS mTLS env
+templates:
+  - gateway/deployment.yaml
+  - gateway/configmap.yaml
+tests:
+  # The binary reads XDS_SERVER_TLS_CA and refuses to start with a certificate
+  # and key but no CA. XDS_SERVER_CA_CERT is the old name, still read as a
+  # fallback, and set for one release alongside it.
+  - it: sets the xDS server certificate, key and CA when xds.mtls.enabled=true
+    set:
+      join_token: "test-token"
+      gateway.controlplane.xds.mtls.enabled: true
+    template: gateway/deployment.yaml
+    documentIndex: 1
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[?(@.name=="catalyst-gateway-controlplane")].env
+          content:
+            name: XDS_SERVER_TLS_CERT
+            value: /var/run/secrets/diagrid.io/tls/tls.crt
+      - contains:
+          path: spec.template.spec.containers[?(@.name=="catalyst-gateway-controlplane")].env
+          content:
+            name: XDS_SERVER_TLS_KEY
+            value: /var/run/secrets/diagrid.io/tls/tls.key
+      - contains:
+          path: spec.template.spec.containers[?(@.name=="catalyst-gateway-controlplane")].env
+          content:
+            name: XDS_SERVER_TLS_CA
+            value: /var/run/secrets/diagrid.io/trust/ca.crt
+      - contains:
+          path: spec.template.spec.containers[?(@.name=="catalyst-gateway-controlplane")].env
+          content:
+            name: XDS_SERVER_CA_CERT
+            value: /var/run/secrets/diagrid.io/trust/ca.crt
+
+  - it: sets none of them when xds.mtls.enabled=false
+    set:
+      join_token: "test-token"
+      gateway.controlplane.xds.mtls.enabled: false
+    template: gateway/deployment.yaml
+    documentIndex: 1
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[?(@.name=="catalyst-gateway-controlplane")].env
+          content:
+            name: XDS_SERVER_TLS_CA
+            value: /var/run/secrets/diagrid.io/trust/ca.crt
+      - notContains:
+          path: spec.template.spec.containers[?(@.name=="catalyst-gateway-controlplane")].env
+          content:
+            name: XDS_SERVER_TLS_CERT
+            value: /var/run/secrets/diagrid.io/tls/tls.crt
