@@ -57,3 +57,17 @@ tests:
       - notContains:
           path: rules[?(@.apiGroups[0] == 'admissionregistration.k8s.io')].resources
           content: validatingwebhookconfigurations
+
+  # The agent warns at boot when a LimitRange caps the CPU of the agent or
+  # root Dapr. It only reads LimitRanges, never writes them.
+  - it: grants read-only access to LimitRanges
+    documentIndex: 0
+    set:
+      join_token: "test-token"
+    asserts:
+      - contains:
+          path: rules
+          content:
+            apiGroups: [""]
+            resources: ["limitranges"]
+            verbs: ["get", "list"]

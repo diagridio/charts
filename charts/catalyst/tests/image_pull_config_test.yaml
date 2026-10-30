@@ -7,6 +7,8 @@ templates:
   - gateway/deployment.yaml
   - gateway/configmap.yaml
   - gateway/gateway-controlplane-configmap.yaml
+  - piko/statefulset.yaml
+  - post-delete-hook.yaml
 tests:
   - it: should apply global imagePullSecrets to all deployments
     set:
@@ -37,6 +39,44 @@ tests:
             name: "my-registry-secret"
         template: gateway/deployment.yaml
         documentIndex: 1
+
+  - it: should apply global imagePullSecrets to the piko StatefulSet and the cleanup Job
+    set:
+      join_token: "test-token"
+      piko.enabled: true
+      cleanup.enabled: true
+      global.image.imagePullSecrets:
+        - name: "my-registry-secret"
+    asserts:
+      - equal:
+          path: spec.template.spec.imagePullSecrets
+          value:
+            - name: "my-registry-secret"
+        template: piko/statefulset.yaml
+      - equal:
+          path: spec.template.spec.imagePullSecrets
+          value:
+            - name: "my-registry-secret"
+        template: post-delete-hook.yaml
+        documentSelector:
+          path: kind
+          value: Job
+
+  - it: should render no imagePullSecrets on piko or the cleanup Job by default
+    set:
+      join_token: "test-token"
+      piko.enabled: true
+      cleanup.enabled: true
+    asserts:
+      - notExists:
+          path: spec.template.spec.imagePullSecrets
+        template: piko/statefulset.yaml
+      - notExists:
+          path: spec.template.spec.imagePullSecrets
+        template: post-delete-hook.yaml
+        documentSelector:
+          path: kind
+          value: Job
 
   - it: should apply global pull policy when set
     set:

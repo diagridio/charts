@@ -184,8 +184,7 @@ confirm() {
 
 require_failover_args() {
   [[ -n "$LOCATION" ]] || {
-    echo "error: --location is required. Without it the Makefile plans against" >&2
-    echo "       its westus2 default, which is not this region." >&2
+    echo "error: --location is required: the Azure region this directory deploys." >&2
     exit 2
   }
   [[ -n "$INGRESS_ENDPOINT" ]] || {
@@ -194,6 +193,34 @@ require_failover_args() {
     exit 2
   }
   [[ -d "$TF_DIR" ]] || { echo "error: no Terraform root at '$TF_DIR'" >&2; exit 1; }
+  require_location_matches_state
+}
+
+# require_location_matches_state refuses a --location that differs from the
+# region this directory's state was applied in. Each region has its own working
+# directory, and the script plans whichever one it is run from: run from the
+# other region's directory, a plan moves that whole region to --location,
+# replacing its cluster, network and database. The database guard catches that
+# plan only because the database is in it; this stops it before planning.
+# When the region cannot be read (nothing applied yet, an unreachable backend,
+# expired credentials, an uninitialised directory) the check is skipped, and
+# says so on stderr rather than looking as if it ran.
+require_location_matches_state() {
+  local deployed wanted
+  deployed="$(terraform -chdir="$TF_DIR" output -raw aks_cluster_region 2>/dev/null || true)"
+  if [[ -z "$deployed" ]]; then
+    echo "warning: could not read aks_cluster_region from ${TF_DIR}; not checking --location against state." >&2
+    return 0
+  fi
+  deployed="$(tr -d ' ' <<<"$deployed" | tr '[:upper:]' '[:lower:]')"
+  wanted="$(tr -d ' ' <<<"$LOCATION" | tr '[:upper:]' '[:lower:]')"
+  if [[ "$deployed" != "$wanted" ]]; then
+    echo "error: this directory deploys ${deployed}, not ${LOCATION}." >&2
+    echo "       failover.sh acts on the region whose directory it runs in. Run it" >&2
+    echo "       from the ${LOCATION} region's working directory, or pass" >&2
+    echo "       --location ${deployed} if this is the region you meant." >&2
+    exit 2
+  fi
 }
 
 # plan_json writes a plan for this region to $PLAN_FILE and prints it as JSON.
@@ -449,6 +476,47 @@ forget_writer_only_resources() {
   guard_other_changes "$others"
 }
 
+# explain_failed_rebuild runs when the rebuild apply fails part-way. Azure can
+# return an error after it has accepted the new server: a 404 on the PATCH that
+# follows the create, while the replica is still being built. Terraform then
+# marks the server tainted, and the next apply destroys it again even though
+# Azure finished creating it. This names the tainted servers and the safe way
+# back, rather than leaving the next `make apply` to repeat a 10-15 minute
+# rebuild.
+explain_failed_rebuild() {
+  # `terraform show -json` marks a tainted instance with "tainted": true. One
+  # pass over the state finds them, with the resource group and name the az
+  # commands below need. jq reads all of its input, so nothing upstream is cut
+  # off mid-write under pipefail.
+  local tainted address rg name
+  tainted="$(terraform -chdir="$TF_DIR" show -json 2>/dev/null | jq -r '
+      [.values.root_module.resources[]?
+       | select(.tainted == true and (.address | startswith("azurerm_postgresql_flexible_server.")))]
+      | .[] | [.address, .values.resource_group_name, .values.name] | @tsv' || true)"
+  [[ -n "$tainted" ]] || return 0
+
+  echo >&2
+  echo "The rebuild failed after Azure started creating the new servers." >&2
+  echo "Terraform has marked these tainted, so the next apply would destroy them again:" >&2
+  while IFS=$'\t' read -r address rg name; do
+    echo "    ${address}  (${name})" >&2
+  done <<<"$tainted"
+  echo >&2
+  echo "Do not re-run 'follow' or 'make apply' yet. Check each server in Azure first:" >&2
+  while IFS=$'\t' read -r address rg name; do
+    echo "    az postgres flexible-server show -g ${rg} -n ${name} --query '{state:state,role:replicationRole}' -o table" >&2
+  done <<<"$tainted"
+  echo >&2
+  echo "Ready with a replica role (GeoAsyncReplica): the server is fine. Untaint it," >&2
+  echo "then plan; the plan should show no destroys:" >&2
+  while IFS=$'\t' read -r address rg name; do
+    echo "    terraform -chdir=${TF_DIR} untaint '${address}'" >&2
+  done <<<"$tainted"
+  echo "    make plan LOCATION=${LOCATION} REGION_INGRESS_ENDPOINT=${INGRESS_ENDPOINT}${MAKE_ARGS[*]+ ${MAKE_ARGS[*]}}" >&2
+  echo >&2
+  echo "Still provisioning: wait, then check again. Missing or failed: re-run follow." >&2
+}
+
 cmd_follow() {
   require_failover_args
 
@@ -531,7 +599,10 @@ cmd_follow() {
 
   forget_writer_only_resources "$plan" "${replace_args[@]+"${replace_args[@]}"}"
 
-  terraform -chdir="$TF_DIR" apply "$PLAN_FILE"
+  if ! terraform -chdir="$TF_DIR" apply "$PLAN_FILE"; then
+    explain_failed_rebuild
+    exit 1
+  fi
 
   echo
   echo "Rebuilt as replicas. Let them catch up before promoting back — a promotion"

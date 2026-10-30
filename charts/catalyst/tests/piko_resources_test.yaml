@@ -1,0 +1,43 @@
+suite: Test Piko resources
+templates:
+  - piko/statefulset.yaml
+
+tests:
+  # Without its own requests, a namespace LimitRange default would decide them.
+  - it: should set requests and no limits by default
+    set:
+      join_token: "test-token"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].resources
+          value:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+      - notExists:
+          path: spec.template.spec.containers[0].resources.limits
+
+  - it: should use piko.resources when set
+    set:
+      join_token: "test-token"
+      piko.resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          memory: 512Mi
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.memory
+          value: 128Mi
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.memory
+          value: 512Mi
+
+  - it: should render no resources block when piko.resources is emptied
+    set:
+      join_token: "test-token"
+      piko.resources: null
+    asserts:
+      - notExists:
+          path: spec.template.spec.containers[0].resources

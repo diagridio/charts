@@ -95,8 +95,8 @@
   {{- end -}}
 {{- end -}}
 {{- /* Convert per-workload node_selector map -> list-of-pairs and affinity map -> YAML string. */ -}}
-{{- range $section := list "sidecar" "internal_dapr" "otel" -}}
-  {{- $cfg := index $agentConfig $section -}}
+{{- $workloads := list (index $agentConfig "sidecar") (index $agentConfig "internal_dapr") (index $agentConfig "otel") (index $agentConfig.project "selfhosted_postgresql") -}}
+{{- range $cfg := $workloads -}}
   {{- if $cfg -}}
     {{- if hasKey $cfg "node_selector" -}}
       {{- if kindIs "map" $cfg.node_selector -}}
@@ -169,6 +169,10 @@
   {{- $_ := set $agentConfig.otel "image_registry" .Values.global.image.registry -}}
   {{- $_ := set $agentConfig.internal_dapr "container_registry" .Values.global.image.registry -}}
   {{- $_ := set $agentConfig.internal_dapr.sentry.image "registry" .Values.global.image.registry -}}
+  {{- /* The JWT key rotation job's image. Set only here, so it stays empty,
+         and the rotation chart keeps its own default, unless every image is
+         mirrored. */ -}}
+  {{- $_ := set $agentConfig.internal_dapr.sentry.jwt "rotation_image_registry" .Values.global.image.registry -}}
 {{- end -}}
 {{- /* The identity-injector sidecar the agent puts beside every workload it
        gives an SVID: sandboxes, and the hosted quickstart runner whether or not

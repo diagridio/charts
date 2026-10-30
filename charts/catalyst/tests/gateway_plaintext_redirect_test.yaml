@@ -1,0 +1,32 @@
+suite: Test Gateway Plaintext Redirect
+templates:
+  - gateway/deployment.yaml
+  - gateway/configmap.yaml
+tests:
+  # Off by default: behind a proxy that terminates TLS and forwards plain HTTP to
+  # the gateway's plaintext port, the redirect would send every request back to
+  # that proxy forever.
+  - it: leaves plaintext served by default
+    set:
+      join_token: "test-token"
+    documentIndex: 1
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[1].env
+          content:
+            name: GATEWAY_PLAINTEXT_REDIRECT_ENABLED
+            value: "false"
+        template: gateway/deployment.yaml
+
+  - it: turns the redirect on when asked
+    set:
+      join_token: "test-token"
+      gateway.plaintextRedirect: true
+    documentIndex: 1
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[1].env
+          content:
+            name: GATEWAY_PLAINTEXT_REDIRECT_ENABLED
+            value: "true"
+        template: gateway/deployment.yaml

@@ -58,3 +58,33 @@ tests:
             apiGroups: [""]
             resources: ["namespaces"]
             verbs: ["get", "list", "watch", "create", "delete", "patch"]
+
+  # The case above checks one rule. This one checks the whole ClusterRole: no rule
+  # that names namespaces (or the "*" resource) may carry a write verb, so a later
+  # grant added for some other feature cannot quietly hand the agent back what an
+  # operator turned this flag on to withhold. Each filter is nested over a scalar
+  # list on purpose: helm-unittest's filters compare only the first element of a
+  # list when written as `@.verbs[*] == "x"`.
+  - it: with externally managed namespaces, no rule anywhere in the ClusterRole writes namespaces
+    documentIndex: 0
+    set:
+      join_token: "test-token"
+      agent.config.project.externally_managed_namespaces: true
+    asserts:
+      - notExists:
+          path: rules[?(@.resources[?(@ == "namespaces" || @ == "*")])].verbs[?(@ == "create" || @ == "delete" || @ == "patch" || @ == "update" || @ == "*")]
+
+  # region_usage brings namespaces:patch back through its own rule, to backfill the
+  # cra.diagrid.io/managed label. It must never bring back create or delete, which
+  # is what lets an external owner keep the namespace lifecycle to itself.
+  - it: with externally managed namespaces and region usage, the agent may patch but never create or delete namespaces
+    documentIndex: 0
+    set:
+      join_token: "test-token"
+      agent.config.project.externally_managed_namespaces: true
+      agent.config.region_usage.enabled: true
+    asserts:
+      - exists:
+          path: rules[?(@.resources[?(@ == "namespaces")])].verbs[?(@ == "patch")]
+      - notExists:
+          path: rules[?(@.resources[?(@ == "namespaces" || @ == "*")])].verbs[?(@ == "create" || @ == "delete" || @ == "*")]

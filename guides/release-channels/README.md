@@ -81,7 +81,7 @@ Pinning the version narrows the blast radius but does not change the level:
 
 ```bash
 helm upgrade --install catalyst oci://public.ecr.aws/diagrid/stable/catalyst \
-     --version 1.136.0 \
+     --version 1.137.0 \
      -n cra-agent \
      -f catalyst-values.yaml
 ```
@@ -792,7 +792,7 @@ test "${PUBLISHED}" = "${CHART_DIGEST}" \
   || { echo "the ${VERSION} tag no longer points at the chart Diagrid named; refusing to install"; exit 1; }
 
 helm upgrade --install catalyst oci://public.ecr.aws/diagrid/catalyst \
-     --version 1.136.0"${VERSION}" \
+     --version 1.137.0"${VERSION}" \
      -n cra-agent -f catalyst-values.yaml
 ```
 
@@ -838,6 +838,30 @@ Pattern C is a `CronJob` you write and run yourself:
 Use Pattern C when running a job outside the cluster is genuinely not an option.
 Otherwise prefer Pattern B, whose whole advantage is that the upgrade goes
 through the review process you already have.
+
+## How long a release line is supported
+
+Fixes are made per release line: 1.135 is the line of 1.135.0, 1.135.1 and
+every later 1.135 patch. A supported line is one Diagrid still patches, and on a
+Premium support plan you can ask for a security or bug fix to be backported to
+it. How long a line stays supported depends on the channel your region follows:
+
+| Channel | Supported lines | When a line leaves support |
+|---|---|---|
+| `lts` | Each line the channel names, for 12 months | 12 months after the channel first named a release of the line |
+| `stable` | The three newest lines the channel has named | When the channel moves onto a new line and it becomes the fourth |
+| `candidate` | None. A fix arrives as the next candidate | — |
+
+The region page warns you when the line your region runs is leaving support: on
+`lts` from 90 days before its last day, and on `stable` once it is the oldest of
+the three. Once support has ended the warning becomes an error. Diagrid also
+emails the members of your organization, once when the warning starts and once
+when support ends.
+
+Your own tooling can read the same facts from the region's release status:
+`currentLine`, `lineSupportStatus` (`supported`, `ending` or `ended`) and
+`lineSupportedUntil`, the last day of support. To get back onto a supported
+line, upgrade to the release your channel points at.
 
 ## What not to do
 

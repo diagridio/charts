@@ -327,6 +327,11 @@ global:
     #   persistence_storage_size: "10Gi"
     #   replica_count: 0
     #   resources: {}
+    #   persistence_storage_class: ""   # StorageClass of the data PVC (holds pg_wal); only
+    #                                   # applies when the database is first created
+    #   node_selector: {}               # also tolerations: [] and affinity: {}
+    #   extended_configuration: ""      # extra postgresql.conf lines; wal_level and the
+    #                                   # replication limits Catalyst needs still win
     selfhosted: {}
     # Connection details for an external Postgres (only used when create: false,
     # disabled: false). Maps to agent.config.project.external_postgresql.
@@ -398,7 +403,8 @@ global:
 #   - Control-plane pods rendered by this chart: agent, management,
 #     gateway.envoy, gateway.controlplane, piko.
 #   - Dapr sidecars the agent provisions per app (see agent.config.sidecar).
-#   - Per-project Dapr control-plane pods (agent.config.internal_dapr).
+#   - Per-project Dapr control-plane pods and the JWT key-rotation CronJob
+#     (agent.config.internal_dapr).
 #   - Per-project OTel collectors (agent.config.otel).
 #
 # Per-workload overrides take precedence on key collision for nodeSelector/
@@ -505,7 +511,7 @@ agent:
             # Only needed when the gateway TLS certificate is signed by a
             # private/internal CA. When using a well-known CA (e.g. Let's Encrypt)
             # this can be left empty and no CA will be distributed to sidecars.
-            # Defaults to "ca.crt" when set.
+            # Defaults to gateway.tls.certificates.caFile when not set explicitly.
             ca_file: ""
     # gateway_probe asks the region's own gateway for a response on an interval
     # so a region with no customer traffic still produces an availability
@@ -526,6 +532,14 @@ agent:
       # this is a limit internal to this catalyst installation that helps prevent resource exhaustion.
       max_appid_count: 300
     project:
+      # enable_workflows_fast_path turns on Dapr's WorkflowsFastPath feature for
+      # every project sidecar: workflow timers, activities and completions are
+      # driven directly by the sidecar instead of through a scheduler reminder
+      # per event, taking scheduler round trips out of each workflow step.
+      # Execution stays at-least-once. Projects that set scheduler-enforced workflow
+      # concurrency limits keep the reminder path so the limits still apply.
+      # Set to false to run every workflow through scheduler reminders.
+      enable_workflows_fast_path: true
       # disable_network_policies disables all Kubernetes NetworkPolicy resources for project namespaces.
       # When true, no network policies are created and any previously created policies are removed on the next reconcile.
       disable_network_policies: false
@@ -535,7 +549,9 @@ agent:
       # the in-namespace resources (network policies, image-pull secret). Set this when the agent
       # runs with least-privilege RBAC that lacks create/delete on namespaces; this same value also
       # drives the namespaces verbs in templates/agent/rbac.yaml so the two cannot drift.
-      # Defaults to false, preserving the Helm-managed namespace behaviour.
+      # Defaults to false, preserving the Helm-managed namespace behaviour. See
+      # "Externally managed namespaces" in the chart README for the namespaces
+      # to create, the labels they need, and the order to create them in.
       externally_managed_namespaces: false
       # pod_security_enforce_level is the Kubernetes Pod Security Admission level
       # enforced on the project namespaces the agent creates: "baseline" (the
@@ -547,13 +563,18 @@ agent:
       # Has no effect when externally_managed_namespaces is true. See "Pod
       # Security for project namespaces" in the chart README.
       pod_security_enforce_level: baseline
+      # trace_sampling_rate is the share of requests sidecars sample for
+      # tracing, from "0" to "1", for projects with no tracing configuration of
+      # their own. Empty means "0.01"; "1" samples every request.
+      trace_sampling_rate: ""
       # blocked_egress denies network destinations from the sidecar 0.0.0.0/0
       # egress rule. Each rule's CIDRs are flattened into the NetworkPolicy
       # IPBlock.except list — NetworkPolicy's "except" only supports CIDRs, so
       # rules here may only contain cidrs (no namespaces, no ports). Defaults
       # cover RFC1918 private ranges and the link-local range (169.254.0.0/16),
-      # which includes cloud instance metadata endpoints. Trim or override to
-      # match your environment (e.g. GKE/AKS pod CIDRs live in 10.0.0.0/8).
+      # which includes cloud instance metadata endpoints. Prefer an
+      # allowed_egress entry over trimming this list; a list set here replaces
+      # the defaults whole.
       #
       # PRECEDENCE: allowed_egress always beats blocked_egress. NetworkPolicy
       # rules are additive, so any destination matched by an allowed_egress
@@ -571,10 +592,12 @@ agent:
         # RFC1918 private address space. Blocking these by default prevents
         # sidecars from reaching internal corporate networks, other tenants'
         # workloads, and in-cluster services that have not been explicitly
-        # allow-listed via allowed_egress. Note that many managed Kubernetes
-        # offerings (GKE, AKS, EKS) place pod and node CIDRs inside 10.0.0.0/8,
-        # so operators typically need to either trim this entry or add an
-        # allowed_egress rule for the cluster's pod/service CIDRs.
+        # allow-listed via allowed_egress. To reach a private address outside
+        # the cluster, add an allowed_egress entry with its cidrs. To reach pods
+        # in another namespace, including an ingress controller behind a
+        # LoadBalancer in this cluster, add one with namespaces and the pods'
+        # ports: whether an ipBlock CIDR matches pod IPs depends on the network
+        # plugin, so do not rely on pod or Service CIDRs here or in allowed_egress.
         - name: rfc1918
           cidrs:
             - "10.0.0.0/8" # RFC1918 — large private network (most cloud VPC/pod CIDRs)
@@ -654,6 +677,11 @@ agent:
       node_selector: {}
       tolerations: []
       affinity: {}
+      # log_level is the Dapr runtime log level in every sidecar (debug, info,
+      # warn, error). A sidecar reads it at startup, so a change reaches
+      # running sidecars on their next restart. Raise it to debug only while
+      # troubleshooting: at debug, sidecars logged about 8x as much as at info.
+      log_level: info
       # default to disable API validation because ingress could be not configured by users
       skip_api_validation: true
       # use_public_identity is an escape hatch that makes sidecars in this
@@ -668,7 +696,7 @@ agent:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       image_name: "{{ ternary .Values.global.consolidated_image.repository \"sidecar\" .Values.global.consolidated_image.enabled }}"
       # image_tag is the sidecar image version
-      image_tag: "1.136.0"
+      image_tag: "1.137.0"
       # image_digest pins the sidecar to an immutable content digest
       # ("sha256:<64 hex>"), which wins over image_tag. Empty = pin by tag.
       # global.consolidated_image.digest, when set, overrides this.
@@ -757,7 +785,7 @@ agent:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       image_name: "{{ ternary .Values.global.consolidated_image.repository \"catalyst-otel-collector\" .Values.global.consolidated_image.enabled }}"
       # image_tag is the otel collector image version
-      image_tag: "1.136.0"
+      image_tag: "1.137.0"
       # image_digest pins the otel collector to an immutable content digest
       # ("sha256:<64 hex>"), which wins over image_tag. Empty = pin by tag.
       # global.consolidated_image.digest, when set, overrides this.
@@ -804,24 +832,33 @@ agent:
         # credential_secret_key is the key within it (default "token").
         credential_secret_name: ""
         credential_secret_key: token
+      # Requests follow measured use; limits keep the headroom for spikes.
+      # production-r1, 6 weeks to 2026-10-13, while prj pods grew 149 -> 209:
+      # - logs (DaemonSet, one per node) peaked at 152 MiB RSS and stayed flat.
+      #   Its load is bounded by the pods on its own node (max 110), so more
+      #   pods add nodes and collectors rather than load on one collector.
+      # - metrics (one Deployment per region) peaked at 607 MiB RSS, above its
+      #   old 500Mi request, and grows with exporter backlog when Cortex is slow.
       logs_resources:
         limits:
           memory: 750Mi
         requests:
           cpu: 50m
-          memory: 500Mi
+          memory: 256Mi
       metrics_resources:
         limits:
           memory: 1100Mi
         requests:
           cpu: 75m
-          memory: 500Mi
+          memory: 768Mi
     internal_dapr:
       # log_level sets the default log level for all Dapr control-plane components. Can be overridden by individual component settings.
       log_level: info
       # Scheduling overrides for per-project Dapr control-plane pods (sentry,
-      # scheduler, operator, placement). Merged with top-level shared.* and
-      # propagated via global.{nodeSelector,tolerations,affinity} on the Dapr Helm chart.
+      # scheduler, operator, placement) and the JWT key-rotation CronJob in
+      # root-dapr-system. Merged with top-level shared.* and propagated via
+      # global.{nodeSelector,tolerations,affinity} on the Dapr Helm chart and
+      # {nodeSelector,tolerations,affinity} on the rotation chart.
       node_selector: {}
       tolerations: []
       affinity: {}
@@ -834,6 +871,14 @@ agent:
       # Override per overlay when the destination registry hosts the dapr
       # multi-binary image under a different name.
       # image_name: ""
+      # disable_root_dapr_ha runs the region's root Dapr control plane, in
+      # root-dapr-system, without high availability: one operator, one sentry
+      # and one placement instead of three of each. The scheduler runs three
+      # replicas, with a volume each on the etcd backend, whatever this is set
+      # to. Leave it false in production; true suits an evaluation or
+      # development region. guides/resource-requirements.md in the self-hosted
+      # bundle has the numbers for both.
+      disable_root_dapr_ha: false
       sentry_resources:
         limits:
           memory: 100Mi
@@ -879,7 +924,7 @@ agent:
           registry: us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public
           # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
           name: "{{ ternary .Values.global.consolidated_image.repository \"private-sentry\" .Values.global.consolidated_image.enabled }}"
-          tag: "1.136.0"
+          tag: "1.137.0"
           # digest pins the private sentry to an immutable content digest
           # ("sha256:<64 hex>"), which wins over tag. Empty = pin by tag.
           # global.consolidated_image.digest, when set, overrides this.
@@ -977,6 +1022,12 @@ agent:
               # to sandbox pods. Opt-in per profile when the workflow
               # genuinely needs outbound (pip install, git clone, …).
               allow_public_internet: false
+              # The narrower alternative to allow_public_internet: egress
+              # to these public CIDRs only, e.g. GitHub's published
+              # ranges for git. Cannot be combined with
+              # allow_public_internet, or name a range inside the
+              # private ranges or blocked_egress_cidrs. Unset by default.
+              # allowed_egress_cidrs: []
     # Report the region's public OIDC documents to the control plane
     # fetched through the region ingress (real wildcard cert,
     # so no insecure_skip_verify needed).
@@ -1001,7 +1052,7 @@ agent:
     # Example: "diagrid/cra-agent" or "cra-agent"
     repository: cra-agent
     # tag is the image tag/version to use
-    tag: "1.136.0"
+    tag: "1.137.0"
     # digest, if set, wins over tag (see global.consolidated_image.digest above).
     digest: ""
     # pullPolicy is the image pull policy for this specific image.
@@ -1065,7 +1116,20 @@ agent:
 # Gateway Configuration
 #------------------------------------------------------------------------------
 gateway:
+  # corsAllowedOrigins are the Catalyst console origins whose browser (CORS)
+  # requests the region's project endpoints accept. Empty accepts the
+  # Diagrid-hosted consoles. A self-hosted install sets its own console, for
+  # example ["https://catalyst.example.com"].
+  corsAllowedOrigins: []
   allowLocalDevOrigin: false
+  # plaintextRedirect makes the plaintext port (gateway.envoy.service.port)
+  # answer every plain HTTP request with a redirect to https, on a region whose
+  # ingress is https and once the gateway holds a certificate. The region-group
+  # health route stays served in plaintext, and https responses carry
+  # Strict-Transport-Security. Leave it off when a proxy in front of the gateway
+  # terminates TLS and forwards plain HTTP to that port: every request would be
+  # redirected back to the proxy.
+  plaintextRedirect: false
   # mcpPublicDomain publishes catalyst-mcp on the public dataplane listener at the
   # ABSOLUTE hostname given. Empty — the default — generates no virtual host and no
   # cluster, so the route does not exist and the service stays ClusterIP-only.
@@ -1093,7 +1157,9 @@ gateway:
       certFile: "tls.crt"
       # Name of the TLS key file in the secret
       keyFile: "tls.key"
-      # Optional: Name of the CA certificate file in the secret for client certificate validation
+      # Optional: Key in the secret that holds the CA certificate that signed the gateway
+      # certificate. Set it when a private CA signed it; the agent distributes it to sidecars.
+      # Sets agent.config.host.ingress.tls.secret.ca_file when that is unset.
       caFile: ""
     # Optional: customize the generated secret name
     # secretName: ""
@@ -1115,7 +1181,7 @@ gateway:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       repository: identity-injector
       # tag is the image tag/version to use
-      tag: "1.136.0"
+      tag: "1.137.0"
       # digest, if set, wins over tag (see global.consolidated_image.digest above).
       digest: ""
       # pullPolicy is the image pull policy for this specific image.
@@ -1269,7 +1335,7 @@ gateway:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       repository: catalyst-gateway
       # tag is the image tag/version to use
-      tag: "1.136.0"
+      tag: "1.137.0"
       # digest, if set, wins over tag (see global.consolidated_image.digest above).
       digest: ""
       # pullPolicy is the image pull policy for this specific image.
@@ -1388,7 +1454,7 @@ management:
     # Deprecated: This field supports template evaluation for backwards compatibility.
     repository: "{{ ternary .Values.global.consolidated_image.repository \"catalyst-management\" .Values.global.consolidated_image.enabled }}"
     # tag is the image tag/version to use
-    tag: "1.136.0"
+    tag: "1.137.0"
     # digest, if set, wins over tag (see global.consolidated_image.digest above).
     digest: ""
     # pullPolicy is the image pull policy for this specific image.
@@ -1623,7 +1689,7 @@ mcp:
     # OpenAPI spec, so this component never uses global.consolidated_image.
     repository: catalyst-mcp
     # tag is the image tag/version to use
-    tag: "1.136.0"
+    tag: "1.137.0"
     # digest, if set, wins over tag (see global.consolidated_image.digest above).
     digest: ""
     # pullPolicy is the image pull policy for this specific image.
@@ -1757,6 +1823,13 @@ piko:
       enabled: false
       secretName: ""
   terminationGracePeriodSeconds: 60
+  # Requests set here so that a namespace LimitRange default does not decide
+  # them. No limits yet: there is no measured peak to size a memory limit from,
+  # and an OOM-killed Piko cuts the control plane's tunnel to management.
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
   readinessProbe:
     httpGet:
       path: /ready

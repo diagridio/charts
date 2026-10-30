@@ -93,11 +93,11 @@ The Catalyst Helm chart creates 4 RBAC subjects. The tables below justify each g
 
 > 🗒️ The Catalyst Agent installs a Catalyst distribution of Dapr and thus must satisfy the permissions required by that. Many of the agent permissions are simply to align with Dapr's own RBAC permissions.
 
-The agent's ServiceAccount (`<release>-agent-sa`, e.g. `catalyst-agent-sa`) carries the broadest permissions because it installs charts into, and reconciles resources across, many namespaces (`cra-agent`, `root-dapr-system`, `shared-{kafka,postgresql}`, per-project `prj-*`, and `default`).
+The agent's ServiceAccount (`<release>-agent-sa`, e.g. `catalyst-agent-sa`) carries the broadest permissions because it installs charts into, and reconciles resources across, many namespaces (`cra-agent`, `root-dapr-system`, `shared-{kafka,postgresql,ratelimit-redis}`, per-project `prj-*`, and `default`).
 
 | API group | Resources | Verbs | Why it is required |
 |-----------|-----------|-------|--------------------|
-| `""` | `namespaces` | get, list, watch, create, patch and delete | Reconcile project namespaces. `patch` applies label changes to an existing project namespace, including the Pod Security Admission labels (see [Pod Security for project namespaces](#pod-security-for-project-namespaces)). `create`, `patch` and `delete` are granted only when the agent owns the namespace lifecycle; set `agent.config.project.externally_managed_namespaces: true` to drop them when an external owner pre-provisions namespaces. `watch` is also needed for no-escalation against the Dapr chart. |
+| `""` | `namespaces` | get, list, watch, create, patch and delete | Reconcile project namespaces. `patch` applies label changes to an existing project namespace, including the Pod Security Admission labels (see [Pod Security for project namespaces](#pod-security-for-project-namespaces)). `create`, `patch` and `delete` are granted only when the agent owns the namespace lifecycle; set `agent.config.project.externally_managed_namespaces: true` to drop them when an external owner pre-provisions namespaces (see [Externally managed namespaces](#externally-managed-namespaces)). `watch` is also needed for no-escalation against the Dapr chart. |
 | `""` | `configmaps`, `secrets`, `services`, `serviceaccounts` | full CRUD | These are created by the Dapr, vcluster, OTel, Kafka, PostgreSQL, Redis, CRA sidecar, component, and namespace charts. The agent also reads image-pull secrets / infra passwords from arbitrary namespaces and syncs pull secrets into project namespaces. Cluster-wide `get`/`list`/`watch` on secrets is also required for no-escalation against `dapr-operator-admin`. |
 | `""` | `pods` | get, list, watch, delete | Helm `--wait` polls pod readiness during install/upgrade (the agent never creates pods directly). `delete` is required for no-escalation against the Dapr chart. |
 | `""` | `pods/log` | get | The on-error handler reads pod logs to surface install/upgrade failure details. |
@@ -174,6 +174,99 @@ When `cleanup.enabled` is `true` (the default), `helm uninstall` runs a `post-de
 
 Set `cleanup.enabled: false` to skip this hook (and its RBAC) entirely. Note this also leaves the `region` resource intact for re-installation, as described under [Uninstall](#uninstall).
 
+### Externally managed namespaces
+
+By default the agent creates every namespace Catalyst needs, and deletes a project's namespace when the project is deleted. Some clusters, often shared ones, don't let the agent create or delete namespaces. There, someone else (usually a platform team) creates them, and you tell the agent with:
+
+```yaml
+agent:
+  config:
+    project:
+      externally_managed_namespaces: true
+```
+
+#### What changes
+
+- The agent can only `get`, `list` and `watch` namespaces. It loses `create`, `delete` and `patch`. One exception: if `agent.config.region_usage.enabled` is `true`, the agent keeps `patch` so it can add the `cra.diagrid.io/managed` label to its infrastructure namespaces. It never gets `create` or `delete`.
+- The Helm release the agent installs for each project no longer includes the project namespace. The agent puts its network policies and image-pull secret into a namespace that must already exist. It doesn't label that namespace, and doesn't delete it when the project is deleted.
+- `agent.config.project.pod_security_enforce_level` does nothing, because the agent doesn't label project namespaces.
+
+#### What stays the same
+
+This setting only affects namespaces. Every other permission in the [agent ClusterRole](#1-agent) stays as it is, across the whole cluster: the agent still installs Dapr with its CRDs and webhooks, and still writes secrets, config maps, workloads and network policies in the namespaces below. So this setting does not keep tenants apart.
+
+The [cleanup hook](#4-cleanup-hook-optional) runs as its own ServiceAccount, and that one can delete namespaces. On `helm uninstall` it deletes `root-dapr-system` and every namespace labelled `cra.diagrid.io/project-namespace=true`, including the ones you created. If only the namespace owner should delete them, set `cleanup.enabled: false`.
+
+#### Namespaces to create
+
+The agent uses these exact names. You can't change them with chart values.
+
+| Namespace | Create it when |
+|-----------|----------------|
+| The release namespace, e.g. `cra-agent` | Always. `helm install --create-namespace` creates it with the installer's permissions. |
+| `root-dapr-system` | Always. If `networkPolicies.enabled` is `true`, the chart creates it at install time with the installer's permissions. |
+| `shared-postgresql` | `global.postgresql.create` is `true` and `global.postgresql.disabled` is `false` (the default). |
+| `shared-kafka` | `global.kafka.create` is `true` and `global.kafka.disabled` is `false`. |
+| `shared-ratelimit-redis` | `global.redis.create` is `true` and `global.redis.disabled` is `false`. It also holds the regional rate-limit service. |
+| `prj-<project-uid>` | Once per project. |
+
+Create the infrastructure namespaces before you install the chart. If `root-dapr-system`, `shared-postgresql` or `shared-kafka` is missing, the agent stops at startup with a Forbidden error containing `cannot create resource "namespaces"`, and keeps restarting until the namespace exists. If `shared-ratelimit-redis` is missing, the agent logs a warning and runs without the managed Redis.
+
+If `agent.config.region_usage.enabled` is `true`, label the infrastructure namespaces `cra.diagrid.io/managed: "true"` so region usage counts them. The agent adds this label itself when it has `patch`.
+
+#### Creating a project namespace
+
+Diagrid Cloud gives a project its UID when you create the project, so you can only create the namespace after that:
+
+1. Create the project, for example `diagrid project create my-project`.
+2. Read its UID: `diagrid project get my-project -o json | jq -r .metadata.uid`.
+3. Read your organization ID: `diagrid org current` prints `<name> (<org-id>)`.
+4. Create the namespace with the labels below.
+
+The project won't become ready until the namespace exists. The agent retries every 3 minutes at first, then waits longer between tries, up to 30 minutes. Once the namespace is there, the project becomes ready on the next try, so it can take up to about half an hour. Create the namespace right after step 1 to keep that wait short.
+
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: prj-<project-uid>
+  labels:
+    cra.diagrid.io/project-namespace: "true"
+    cra.diagrid.io/project-id: <project-uid>
+    cra.diagrid.io/org-id: <org-id>
+    cra.diagrid.io/project-name: my-project
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/audit: restricted
+```
+
+These are the same labels the agent sets on namespaces it creates. If one is missing:
+
+| Label | What goes wrong without it |
+|-------|----------------------------|
+| `cra.diagrid.io/project-namespace` | When `networkPolicies.enabled` is `true`, the management service, Piko and the MCP bridge block traffic from the project's sidecars. Region usage doesn't count the namespace. |
+| `cra.diagrid.io/project-id`, `cra.diagrid.io/org-id` | The management service can't tell which project the namespace belongs to. The project has no workflow metrics or workflow graph, LLM token use can't be charged to its budget, and region usage isn't credited to it. |
+| `cra.diagrid.io/project-name` | Nothing. Nothing reads it; it just helps you find a project's namespace by name. |
+| `pod-security.kubernetes.io/*` | The cluster's default Pod Security rules apply instead of `baseline`. If your workloads need a lower `enforce` level, set one; see [Pod Security for project namespaces](#pod-security-for-project-namespaces). |
+
+#### Deleting a project
+
+When you delete a project, the agent removes everything it put in the project namespace, but leaves the namespace itself. Delete `prj-<project-uid>` yourself once the project is gone.
+
+#### Turning the setting on or off for an existing region
+
+Switching the setting changes nothing for an existing project until the agent next updates that project's Helm release, which happens when something that goes into the release changes, such as its network policies. Projects created after the switch get the new behaviour straight away.
+
+- Turning it on: each existing project namespace stays, with its labels, and becomes yours to manage. On the next update Helm takes the namespace out of the project's release and tries to delete it. The agent's ClusterRole refuses, and Helm carries on. Keep the chart's ClusterRole in place when you switch: if the agent can still delete namespaces, Helm deletes each project's namespace and everything in it.
+- Turning it off: the agent can't take over a namespace your team created. Helm refuses it, and the project fails on its next update with an error containing `invalid ownership metadata`. Before you turn the setting off, give each such namespace the label `app.kubernetes.io/managed-by: Helm` and the annotations `meta.helm.sh/release-name: prj-<project-uid>` and `meta.helm.sh/release-namespace: default`. Namespaces the agent created before the setting was turned on already have them.
+
+#### When a namespace is missing
+
+No error mentions this setting, so look for these signs:
+
+- Project namespace missing: the project stays not ready, and the agent logs `Apply release <release> failed: ... namespaces "prj-<project-uid>" not found`. In the `vcluster` workflow the error contains `cannot create resource "namespaces"` instead.
+- Infrastructure namespace missing: the agent keeps restarting, and its last log line contains `cannot create resource "namespaces"`.
+
 ### Images
 
 The following images are deployed by the chart. Use this list as a starting point for building a registry allowlist or for mirroring to a private registry.
@@ -186,20 +279,21 @@ By default, this is the full list of images that are installed in your cluster:
 |-----------|--------------|-------------|
 | **Alpine k8s** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy/alpine/k8s:1.36.0` | Utility image used by Helm install and cleanup hooks |
 | **Envoy Proxy** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy/envoyproxy/envoy:distroless-v1.38.0` | Envoy proxy for gateway |
-| **Catalyst** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.136.0` | Consolidated Catalyst services image |
+| **Catalyst** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.137.0` | Consolidated Catalyst services image |
 | **Piko** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/diagrid-piko:v1.0.1` | Piko reverse tunneling service |
-| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.19.0-20261009-catalyst.1` | Catalyst Dapr control plane services |
-| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.136.0` | Catalyst dapr server |
-| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.136.0` | OTel collector for telemetry |
+| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.19.0-20261029-catalyst.1` | Catalyst Dapr control plane services |
+| **JWT Key Rotation** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/k8s-tools:1.0.0` | Rotates the signing keys for workload JWTs |
+| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.137.0` | Catalyst dapr server |
+| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.137.0` | OTel collector for telemetry |
 
 Alternatively, separate images can be used:
 
 | Component | Default Image | Description |
 |-----------|--------------|-------------|
-| **Catalyst Agent** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/cra-agent:1.136.0` | Catalyst agent service |
-| **Catalyst Management** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-management:1.136.0` | Catalyst management service |
-| **Gateway Control Plane** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-gateway:1.136.0` | Gateway control plane service |
-| **Gateway Identity Injector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/identity-injector:1.136.0` | Identity injection service |
+| **Catalyst Agent** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/cra-agent:1.137.0` | Catalyst agent service |
+| **Catalyst Management** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-management:1.137.0` | Catalyst management service |
+| **Gateway Control Plane** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-gateway:1.137.0` | Gateway control plane service |
+| **Gateway Identity Injector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/identity-injector:1.137.0` | Identity injection service |
 
 Dependencies:
 
@@ -215,9 +309,10 @@ The Agent provisions these at runtime:
 
 | Component | Default Image | Description |
 |-----------|--------------|-------------|
-| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/sidecar:1.136.0` | Catalyst dapr server |
-| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-otel-collector:1.136.0` | OTel collector for telemetry |
-| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.19.0-20261009-catalyst.1` | Catalyst Dapr control plane services |
+| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/sidecar:1.137.0` | Catalyst dapr server |
+| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-otel-collector:1.137.0` | OTel collector for telemetry |
+| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.19.0-20261029-catalyst.1` | Catalyst Dapr control plane services |
+| **JWT Key Rotation** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/k8s-tools:1.0.0` | Rotates the signing keys for workload JWTs |
 
 #### Optional Images
 
@@ -357,7 +452,7 @@ agent:
 
 Any other value fails the install. `warn` and `audit` stay at `restricted` whatever you choose, so you still see which pods would not meet it. Changing the value relabels existing project namespaces on the agent's next reconcile.
 
-Namespaces provisioned externally (`agent.config.project.externally_managed_namespaces: true`) are not labelled by the agent, and `pod_security_enforce_level` has no effect on them; label them yourself.
+Namespaces provisioned externally (`agent.config.project.externally_managed_namespaces: true`) are not labelled by the agent, and `pod_security_enforce_level` has no effect on them; label them yourself, as shown in [Externally managed namespaces](#externally-managed-namespaces).
 
 ### Pod Scheduling
 
@@ -369,7 +464,7 @@ Every Catalyst workload exposes standard Kubernetes scheduling primitives (`node
 
 - **Control-plane pods** the chart renders directly: agent, management, gateway.envoy, gateway.controlplane, piko.
 - **Dapr sidecars** the agent provisions per app.
-- **Per-project Dapr control plane** (sentry, scheduler, operator, placement) the agent provisions per project.
+- **Per-project Dapr control plane** (sentry, scheduler, operator, placement) the agent provisions per project, and the JWT key-rotation CronJob beside the root Dapr control plane.
 - **Per-project OTel collectors** (metrics Deployment + logs DaemonSet) the agent provisions.
 
 Pin everything to one pool with a single block:
@@ -408,7 +503,7 @@ Agent-provisioned per-workload overrides:
 | Workload | Path |
 |---|---|
 | Dapr sidecars | `agent.config.sidecar.{node_selector,tolerations,affinity}` |
-| Per-project Dapr control plane | `agent.config.internal_dapr.{node_selector,tolerations,affinity}` |
+| Per-project Dapr control plane, JWT key-rotation CronJob | `agent.config.internal_dapr.{node_selector,tolerations,affinity}` |
 | Per-project OTel collectors | `agent.config.otel.{node_selector,tolerations,affinity}` |
 
 Example: pin everything to one pool, but also spread the gateway across nodes:
@@ -466,6 +561,10 @@ shared:
 ```
 
 The gateway Envoy also serves `/ready` and `/stats/prometheus` on a pod-IP `health` port (`gateway.envoy.health`, default 9091) in front of its loopback admin API. The readiness probe on it keeps a new pod out of service until Envoy has loaded its routes.
+
+#### Root Dapr high availability
+
+The Dapr control plane the agent installs in `root-dapr-system` runs three replicas each of operator, sentry and placement. `agent.config.internal_dapr.disable_root_dapr_ha: true` runs one of each instead, for an evaluation or development region; leave it `false` in production. The scheduler runs three replicas either way, each with a volume of `agent.config.internal_dapr.scheduler.storage_size` on the etcd backend.
 
 #### Gateway probe
 
@@ -854,8 +953,8 @@ global:
 There is no credential to configure: every pod that resolves a secret — agent,
 management, gateway and each project's Dapr sidecar — authenticates with the AKS
 workload identity, the same way the `awskms` provider falls through to the
-service account's IRSA role. That takes four things from you, none of which this
-chart can do on its own:
+service account's role from IAM roles for service accounts (IRSA). That takes
+four things from you, none of which this chart can do on its own:
 
 1. Workload identity enabled on the AKS cluster (`az aks update
    --enable-oidc-issuer --enable-workload-identity`).
@@ -890,9 +989,16 @@ chart can do on its own:
          annotations:
            azure.workload.identity/client-id: "<the identity's client id>"
    ```
+
+   Each of those three service accounts also needs a federated credential on
+   the identity, with subject `system:serviceaccount:<namespace>:<name>` and
+   audience `api://AzureADTokenExchange`.
 4. The **sidecars** pointed at it too. Every project's Dapr sidecar builds its
    own KEK provider from the component metadata the agent publishes, so it
-   unwraps DEKs itself and needs the same identity. The sidecar pods are
+   unwraps DEKs itself and needs the same identity. Each sidecar runs under a
+   service account of its own, `sidecar-<project-uid>-<appid-uid>` in the
+   `prj-<project-uid>` namespace, so the identity needs one more federated
+   credential for every app, created when the app is. The sidecar pods are
    provisioned by the agent, not by this chart's templates, so they are labelled
    through the agent's own region-wide sidecar settings — miss this and app
    secret reads fail with an Azure credential error while the control plane looks
@@ -909,6 +1015,31 @@ chart can do on its own:
            - key: azure.workload.identity/client-id
              value: "<the identity's client id>"
    ```
+
+**Twenty federated credentials per identity.** Azure caps a managed identity at
+[20 federated credentials](https://learn.microsoft.com/en-us/entra/workload-id/workload-identity-federation-considerations),
+and none of them can be a wildcard. One identity shared as above holds three for
+the agent, management and gateway plus one per app, so it runs out at 17 apps in
+the region.
+
+**One identity per app.** Past that, or to keep one app's identity away from
+another app's Azure resources, give each app its own identity, as the
+[Azure installation guide](https://docs.diagrid.io/operate/hosting/enterprise-self-hosted/azure-installation-guide#managed-identities)
+does. [`setup-user-managed-catalyst-identity.sh`](../../guides/azure/setup-user-managed-catalyst-identity.sh)
+`--project <project> --app <app>` creates the identity and the app's one
+federated credential, then prints the `diagrid appid update --label
+azure.workload.identity/use=true --annotation
+azure.workload.identity/client-id=<client id>` that points the app at it. An
+app's own annotation overrides the region-wide `service_account_annotations`
+default from point 4, so that app's sidecar unwraps DEKs as the app's identity.
+That identity therefore needs **Key Vault Crypto User** on the KEK as well as
+the roles the app itself uses. `--keyvault <vault>` grants it, together with
+`Key Vault Secrets User`, vault-wide as in point 2. If the KEK has a vault of its
+own, run the script again with that vault: it reuses the identity and
+credential it already created. The shared identity then needs only the control
+plane's three credentials. Keep the point 4 default, and a credential on the
+shared identity for each app still using it, until every app has an identity of
+its own: an app with no annotation falls back to the default.
 
 **Rotation.** Rotate the key in the vault as usual — manually or with a rotation
 policy. Every wrapped DEK records the key version that wrapped it and is always
@@ -1053,10 +1184,10 @@ Catalyst Enterprise Self-Hosted requires outbound connectivity to Diagrid Cloud.
 
 | Endpoint | mTLS | Client | Purpose | Required |
 |---|---|---|---|---|
-| `catalyst-cloud.r1.diagrid.io:443` | Yes | agent, management, gateway-controlplane | Resource and configuration sync, events | Yes |
+| `catalyst-cloud.r1.diagrid.io:443` | Yes | agent, management, gateway-controlplane, project sidecars | Resource and configuration sync, events | Yes |
 | `sentry.r1.diagrid.io:443` | Yes | agent, project sidecars, in-region Sentry | Workload identity (SVID issuance) | Yes |
 | `trust.r1.diagrid.io` | No | agent, management, gateway-controlplane, sidecars, in-region Sentry | Fetches the Diagrid trust anchors at startup. A workload that cannot verify it does not start. | Yes |
-| `api.r1.diagrid.io` | No | agent, management, sidecars | Control plane HTTPS API | Yes |
+| `api.r1.diagrid.io` | No | agent, management | Control plane HTTPS API | Yes |
 | `public.ecr.aws` | No | agent | Pulls the internal Dapr chart at runtime | Yes |
 | `us-central1-docker.pkg.dev` | No | agent, container runtime | Container images | Yes |
 | `login.diagrid.io` | No | management | IdP JWKS, to validate user tokens | Yes |
@@ -1159,7 +1290,23 @@ composes with `global.trustedCA`: sidecars trust the union of the two.
 
 ### Gateway TLS
 
-The Catalyst gateway is responsible for ingress traffic into the region. It terminates TLS for the public endpoint and forwards traffic internally to the desired service. You can provide your own TLS certificate and key for the gateway via the following Helm values. The certificate and key can be provided inline or via an existing Kubernetes secret.
+The Catalyst gateway is responsible for ingress traffic into the region, on the region's wildcard domain (`*.<region-domain>`). It routes on the hostname in the TLS handshake (SNI), and handles two kinds of traffic differently:
+
+- **Terminated at the gateway**, with the certificate below: your projects' endpoints and the region's HTTP services (`oidc.`, `tunnels.`, `tunnels-proxy.` and `management.<region-domain>`).
+- **Passed through unchanged** to the region's gRPC control plane services, which present their own certificates. The gateway never decrypts these:
+
+  | Hostname | Service in the region |
+  |---|---|
+  | `sentry.<region-domain>` | Dapr Sentry (`dapr-sentry`) |
+  | `xrs.<region-domain>` | Management (`management`) |
+  | `dapr-api.<region-domain>` | Dapr operator API (`dapr-api`) |
+  | `dapr-placement.<region-domain>` | Dapr placement (`dapr-placement-server`) |
+  | `dapr-scheduler.<region-domain>` | Dapr scheduler (`dapr-scheduler-server`) |
+  | `dapr-scheduler-server-<N>.<region-domain>` | One per scheduler replica, `0` to `2` by default |
+
+So anything in front of the gateway, such as a cloud load balancer or your own, must forward TCP without terminating TLS or rejecting HTTP/2. An L7 proxy or WAF there breaks the passthrough hostnames. The [Gateway Exposure guide](../../guides/gateway-exposure/README.md#layer-4-only) lists what works and what breaks it on each cloud.
+
+You can provide your own TLS certificate and key for the gateway via the following Helm values. The certificate and key can be provided inline or via an existing Kubernetes secret.
 
 ```yaml
 gateway:
@@ -1169,7 +1316,11 @@ gateway:
     # Or provide cert/key inline
 ```
 
-For step-by-step instructions covering self-signed (dev), bring-your-own certificates, cert-manager integration, private CA trust for sidecars, and rotation, see the [Gateway TLS guide](../../guides/gateway-tls/README.md).
+With `gateway.plaintextRedirect: true`, when the region's ingress is https and the gateway holds a certificate, the plaintext port (`gateway.envoy.service.port`, 8080 by default) answers every plain-HTTP request with a 308 redirect to https, and https responses carry `Strict-Transport-Security`. The one exception is the region-group health route, which stays reachable in plaintext; TLS passthrough to the Dapr control plane services on that port is unchanged, and a blocked region keeps answering 403 on both ports. A region whose ingress is http keeps serving all its routes on the plaintext port. Leave it off (the default) when a proxy in front of the gateway terminates TLS and forwards plain HTTP to that port, or every request is redirected back to that proxy.
+
+`gateway.corsAllowedOrigins` lists the Catalyst console origins whose browser requests the region's project endpoints accept (CORS). Leave it empty for the Diagrid-hosted consoles, the default. A self-hosted control plane sets its own console, for example `["https://catalyst.example.com"]`.
+
+For step-by-step instructions covering self-signed (dev), bring-your-own certificates, cert-manager integration, a [private or self-signed CA](../../guides/gateway-tls/README.md#private-or-self-signed-ca), and rotation, see the [Gateway TLS guide](../../guides/gateway-tls/README.md).
 
 ### Gateway Address
 
@@ -1184,7 +1335,11 @@ gateway:
 
 With that set and `agent.config.host.ingress.ip_addr` empty, the chart points the agent at `gateway.envoy.service.name` in the release namespace. Set `agent.config.host.ingress.service.name` and `.namespace` only when the ingress is a different Service, or `ip_addr` when it has a static address. A `ClusterIP` or `NodePort` gateway gets no default, because it never receives a LoadBalancer address and the agent would exit waiting for one.
 
+The agent also reports the Service's `https` port (`gateway.envoy.service.httpsPort`, `8443` by default), or `agent.config.host.ingress.port` (`443` by default) when `ip_addr` is set. The region's `--ingress` must use the same port. For a public or private address, a fixed address, `NodePort` behind your own load balancer, the port and DNS, see the [Gateway Exposure guide](../../guides/gateway-exposure/README.md).
+
 ### Managed Domain
+
+> **Note:** Managed Domain requires Diagrid Cloud. A control plane you run yourself neither creates the DNS record nor issues a publicly trusted certificate, so bring your own domain and certificate there; see [Gateway TLS](#gateway-tls).
 
 Set this when you want Diagrid Cloud to allocate the region's public wildcard hostname and TLS certificate for you, instead of bringing your own. Your `--ingress` endpoint then only needs to resolve **locally** (or privately) to the gateway. The controlplane allocates a public wildcard subdomain (under `privatediagrid.net` for Diagrid Cloud) and a matching wildcard certificate, then delivers them to the dataplane.
 
@@ -1196,7 +1351,7 @@ Enable it at region creation time:
 diagrid region create <region-id> --enable-managed-domain --ingress <local-endpoint>
 ```
 
-With managed domain, `--ingress` is a locally resolvable address (e.g. an internal hostname or an IP). Without it, `--ingress` must be a publicly resolvable wildcard FQDN that you control (e.g. `*.my-region.company.com`).
+With managed domain, `--ingress` is a locally resolvable address (e.g. an internal hostname or an IP). Without it, `--ingress` must be a wildcard FQDN that you control (e.g. `*.my-region.company.com`), resolvable from every network that has to reach the region; see [DNS](../../guides/gateway-exposure/README.md#dns) in the Gateway Exposure guide.
 
 When managed domain is enabled, you can omit the `gateway.tls` block from your Helm values; the certificate is provisioned by the controlplane and delivered to the dataplane gateway. See [Gateway TLS](#gateway-tls) for the bring-your-own case.
 
@@ -1289,6 +1444,27 @@ this to punch narrow holes through the block list rather than weakening it.
 **Ingress floor (non-configurable):** the agent namespace (`cra-agent`) and the `monitoring` namespace are always
 permitted as ingress sources. Management and Prometheus scraping therefore never break regardless of `allowed_ingress`.
 
+#### What each project namespace gets
+
+The agent writes these policies into every project namespace, each named after it (`deny-all-prj-<N>` and so on).
+"Project pods" means every pod in the namespace except agent sandbox pods (label `cra.diagrid.io/sandbox-netpol`),
+which get a narrower policy of their own.
+
+| Policy | Selects | Allows |
+|---|---|---|
+| `deny-all-` | every pod | Nothing. Denies all ingress and egress, so only what the policies below allow gets through. |
+| `allow-internal-` | project pods | Ingress from and egress to every pod in the same namespace. |
+| `allow-egress-` | project pods | Egress to `0.0.0.0/0` except the `blocked_egress` CIDRs. DNS on port 53, TCP and UDP, to pods labelled `k8s-app: kube-dns` in `kube-system` and to the ClusterIP of the `kube-system/kube-dns` Service. One rule per `allowed_egress` entry. The Kubernetes API server, only with the Kubernetes secrets provider. |
+| `allow-system-ingress-` | project pods | Ingress from `cra-agent` and `monitoring`, plus one rule per `allowed_ingress` entry. |
+| `allow-egress-management-` | project pods | Egress to the management pods in `cra-agent`. |
+| `allow-egress-piko-` | project pods | Egress to the Piko pods in `cra-agent`. |
+| `allow-dapr-root-access-` | project pods, on projects that use the shared Dapr control plane | Egress to the Dapr control plane in `root-dapr-system`, and ingress from that namespace. |
+| `allow-dapr-cp-egress-` | pods labelled `app.kubernetes.io/name: dapr` | Egress to the Kubernetes API server, for a project that runs its own Dapr control plane. |
+| `allow-egress-shared-postgresql-`, `allow-egress-postgresql-secrets-`, `allow-egress-shared-kafka-`, `allow-egress-shared-redis-` | project pods, when that backend is in use | Egress to that backend's namespace or subnets. |
+
+Any other namespace, including the one your ingress controller runs in, needs an `allowed_egress` entry with
+`namespaces`.
+
 #### Default block list
 
 ```yaml
@@ -1332,6 +1508,24 @@ agent:
         - name: worker-namespace
           namespaces: ["my-workers"]
 ```
+
+How each field becomes a policy peer:
+
+- **`cidrs`** become `ipBlock` peers. The Kubernetes documentation says `ipBlock` is meant for
+  [cluster-external IPs](https://kubernetes.io/docs/concepts/services-networking/network-policies/#behavior-of-to-and-from-selectors),
+  and that whether a rewritten destination is matched before or after the rewrite depends on the network plugin. Do not
+  rely on a CIDR, including the `0.0.0.0/0` of `allow-egress-`, to reach pods.
+- **`namespaces`** become a `namespaceSelector` on `kubernetes.io/metadata.name`, with no pod selector: the rule allows
+  every pod in those namespaces. `allowed_egress` cannot pick pods within a namespace. To allow only some pods, scope
+  the rule with `ports`, or add a NetworkPolicy of your own to each project namespace. Policies add up and the agent does
+  not remove one it did not create, but you must add yours to each new project.
+- **`ports`** match the port the packet is addressed to when the policy sees it. For a pod reached through a Service,
+  that is the pod's port (the Service's `targetPort`), not the Service port.
+
+A hostname that resolves to a `LoadBalancer` Service in the same cluster is the case these rules catch out. kube-proxy,
+and network plugins that replace it, usually deliver traffic for the load balancer's IP straight to the Service's pods
+without it leaving the cluster. The policy then sees a pod as the destination, so allow it with `namespaces` and the
+pods' ports rather than with the load balancer's IP.
 
 #### Allowing ingress
 

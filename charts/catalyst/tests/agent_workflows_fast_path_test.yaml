@@ -1,0 +1,21 @@
+suite: Test agent workflows fast path setting
+templates:
+  - agent/configmap.yaml
+
+tests:
+  - it: turns the fast path on by default
+    set:
+      join_token: "test-token"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "enable_workflows_fast_path: true"
+
+  - it: turns the fast path off when set to false
+    set:
+      join_token: "test-token"
+      agent.config.project.enable_workflows_fast_path: false
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "enable_workflows_fast_path: false"

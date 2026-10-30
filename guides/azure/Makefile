@@ -31,7 +31,12 @@ PEER_VNET_ID ?=
 # servers, which have no public endpoint, and a region that never needs a psql
 # session never needs the host.
 ENABLE_BASTION ?= "false"
-LOCATION ?= "westus2"
+# No default region. A region's state lives in one Azure region; a silent default
+# turns a mistyped target (`make group apply` runs `apply`) into a plan that
+# replaces the whole region somewhere else. Pass LOCATION every time. It is
+# passed after TF_VAR_FILE, so it wins over a `location` set there (terraform
+# keeps the last value it sees).
+LOCATION ?=
 REGION_INGRESS_ENDPOINT ?= ""
 
 # Help target
@@ -64,13 +69,13 @@ help:
 	@echo "  ENABLE_PEERING        - Whether to peer with an external virtual network (default: false)"
 	@echo "  PEER_VNET_ID          - Resource ID of the virtual network to peer with (required if ENABLE_PEERING=true)"
 	@echo "  ENABLE_BASTION        - Whether to deploy a bastion host (default: false)"
-	@echo "  LOCATION              - Azure region to deploy resources (default: westus2)"
+	@echo "  LOCATION              - Azure region this directory deploys (required by plan, apply and destroy)"
 	@echo "  REGION_INGRESS_ENDPOINT - The region's wildcard domain, without the leading star"
 	@echo ""
 	@echo "Example usage:"
 	@echo "  make plan LOCATION=westus2 REGION_INGRESS_ENDPOINT=catalyst.example.com"
-	@echo "  make apply ENABLE_PEERING=true PEER_VNET_ID=/subscriptions/.../virtualNetworks/corp"
-	@echo "  make apply ENABLE_BASTION=true"
+	@echo "  make apply LOCATION=westus2 ENABLE_PEERING=true PEER_VNET_ID=/subscriptions/.../virtualNetworks/corp"
+	@echo "  make apply LOCATION=westus2 ENABLE_BASTION=true"
 
 # Initialize terraform
 init:
@@ -78,6 +83,11 @@ init:
 
 # Plan terraform changes
 plan:
+	@if [ -z "$(LOCATION)" ]; then \
+		echo "Error: LOCATION is required: the Azure region this directory deploys"; \
+		echo "Example: make plan LOCATION=westus2 REGION_INGRESS_ENDPOINT=catalyst.example.com"; \
+		exit 1; \
+	fi
 	@if [ "$(ENABLE_PEERING)" = "true" ] && [ -z "$(PEER_VNET_ID)" ]; then \
 		echo "Error: When ENABLE_PEERING=true, PEER_VNET_ID must be provided"; \
 		echo "Example: make plan PEER_VNET_ID=/subscriptions/.../virtualNetworks/corp"; \
@@ -87,14 +97,19 @@ plan:
 		-var="enable_peering=$(ENABLE_PEERING)" \
 		-var="peer_vnet_id=$(PEER_VNET_ID)" \
 		-var="enable_bastion=$(ENABLE_BASTION)" \
-		-var="location=$(LOCATION)" \
 		-var="region_ingress_endpoint=$(REGION_INGRESS_ENDPOINT)" \
 		$(if $(wildcard $(TF_VAR_FILE)),-var-file=../$(TF_VAR_FILE),) \
+		-var="location=$(LOCATION)" \
 		$(if $(TF_PLAN_OUT),-out=$(TF_PLAN_OUT),) \
 		$(TF_PLAN_ARGS)
 
 # Apply terraform changes
 apply:
+	@if [ -z "$(LOCATION)" ]; then \
+		echo "Error: LOCATION is required: the Azure region this directory deploys"; \
+		echo "Example: make apply LOCATION=westus2 REGION_INGRESS_ENDPOINT=catalyst.example.com"; \
+		exit 1; \
+	fi
 	@if [ "$(ENABLE_PEERING)" = "true" ] && [ -z "$(PEER_VNET_ID)" ]; then \
 		echo "Error: When ENABLE_PEERING=true, PEER_VNET_ID must be provided"; \
 		echo "Example: make apply PEER_VNET_ID=/subscriptions/.../virtualNetworks/corp"; \
@@ -104,12 +119,17 @@ apply:
 		-var="enable_peering=$(ENABLE_PEERING)" \
 		-var="peer_vnet_id=$(PEER_VNET_ID)" \
 		-var="enable_bastion=$(ENABLE_BASTION)" \
-		-var="location=$(LOCATION)" \
 		-var="region_ingress_endpoint=$(REGION_INGRESS_ENDPOINT)" \
-		$(if $(wildcard $(TF_VAR_FILE)),-var-file=../$(TF_VAR_FILE),)
+		$(if $(wildcard $(TF_VAR_FILE)),-var-file=../$(TF_VAR_FILE),) \
+		-var="location=$(LOCATION)"
 
 # Destroy terraform resources
 destroy:
+	@if [ -z "$(LOCATION)" ]; then \
+		echo "Error: LOCATION is required: the Azure region this directory deploys"; \
+		echo "Example: make destroy LOCATION=westus2 REGION_INGRESS_ENDPOINT=catalyst.example.com"; \
+		exit 1; \
+	fi
 	@if [ "$(ENABLE_PEERING)" = "true" ] && [ -z "$(PEER_VNET_ID)" ]; then \
 		echo "Error: When ENABLE_PEERING=true, PEER_VNET_ID must be provided"; \
 		echo "Example: make destroy PEER_VNET_ID=/subscriptions/.../virtualNetworks/corp"; \
@@ -119,9 +139,9 @@ destroy:
 		-var="enable_peering=$(ENABLE_PEERING)" \
 		-var="peer_vnet_id=$(PEER_VNET_ID)" \
 		-var="enable_bastion=$(ENABLE_BASTION)" \
-		-var="location=$(LOCATION)" \
 		-var="region_ingress_endpoint=$(REGION_INGRESS_ENDPOINT)" \
-		$(if $(wildcard $(TF_VAR_FILE)),-var-file=../$(TF_VAR_FILE),)
+		$(if $(wildcard $(TF_VAR_FILE)),-var-file=../$(TF_VAR_FILE),) \
+		-var="location=$(LOCATION)"
 
 output:
 	@cd terraform && terraform output $(filter-out $@,$(MAKECMDGOALS)) | tr -d '"'

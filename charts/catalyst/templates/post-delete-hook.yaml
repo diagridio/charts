@@ -100,6 +100,10 @@ spec:
     spec:
       serviceAccountName: {{ .Release.Name }}-cleanup
       restartPolicy: OnFailure
+      {{- with .Values.global.image.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
       - name: cleanup
         image: {{ include "catalyst.image" (dict "image" .Values.cleanup.image "consolidated" nil "global" .Values.global.image "context" .) }}

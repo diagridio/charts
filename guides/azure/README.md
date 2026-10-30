@@ -16,7 +16,10 @@ multi-region guide from the start.
 
 `setup-user-managed-catalyst-identity.sh` and
 `setup-federated-catalyst-identity.sh` set up Azure identities for Catalyst
-apps. Both guides use them.
+apps. Both guides use them. `setup-user-managed-catalyst-identity.sh` tags each
+identity it creates or reuses with `catalyst-identity`, and the single-region
+guide's teardown ("Remove the identities") deletes every identity carrying that
+tag.
 
 To switch which region takes writes, see
 [Failing a self-managed region group over on Azure](../../../docs/content/runbooks/catalyst-region-group-failover-azure.md).

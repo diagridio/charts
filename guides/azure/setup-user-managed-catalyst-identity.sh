@@ -60,15 +60,28 @@ CATALYST_APP="${CATALYST_APP:-app1}"
 # Note: the sidecar service account namespace/name are always derived from the
 # project/appid UIDs (resolved below) — they are not configurable.
 
-# The regional Catalyst management service's Kubernetes service account.
-# Management resolves bring-your-own secret stores (e.g. Azure Key Vault)
-# in-process for a project's workflow / agent state stores, authenticating as
-# this service account rather than any appid's, so it is federated to the same
-# managed identity (below). The defaults match the catalyst chart installed as
-# release "catalyst" into the cra-agent namespace; override them if your
-# install differs (the generated name is <release>-management-sa).
+# Each appid gets its own managed identity, holding the one federated credential
+# for its sidecar's service account. Azure caps an identity at 20 federated
+# credentials, with no wildcards, so an identity shared by appids would run out
+# at 20. Empty means catalyst-<project>-<app>, or catalyst-management with
+# --management.
+IDENTITY_NAME="${IDENTITY_NAME:-}"
+
+# --management sets up the regional Catalyst management service's identity
+# instead of an appid's. Management resolves bring-your-own secret stores (e.g.
+# Azure Key Vault) in-process for a project's workflow / agent state stores,
+# authenticating as its own service account rather than any appid's. The
+# service account defaults match the catalyst chart installed as release
+# "catalyst" into the cra-agent namespace; override them if your install
+# differs (the generated name is <release>-management-sa).
+MANAGEMENT="${MANAGEMENT:-false}"
 MANAGEMENT_NAMESPACE="${MANAGEMENT_NAMESPACE:-cra-agent}"
 MANAGEMENT_SERVICE_ACCOUNT="${MANAGEMENT_SERVICE_ACCOUNT:-catalyst-management-sa}"
+
+# Every identity this script creates or reuses carries this tag, so the guide's
+# teardown can find them without touching the cert-manager identity terraform/
+# keeps in the same resource group.
+IDENTITY_TAG="catalyst-identity"
 
 # Optional: when set, grant the identity data-plane access to these resources
 CATALYST_KEYVAULT="${CATALYST_KEYVAULT:-}"
@@ -80,16 +93,17 @@ usage() {
     cat <<EOF
 Usage: $(basename "$0") [options]
 
-Sets up an Azure user-assigned managed identity federated to a Catalyst
-AppID service account via AKS workload-identity (service-account OIDC).
+Sets up an Azure user-assigned managed identity for one Catalyst AppID,
+federated to its sidecar service account via AKS workload-identity
+(service-account OIDC). Run it once per AppID: each gets its own identity,
+because Azure caps an identity at 20 federated credentials.
 
-A credential is also federated for the regional Catalyst management service's
-Kubernetes service account. Management resolves bring-your-own secret stores
-such as Azure Key Vault in-process for a project's workflow / agent state
-stores, authenticating as its own service account, so it must be trusted by
-the same managed identity to reach the granted resources. Opting the
-management pod into workload identity happens through Helm values; the script
-prints the values to apply when it finishes.
+With --management, it sets up the regional Catalyst management service's
+identity instead, once per region. Management resolves bring-your-own secret
+stores such as Azure Key Vault in-process for a project's workflow / agent
+state stores, authenticating as its own service account. Opting the management
+pod into workload identity happens through Helm values; the script prints the
+values to apply when it finishes.
 
 Options:
   --resource-group NAME    Azure resource group        (default: ${RESOURCE_GROUP})
@@ -97,6 +111,10 @@ Options:
   --cluster-name NAME      AKS cluster name             (default: ${CLUSTER_NAME})
   --project NAME           Catalyst project name        (default: ${CATALYST_PROJECT})
   --app NAME               AppID name                   (default: ${CATALYST_APP})
+  --identity-name NAME     Managed identity name        (default: catalyst-<project>-<app>,
+                                                         or catalyst-management with --management)
+  --management             Set up the management service's identity, not an AppID's;
+                           --project and --app are ignored
   --management-namespace NAME        Management service account namespace   (default: ${MANAGEMENT_NAMESPACE})
   --management-service-account NAME  Management service account name        (default: ${MANAGEMENT_SERVICE_ACCOUNT})
   --keyvault NAME          Grant 'Key Vault Secrets User' + 'Key Vault Crypto User'
@@ -119,6 +137,8 @@ while [[ $# -gt 0 ]]; do
         --cluster-name) CLUSTER_NAME="$2"; shift 2 ;;
         --project) CATALYST_PROJECT="$2"; shift 2 ;;
         --app) CATALYST_APP="$2"; shift 2 ;;
+        --identity-name) IDENTITY_NAME="$2"; shift 2 ;;
+        --management) MANAGEMENT=true; shift ;;
         --management-namespace) MANAGEMENT_NAMESPACE="$2"; shift 2 ;;
         --management-service-account) MANAGEMENT_SERVICE_ACCOUNT="$2"; shift 2 ;;
         --keyvault) CATALYST_KEYVAULT="$2"; shift 2 ;;
@@ -130,28 +150,56 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Resolve the project/appid UIDs from the Diagrid control plane and derive the
-# sidecar service account namespace/name from them.
-log "Resolving UID for Catalyst project '${CATALYST_PROJECT}'..."
-PROJECT_UID="$(diagrid project get "${CATALYST_PROJECT}" --output yaml | yq '.metadata.uid')"
-if [[ -z "${PROJECT_UID}" || "${PROJECT_UID}" == "null" ]]; then
-    echo "ERROR: could not resolve metadata.uid for project '${CATALYST_PROJECT}'." >&2
-    exit 1
-fi
-log "Project UID: ${PROJECT_UID}"
+# Work out the identity, the service account it trusts, and the federated
+# credential that links the two.
+if [[ "${MANAGEMENT}" == "true" ]]; then
+    IDENTITY_NAME="${IDENTITY_NAME:-catalyst-management}"
+    IDENTITY_TAG_VALUE="management"
+    SERVICE_ACCOUNT_NAMESPACE="${MANAGEMENT_NAMESPACE}"
+    SERVICE_ACCOUNT_NAME="${MANAGEMENT_SERVICE_ACCOUNT}"
+    FEDERATED_IDENTITY_CREDENTIAL_NAME="catalyst-management"
+else
+    # Resolve the project/appid UIDs from the Diagrid control plane and derive the
+    # sidecar service account namespace/name from them.
+    log "Resolving UID for Catalyst project '${CATALYST_PROJECT}'..."
+    PROJECT_UID="$(diagrid project get "${CATALYST_PROJECT}" --output yaml | yq '.metadata.uid')"
+    if [[ -z "${PROJECT_UID}" || "${PROJECT_UID}" == "null" ]]; then
+        echo "ERROR: could not resolve metadata.uid for project '${CATALYST_PROJECT}'." >&2
+        exit 1
+    fi
+    log "Project UID: ${PROJECT_UID}"
 
-log "Resolving UID for Catalyst appid '${CATALYST_APP}' in project '${CATALYST_PROJECT}'..."
-APPID_UID="$(diagrid appid get "${CATALYST_APP}" --project "${CATALYST_PROJECT}" --output yaml | yq '.metadata.uid')"
-if [[ -z "${APPID_UID}" || "${APPID_UID}" == "null" ]]; then
-    echo "ERROR: could not resolve metadata.uid for appid '${CATALYST_APP}' in project '${CATALYST_PROJECT}'." >&2
-    exit 1
-fi
-log "AppID UID: ${APPID_UID}"
+    log "Resolving UID for Catalyst appid '${CATALYST_APP}' in project '${CATALYST_PROJECT}'..."
+    APPID_YAML="$(diagrid appid get "${CATALYST_APP}" --project "${CATALYST_PROJECT}" --output yaml)"
+    APPID_UID="$(yq '.metadata.uid' <<<"${APPID_YAML}")"
+    if [[ -z "${APPID_UID}" || "${APPID_UID}" == "null" ]]; then
+        echo "ERROR: could not resolve metadata.uid for appid '${CATALYST_APP}' in project '${CATALYST_PROJECT}'." >&2
+        exit 1
+    fi
+    log "AppID UID: ${APPID_UID}"
 
-# Build the sidecar service account identity from the UIDs
-CATALYST_SERVICE_ACCOUNT_NAMESPACE="prj-${PROJECT_UID}"
-CATALYST_SERVICE_ACCOUNT_NAME="sidecar-${PROJECT_UID}-${APPID_UID}"
-log "Service account: ${CATALYST_SERVICE_ACCOUNT_NAMESPACE}/${CATALYST_SERVICE_ACCOUNT_NAME}"
+    # The App ID backing an Agent or MCP server is managed: it can't be updated
+    # directly, so its labels and annotations are set on the owning resource.
+    # The managed_by annotation is "<group>/<version>/<Kind>/<Name>/<UID>".
+    OWNER_KIND="$(yq '.metadata.annotations["cra.diagrid.io/managed_by"] // ""' <<<"${APPID_YAML}" | cut -d/ -f3)"
+    case "${OWNER_KIND}" in
+        "") UPDATE_COMMAND="diagrid app update" ;;
+        Agent) UPDATE_COMMAND="diagrid agent update" ;;
+        MCPServer) UPDATE_COMMAND="diagrid mcpserver update" ;;
+        *)
+            echo "ERROR: appid '${CATALYST_APP}' belongs to a ${OWNER_KIND}, which doesn't support workload labels and annotations." >&2
+            exit 1
+            ;;
+    esac
+
+    IDENTITY_NAME="${IDENTITY_NAME:-catalyst-${CATALYST_PROJECT}-${CATALYST_APP}}"
+    IDENTITY_TAG_VALUE="${CATALYST_PROJECT}/${CATALYST_APP}"
+    # Build the sidecar service account identity from the UIDs
+    SERVICE_ACCOUNT_NAMESPACE="prj-${PROJECT_UID}"
+    SERVICE_ACCOUNT_NAME="sidecar-${PROJECT_UID}-${APPID_UID}"
+    FEDERATED_IDENTITY_CREDENTIAL_NAME="catalyst-${PROJECT_UID}-${APPID_UID}"
+fi
+log "Service account: ${SERVICE_ACCOUNT_NAMESPACE}/${SERVICE_ACCOUNT_NAME}"
 
 # Retrieve the OIDC issuer URL for the AKS cluster (you'll need this for the federated credential setup)
 log "Looking up OIDC issuer for AKS cluster '${CLUSTER_NAME}' in resource group '${RESOURCE_GROUP}'..."
@@ -164,73 +212,58 @@ log "OIDC issuer: ${AKS_OIDC_ISSUER}"
 SUBSCRIPTION="$(az account show --query id --output tsv)"
 log "Using subscription: ${SUBSCRIPTION}"
 
-# A single Catalyst-wide managed identity, shared across all appids and federated
-# to each appid's service account via its own federated credential (below).
-USER_ASSIGNED_IDENTITY_NAME="catalyst"
 if az identity show \
-    --name "${USER_ASSIGNED_IDENTITY_NAME}" \
+    --name "${IDENTITY_NAME}" \
     --resource-group "${RESOURCE_GROUP}" &>/dev/null; then
-    log "Managed identity '${USER_ASSIGNED_IDENTITY_NAME}' already exists; reusing it."
+    log "Managed identity '${IDENTITY_NAME}' already exists; reusing it."
+    # Tag it too, so the guide's teardown finds an identity this script didn't
+    # create. Merge keeps any tags it already has; az identity update --tags
+    # would replace them.
+    az tag update \
+        --resource-id "$(az identity show \
+            --name "${IDENTITY_NAME}" \
+            --resource-group "${RESOURCE_GROUP}" \
+            --query id \
+            --output tsv)" \
+        --operation Merge \
+        --tags "${IDENTITY_TAG}=${IDENTITY_TAG_VALUE}" \
+        --output none
 else
-    log "Creating user-assigned managed identity '${USER_ASSIGNED_IDENTITY_NAME}'..."
+    log "Creating user-assigned managed identity '${IDENTITY_NAME}'..."
     az identity create \
-        --name "${USER_ASSIGNED_IDENTITY_NAME}" \
+        --name "${IDENTITY_NAME}" \
         --resource-group "${RESOURCE_GROUP}" \
         --location "${LOCATION}" \
         --subscription "${SUBSCRIPTION}" \
+        --tags "${IDENTITY_TAG}=${IDENTITY_TAG_VALUE}" \
         --output none
 fi
 USER_ASSIGNED_CLIENT_ID="$(az identity show \
     --resource-group "${RESOURCE_GROUP}" \
-    --name "${USER_ASSIGNED_IDENTITY_NAME}" \
+    --name "${IDENTITY_NAME}" \
     --query 'clientId' \
     --output tsv)"
 PRINCIPAL_ID="$(az identity show \
     --resource-group "${RESOURCE_GROUP}" \
-    --name "${USER_ASSIGNED_IDENTITY_NAME}" \
+    --name "${IDENTITY_NAME}" \
     --query 'principalId' \
     --output tsv)"
 log "Client ID: ${USER_ASSIGNED_CLIENT_ID}"
 log "Principal ID: ${PRINCIPAL_ID}"
 
-FEDERATED_IDENTITY_CREDENTIAL_NAME="catalyst-${PROJECT_UID}-${APPID_UID}"
 if az identity federated-credential show \
     --name "${FEDERATED_IDENTITY_CREDENTIAL_NAME}" \
-    --identity-name "${USER_ASSIGNED_IDENTITY_NAME}" \
+    --identity-name "${IDENTITY_NAME}" \
     --resource-group "${RESOURCE_GROUP}" &>/dev/null; then
     log "Federated credential '${FEDERATED_IDENTITY_CREDENTIAL_NAME}' already exists; reusing it."
 else
-    log "Creating federated credential '${FEDERATED_IDENTITY_CREDENTIAL_NAME}' for subject 'system:serviceaccount:${CATALYST_SERVICE_ACCOUNT_NAMESPACE}:${CATALYST_SERVICE_ACCOUNT_NAME}'..."
+    log "Creating federated credential '${FEDERATED_IDENTITY_CREDENTIAL_NAME}' for subject 'system:serviceaccount:${SERVICE_ACCOUNT_NAMESPACE}:${SERVICE_ACCOUNT_NAME}'..."
     az identity federated-credential create \
         --name "${FEDERATED_IDENTITY_CREDENTIAL_NAME}" \
-        --identity-name "${USER_ASSIGNED_IDENTITY_NAME}" \
+        --identity-name "${IDENTITY_NAME}" \
         --resource-group "${RESOURCE_GROUP}" \
         --issuer "${AKS_OIDC_ISSUER}" \
-        --subject system:serviceaccount:"${CATALYST_SERVICE_ACCOUNT_NAMESPACE}":"${CATALYST_SERVICE_ACCOUNT_NAME}" \
-        --audience api://AzureADTokenExchange \
-        --output none
-fi
-
-# Also federate the regional Catalyst management service's service account.
-# Management resolves bring-your-own secret stores (e.g. Azure Key Vault)
-# in-process for a project's workflow / agent state stores, authenticating as
-# this service account rather than any appid's, so the shared identity must
-# trust it too. The credential is region-wide (one per cluster, not per appid),
-# so re-runs of this script for other appids reuse it.
-MANAGEMENT_FIC_NAME="catalyst-management"
-if az identity federated-credential show \
-    --name "${MANAGEMENT_FIC_NAME}" \
-    --identity-name "${USER_ASSIGNED_IDENTITY_NAME}" \
-    --resource-group "${RESOURCE_GROUP}" &>/dev/null; then
-    log "Federated credential '${MANAGEMENT_FIC_NAME}' already exists; reusing it."
-else
-    log "Creating federated credential '${MANAGEMENT_FIC_NAME}' for subject 'system:serviceaccount:${MANAGEMENT_NAMESPACE}:${MANAGEMENT_SERVICE_ACCOUNT}'..."
-    az identity federated-credential create \
-        --name "${MANAGEMENT_FIC_NAME}" \
-        --identity-name "${USER_ASSIGNED_IDENTITY_NAME}" \
-        --resource-group "${RESOURCE_GROUP}" \
-        --issuer "${AKS_OIDC_ISSUER}" \
-        --subject system:serviceaccount:"${MANAGEMENT_NAMESPACE}":"${MANAGEMENT_SERVICE_ACCOUNT}" \
+        --subject system:serviceaccount:"${SERVICE_ACCOUNT_NAMESPACE}":"${SERVICE_ACCOUNT_NAME}" \
         --audience api://AzureADTokenExchange \
         --output none
 fi
@@ -265,19 +298,26 @@ if [[ -n "${CATALYST_SERVICEBUS}" ]]; then
 fi
 
 echo '--- User-Assigned Managed Identity ready ---'
-echo 'Run the following Diagrid CLI command in order to necessary labels/annotations to the AppID:'
-echo ''
-echo " diagrid appid update ${CATALYST_APP} --project ${CATALYST_PROJECT} --label azure.workload.identity/use=true --annotation azure.workload.identity/client-id=\"$USER_ASSIGNED_CLIENT_ID\""
-echo ''
-echo 'To let the management service resolve bring-your-own secret stores (workflow or'
-echo 'agent state stores that reference secrets via secretKeyRef), opt its pod into'
-echo 'workload identity by adding the following to your Helm values and upgrading the'
-echo 'catalyst release:'
-echo ''
-echo ' management:'
-echo '   podLabels:'
-echo '     azure.workload.identity/use: "true"'
-echo '   serviceAccount:'
-echo '     annotations:'
-echo "       azure.workload.identity/client-id: \"${USER_ASSIGNED_CLIENT_ID}\""
-echo ''
+if [[ "${MANAGEMENT}" == "true" ]]; then
+    echo 'Opt the management pod into workload identity by adding the following to your'
+    echo 'Helm values and upgrading the catalyst release:'
+    echo ''
+    echo ' management:'
+    echo '   podLabels:'
+    echo '     azure.workload.identity/use: "true"'
+    echo '   podAnnotations:'
+    echo "     azure.workload.identity/client-id: \"${USER_ASSIGNED_CLIENT_ID}\""
+    echo '   serviceAccount:'
+    echo '     annotations:'
+    echo "       azure.workload.identity/client-id: \"${USER_ASSIGNED_CLIENT_ID}\""
+    echo ''
+else
+    echo 'Run the following Diagrid CLI command to add the workload identity label and annotation:'
+    echo ''
+    echo " ${UPDATE_COMMAND} ${CATALYST_APP} --project ${CATALYST_PROJECT} --label azure.workload.identity/use=true --annotation azure.workload.identity/client-id=\"$USER_ASSIGNED_CLIENT_ID\""
+    echo ''
+    echo 'If a workflow or agent state store references a secret via secretKeyRef, the'
+    echo 'management service needs an identity of its own: run this script once per'
+    echo 'region with --management.'
+    echo ''
+fi

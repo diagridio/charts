@@ -98,3 +98,25 @@ tests:
           path: data["config.yaml"]
           pattern: "registry: my-registry.io"
         template: agent/configmap.yaml
+
+  # The agent passes this to the jwt-key-rotation chart it installs into the
+  # root Dapr namespace. It must stay unset without a global registry, or the
+  # rotation job would stop pulling from that chart's own default registry.
+  - it: should set the jwt rotation image registry in agent configmap
+    set:
+      join_token: "test-token"
+      global.image.registry: "my-registry.io"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "(?m)^\\s+rotation_image_registry: my-registry\\.io$"
+        template: agent/configmap.yaml
+
+  - it: should leave the jwt rotation image registry unset without a global registry
+    set:
+      join_token: "test-token"
+    asserts:
+      - notMatchRegex:
+          path: data["config.yaml"]
+          pattern: "rotation_image_registry"
+        template: agent/configmap.yaml

@@ -1,0 +1,32 @@
+suite: Test Gateway CORS Allowed Origins
+templates:
+  - gateway/deployment.yaml
+  - gateway/configmap.yaml
+tests:
+  # Unset leaves the gateway on its built-in list, the Diagrid-hosted consoles.
+  - it: sets no origin list by default
+    set:
+      join_token: "test-token"
+    documentIndex: 1
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[1].env
+          content:
+            name: CORS_ALLOWED_ORIGINS
+          any: true
+        template: gateway/deployment.yaml
+
+  - it: passes the configured console origins to the gateway
+    set:
+      join_token: "test-token"
+      gateway.corsAllowedOrigins:
+        - https://catalyst.example.com
+        - https://console.example.com
+    documentIndex: 1
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[1].env
+          content:
+            name: CORS_ALLOWED_ORIGINS
+            value: "https://catalyst.example.com,https://console.example.com"
+        template: gateway/deployment.yaml

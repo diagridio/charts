@@ -390,7 +390,7 @@
                         },
                         "selfhosted": {
                             "type": "object",
-                            "description": "Tuning for the self-hosted PostgreSQL (only used when create: true, disabled: false). Maps to agent.config.project.selfhosted_postgresql. Leave empty ({}) for defaults; override subkeys such as persistence_storage_size."
+                            "description": "Tuning for the self-hosted PostgreSQL (only used when create: true, disabled: false). Maps to agent.config.project.selfhosted_postgresql. Leave empty ({}) for defaults; override subkeys such as persistence_storage_size, persistence_storage_class, node_selector, tolerations, affinity and extended_configuration."
                         },
                         "external": {
                             "type": "object",
@@ -720,6 +720,10 @@
                         "internal_dapr": {
                             "type": "object",
                             "properties": {
+                                "disable_root_dapr_ha": {
+                                    "type": "boolean",
+                                    "description": "Run root Dapr's operator, sentry and placement with one replica each instead of three. For evaluation regions."
+                                },
                                 "sentry": {
                                     "type": "object",
                                     "properties": {
@@ -1248,6 +1252,9 @@
             "type": "object",
             "description": "Piko reverse tunnel configuration",
             "properties": {
+                "resources": {
+                    "$ref": "#/definitions/resourceRequirements"
+                },
                 "enabled": {
                     "type": "boolean",
                     "default": true

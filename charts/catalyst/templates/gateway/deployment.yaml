@@ -246,8 +246,14 @@ spec:
               value: {{ .Values.gateway.ha.enabled | quote }}
             - name: GATEWAY_TLS_ENABLED
               value: {{ .Values.gateway.tls.enabled | quote }}
+          {{- with .Values.gateway.corsAllowedOrigins }}
+            - name: CORS_ALLOWED_ORIGINS
+              value: {{ join "," . | quote }}
+          {{- end }}
             - name: ALLOW_LOCAL_DEV_ORIGIN
               value: {{ .Values.gateway.allowLocalDevOrigin | default false | quote }}
+            - name: GATEWAY_PLAINTEXT_REDIRECT_ENABLED
+              value: {{ .Values.gateway.plaintextRedirect | default false | quote }}
           {{- with .Values.gateway.mcpPublicDomain }}
             - name: CATALYST_MCP_PUBLIC_DOMAIN
               value: {{ . | quote }}

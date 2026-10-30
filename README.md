@@ -48,6 +48,7 @@ Catalyst supports the following Dapr APIs:
 - [Deploying to KinD](./guides/kind/README.md)
 - [Deploying to Azure Kubernetes Service (AKS)](./guides/azure/README.md)
 - [Deploying to AWS Elastic Kubernetes Service (EKS)](./guides/aws/README.md)
+- [Exposing the Catalyst gateway](./guides/gateway-exposure/README.md) — load balancer, public or private address, port, DNS
 - [Configuring Dapr PKI with cert-manager](./guides/dapr-pki/README.md)
 - [Enabling tracing for Catalyst apps](./guides/tracing/README.md)
 - [Air-gapped / private registry installs](./guides/air-gapped/README.md)

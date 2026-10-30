@@ -88,10 +88,6 @@ agent:
         limits: null
         requests:
           memory: 256Mi
-      scheduler:
-        # Increase concurrent job streams for high-fanout workloads.
-        # Plumbs through to the Dapr scheduler --scheduler-job-streams flag.
-        job_streams: 100
 
 # -----------------------------------------------------------------------------
 # Management

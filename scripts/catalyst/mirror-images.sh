@@ -7,11 +7,16 @@
 # registries and pushes them to a target registry with the same repository paths
 # and tags preserved.
 #
-# Released Catalyst charts pin every Diagrid image by digest, so the mirror has
-# to hold the same manifests as the source registry. crane is preferred when it
-# is installed because `crane copy` preserves digests; docker and podman re-push
-# through the local daemon, which can re-encode layers and change digests, and a
-# digest-pinned chart then fails to pull from the mirror.
+# Released Catalyst charts pin every Diagrid image by digest, resolved from
+# the production registry below, so the mirror has to hold the same manifests
+# as that registry. ORAS is preferred when it is installed: `oras cp
+# --recursive` preserves digests and also copies each image's signature, build
+# provenance and SBOMs, so the mirror can be verified (see
+# guides/image-verification). ORAS also needs jq, to find the per-architecture
+# images whose legacy attestation tags it copies. crane also preserves digests but copies the image
+# alone. docker and podman re-push through the local daemon, which can
+# re-encode layers and change digests, and a digest-pinned chart then fails to
+# pull from the mirror.
 #
 # Usage:
 #   ./mirror-images.sh <target-registry> [OPTIONS]
@@ -122,39 +127,85 @@ fi
 # Remove trailing slash from registry if present
 TARGET_REGISTRY="${TARGET_REGISTRY%/}"
 
-# Detect container runtime. crane first: it copies manifests as they are, so the
-# digests a released chart pins exist in the mirror.
-if command -v crane &> /dev/null; then
+# The repository part of an image reference: no tag, no digest.
+image_repository() {
+  local ref="${1%@*}"
+  local last="${ref##*/}"
+  if [[ "$last" == *:* ]]; then
+    ref="${ref%:*}"
+  fi
+  echo "$ref"
+}
+
+# `oras cp --recursive` follows the artifacts that refer to an image. The SLSA
+# Build L3 provenance and the VEX statements are instead stored the older way,
+# under a tag named after the digest (sha256-<hex>.att), for the index and for
+# each per-architecture image. Copy those tags as well, where they exist.
+copy_legacy_attestations() {
+  local source_repo target_repo digest
+  source_repo=$(image_repository "$1")
+  target_repo=$(image_repository "$2")
+  local digests
+  digests=$(oras resolve "$1") || return 1
+  digests+=" $(oras manifest fetch "$1" | jq -r '.manifests[]?.digest')" || return 1
+  for digest in ${digests}; do
+    local tag="sha256-${digest#sha256:}.att" err
+    # Only a missing tag means there is nothing to copy. Any other error, a
+    # missing login or a timeout, would leave the mirror without them.
+    if err=$(oras manifest fetch --descriptor "${source_repo}:${tag}" 2>&1 > /dev/null); then
+      oras cp "${source_repo}:${tag}" "${target_repo}:${tag}" > /dev/null || return 1
+    elif ! grep -qiE 'not found|manifest unknown' <<< "${err}"; then
+      echo -e "${RED}Could not check ${source_repo}:${tag}: ${err}${NC}" >&2
+      return 1
+    fi
+  done
+}
+
+# Detect container runtime. ORAS, then crane: both copy manifests as they are,
+# so the digests a released chart pins exist in the mirror, and ORAS also brings
+# the signatures and attestations that refer to them.
+if command -v oras &> /dev/null && command -v jq &> /dev/null; then
+  RUNTIME="oras"
+elif command -v crane &> /dev/null; then
   RUNTIME="crane"
 elif command -v docker &> /dev/null; then
   RUNTIME="docker"
 elif command -v podman &> /dev/null; then
   RUNTIME="podman"
 else
-  echo -e "${RED}Error: No container runtime found. Please install crane, docker, or podman.${NC}" >&2
+  echo -e "${RED}Error: No container runtime found. Please install oras, crane, docker, or podman.${NC}" >&2
   exit 1
 fi
 
-# crane copies registry to registry, so there is no locally pulled image for
-# --skip-pull to reuse. The combination used to skip the copy and the push
+# oras and crane copy registry to registry, so there is no locally pulled image
+# for --skip-pull to reuse. The combination used to skip the copy and the push
 # alike and still count every image as mirrored, reporting a complete mirror
 # that holds nothing.
-if [[ "$RUNTIME" == "crane" && "$SKIP_PULL" == "true" ]]; then
-  echo -e "${RED}Error: --skip-pull cannot be used with crane, which copies directly between registries.${NC}" >&2
+if [[ ( "$RUNTIME" == "oras" || "$RUNTIME" == "crane" ) && "$SKIP_PULL" == "true" ]]; then
+  echo -e "${RED}Error: --skip-pull cannot be used with ${RUNTIME}, which copies directly between registries.${NC}" >&2
   echo -e "${RED}Drop the flag, or install docker or podman if you meant to push images you already pulled.${NC}" >&2
   exit 1
 fi
 
 echo -e "${BLUE}Using container runtime: ${RUNTIME}${NC}"
-if [[ "$RUNTIME" != "crane" ]]; then
+if [[ "$RUNTIME" == "crane" ]]; then
+  echo -e "${YELLOW}Warning: crane copies each image without its signature, provenance or SBOMs, so the mirror cannot be verified.${NC}"
+  echo -e "${YELLOW}Install oras to copy them too.${NC}"
+elif [[ "$RUNTIME" != "oras" ]]; then
   echo -e "${YELLOW}Warning: ${RUNTIME} re-pushes images through the local daemon, which can change their digests.${NC}"
-  echo -e "${YELLOW}Released Catalyst charts pin Diagrid images by digest; install crane for a digest-preserving mirror.${NC}"
+  echo -e "${YELLOW}Released Catalyst charts pin Diagrid images by digest; install oras (or crane) for a digest-preserving mirror.${NC}"
 fi
 echo -e "${BLUE}Target registry: ${TARGET_REGISTRY}${NC}"
 echo -e "${BLUE}Catalyst version: ${CATALYST_VERSION}${NC}"
 echo -e "${BLUE}Dapr version: ${DAPR_VERSION}${NC}"
 echo -e "${BLUE}Internal Dapr version: ${INTERNAL_DAPR_VERSION}${NC}"
 echo -e "${BLUE}OpenTelemetry Collector version: ${OTEL_VERSION}${NC}"
+
+# The registries the released chart's defaults name: Diagrid's production
+# public registry, whose digests the release pipeline pins and signs, and
+# Diagrid's production Docker Hub proxy for third-party images.
+DIAGRID_REGISTRY="us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public"
+DOCKER_HUB_PROXY="us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy"
 
 # Define all images from the Catalyst Helm chart
 # Format: "SOURCE_IMAGE"
@@ -165,32 +216,32 @@ echo -e "${BLUE}OpenTelemetry Collector version: ${OTEL_VERSION}${NC}"
 # released chart then fails against the mirror with "manifest unknown".
 declare -a IMAGES=(
   # Primary Component Images (Default Mode)
-  "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/cra-agent:${CATALYST_VERSION}"
-  "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-management:${CATALYST_VERSION}"
-  "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-gateway:${CATALYST_VERSION}"
-  "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/identity-injector:${CATALYST_VERSION}"
-  "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-mcp:${CATALYST_VERSION}"
+  "${DIAGRID_REGISTRY}/cra-agent:${CATALYST_VERSION}"
+  "${DIAGRID_REGISTRY}/catalyst-management:${CATALYST_VERSION}"
+  "${DIAGRID_REGISTRY}/catalyst-gateway:${CATALYST_VERSION}"
+  "${DIAGRID_REGISTRY}/identity-injector:${CATALYST_VERSION}"
+  "${DIAGRID_REGISTRY}/catalyst-mcp:${CATALYST_VERSION}"
 
   # Consolidated Image (Alternative Mode)
-  "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-all:${CATALYST_VERSION}"
+  "${DIAGRID_REGISTRY}/catalyst-all:${CATALYST_VERSION}"
   
   # External Component Images
-  "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/envoyproxy/envoy:${ENVOY_VERSION}"
-  "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/diagrid-piko:${PIKO_VERSION}"
+  "${DOCKER_HUB_PROXY}/envoyproxy/envoy:${ENVOY_VERSION}"
+  "${DIAGRID_REGISTRY}/diagrid-piko:${PIKO_VERSION}"
   
   # OpenTelemetry Collector Images (Optional)
   "ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s:${OTEL_VERSION}"
   
   # Agent Nested Images
-  "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/sidecar:${CATALYST_VERSION}"
-  "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/catalyst-otel-collector:${CATALYST_VERSION}"
-  "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/private-sentry:${CATALYST_VERSION}"
+  "${DIAGRID_REGISTRY}/sidecar:${CATALYST_VERSION}"
+  "${DIAGRID_REGISTRY}/catalyst-otel-collector:${CATALYST_VERSION}"
+  "${DIAGRID_REGISTRY}/private-sentry:${CATALYST_VERSION}"
   
   # Upstream Dapr Images
-  "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-hub-proxy/daprio/dapr:${DAPR_VERSION}"
+  "${DOCKER_HUB_PROXY}/daprio/dapr:${DAPR_VERSION}"
   
   # Internal Dapr Images
-  "us-central1-docker.pkg.dev/prj-common-d-shared-89549/reg-d-common-docker-public/dapr:${INTERNAL_DAPR_VERSION}"
+  "${DIAGRID_REGISTRY}/dapr:${INTERNAL_DAPR_VERSION}"
 )
 
 # Function to extract repository path and tag from full image reference
@@ -221,8 +272,22 @@ mirror_image() {
   if [[ "$SKIP_PULL" == "false" ]]; then
     echo -e "${GREEN}Pulling: ${source_image}${NC}"
     case $RUNTIME in
+      oras)
+        # Checked explicitly: mirror_image runs as an if condition, where
+        # set -e does not apply.
+        if ! oras cp --recursive "$source_image" "$target_image" \
+          || ! copy_legacy_attestations "$source_image" "$target_image"; then
+          echo -e "${RED}✗ Failed to copy image${NC}" >&2
+          return 1
+        fi
+        echo -e "${GREEN}✓ Mirrored successfully, with signatures and attestations${NC}"
+        return 0
+        ;;
       crane)
-        crane copy "$source_image" "$target_image"
+        if ! crane copy "$source_image" "$target_image"; then
+          echo -e "${RED}✗ Failed to copy image${NC}" >&2
+          return 1
+        fi
         echo -e "${GREEN}✓ Mirrored successfully${NC}"
         return 0
         ;;
@@ -235,8 +300,8 @@ mirror_image() {
     esac
   fi
   
-  # Tag image (not needed for crane)
-  if [[ "$RUNTIME" != "crane" ]]; then
+  # Tag image (not needed for oras or crane)
+  if [[ "$RUNTIME" != "oras" && "$RUNTIME" != "crane" ]]; then
     echo -e "${GREEN}Tagging: ${target_image}${NC}"
     if ! $RUNTIME tag "$source_image" "$target_image"; then
       echo -e "${RED}✗ Failed to tag image${NC}" >&2

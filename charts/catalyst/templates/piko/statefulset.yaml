@@ -37,6 +37,10 @@ spec:
       terminationGracePeriodSeconds: {{ .Values.piko.terminationGracePeriodSeconds }}
       securityContext:
         {{- toYaml .Values.piko.podSecurityContext | nindent 8 }}
+      {{- with .Values.global.image.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
 
       containers:
         - name: piko
@@ -53,6 +57,10 @@ spec:
               name: admin
             - containerPort: {{ .Values.piko.server.gossipPort }}
               name: gossip
+          {{- with .Values.piko.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           readinessProbe:
             {{- toYaml .Values.piko.readinessProbe | nindent 12 }}
           args:

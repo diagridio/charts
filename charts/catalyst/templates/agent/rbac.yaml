@@ -70,6 +70,12 @@ rules:
   resources: ["pods/log"]
   verbs: ["get"]
 
+# At boot the agent reads the LimitRanges in cra-agent and root-dapr-system to
+# warn when one caps the CPU of the agent or root Dapr (internal/boot/cpulimit.go).
+- apiGroups: [""]
+  resources: ["limitranges"]
+  verbs: ["get", "list"]
+
 {{- if dig "region_usage" "enabled" false .Values.agent.config }}
 # Region CPU-usage collector (pkg/regionusage) lists PodMetrics from the
 # cluster metrics-server (metrics.k8s.io) across all Catalyst-managed namespaces

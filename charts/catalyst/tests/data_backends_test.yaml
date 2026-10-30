@@ -369,3 +369,28 @@ tests:
           path: data["config.yaml"]
           pattern: "default_managed_redis_type"
         template: agent/configmap.yaml
+
+  - it: self-hosted Postgres scheduling reaches the agent in its list and string forms
+    set:
+      join_token: "test-token"
+      global.postgresql.selfhosted.node_selector:
+        diagrid.dev/disk: ultra
+      global.postgresql.selfhosted.affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution: {}
+      global.postgresql.selfhosted.extended_configuration: "shared_preload_libraries = 'pgaudit,pg_stat_statements'"
+    asserts:
+      # A map would reach viper, which splits the dotted label key.
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "node_selector:\\n\\s*- key: diagrid.dev/disk\\n\\s*value: ultra"
+        template: agent/configmap.yaml
+      # A string, so viper cannot lowercase nodeAffinity.
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "affinity: \\|-\\n\\s*nodeAffinity:"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "extended_configuration: shared_preload_libraries = 'pgaudit,pg_stat_statements'"
+        template: agent/configmap.yaml
