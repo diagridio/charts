@@ -26,13 +26,15 @@ helm install catalyst oci://public.ecr.aws/diagrid/catalyst \
 
 `JOIN_TOKEN` must be obtained from Diagrid Cloud before installing. See the [Getting Started guide](../../guides/getting-started/README.md) for signup and token retrieval.
 
+When the install or an upgrade finishes, Helm prints the next steps for the values you set: how to check the region is connected, how to find the gateway address for DNS, and how to collect diagnostics. Print them again with `helm get notes catalyst -n cra-agent`.
+
 ## Uninstall
 
 ```bash
 helm uninstall catalyst -n cra-agent
 ```
 
-> **WARNING:** The `region` resource is intended for a single installation, once you uninstall Catalyst, the region is no longer valid. If you want to uninstall Catalyst but allow re-installation, remove the clean up hook by setting the values:
+> **WARNING:** By default, `helm uninstall` runs a cleanup hook that deletes Dapr, every project namespace and their data, and the cluster's record of the region. The region stays registered with Diagrid, and installing again with the same join token rejoins it only while the region's Dapr root CA is unchanged. With the CA Dapr generates (the default, unless you set up [Dapr PKI](#dapr-pki)), the hook deletes that CA, and rejoining afterwards needs Diagrid support. To uninstall and keep the option of reinstalling, disable the cleanup hook first:
 
 ```yaml
 cleanup:
@@ -279,21 +281,21 @@ By default, this is the full list of images that are installed in your cluster:
 |-----------|--------------|-------------|
 | **Alpine k8s** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy/alpine/k8s:1.36.0` | Utility image used by Helm install and cleanup hooks |
 | **Envoy Proxy** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy/envoyproxy/envoy:distroless-v1.38.0` | Envoy proxy for gateway |
-| **Catalyst** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.137.0` | Consolidated Catalyst services image |
+| **Catalyst** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.137.1` | Consolidated Catalyst services image |
 | **Piko** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/diagrid-piko:v1.0.1` | Piko reverse tunneling service |
-| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.19.0-20261029-catalyst.1` | Catalyst Dapr control plane services |
+| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.20.0-20261102-catalyst.1` | Catalyst Dapr control plane services |
 | **JWT Key Rotation** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/k8s-tools:1.0.0` | Rotates the signing keys for workload JWTs |
-| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.137.0` | Catalyst dapr server |
-| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.137.0` | OTel collector for telemetry |
+| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.137.1` | Catalyst dapr server |
+| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.137.1` | OTel collector for telemetry |
 
 Alternatively, separate images can be used:
 
 | Component | Default Image | Description |
 |-----------|--------------|-------------|
-| **Catalyst Agent** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/cra-agent:1.137.0` | Catalyst agent service |
-| **Catalyst Management** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-management:1.137.0` | Catalyst management service |
-| **Gateway Control Plane** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-gateway:1.137.0` | Gateway control plane service |
-| **Gateway Identity Injector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/identity-injector:1.137.0` | Identity injection service |
+| **Catalyst Agent** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/cra-agent:1.137.1` | Catalyst agent service |
+| **Catalyst Management** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-management:1.137.1` | Catalyst management service |
+| **Gateway Control Plane** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-gateway:1.137.1` | Gateway control plane service |
+| **Gateway Identity Injector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/identity-injector:1.137.1` | Identity injection service |
 
 Dependencies:
 
@@ -309,9 +311,9 @@ The Agent provisions these at runtime:
 
 | Component | Default Image | Description |
 |-----------|--------------|-------------|
-| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/sidecar:1.137.0` | Catalyst dapr server |
-| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-otel-collector:1.137.0` | OTel collector for telemetry |
-| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.19.0-20261029-catalyst.1` | Catalyst Dapr control plane services |
+| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/sidecar:1.137.1` | Catalyst dapr server |
+| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-otel-collector:1.137.1` | OTel collector for telemetry |
+| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.20.0-20261102-catalyst.1` | Catalyst Dapr control plane services |
 | **JWT Key Rotation** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/k8s-tools:1.0.0` | Rotates the signing keys for workload JWTs |
 
 #### Optional Images
@@ -321,6 +323,39 @@ Used when OpenTelemetry addons are enabled:
 | Component | Default Image | Description |
 |-----------|--------------|-------------|
 | **OpenTelemetry Collector (OSS)** | `ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s:<tag>` | Collector for traces, metrics, and logs |
+
+### Verifying the chart and its images
+
+This chart and the Diagrid images it installs are signed by Diagrid's release workflows, keyless, with the signatures recorded in Sigstore's public transparency log. The images also carry SLSA build provenance, a CycloneDX SBOM for each architecture and, where Diagrid has made any, OpenVEX vulnerability statements. Check the chart by digest before you install or upgrade:
+
+```bash
+version=<CHART_VERSION>
+digest=$(crane digest public.ecr.aws/diagrid/catalyst:${version})
+
+cosign verify --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity-regexp '^https://github\.com/diagridio/cloudgrid/\.github/workflows/publish-catalyst-chart-release\.yaml@refs/tags/(catalyst-dataplane/)?v.+$' \
+  public.ecr.aws/diagrid/catalyst@${digest}
+```
+
+and an image by the digest the chart pins:
+
+```bash
+cosign verify --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity-regexp '^https://github\.com/diagridio/cloudgrid/\.github/workflows/(publish-docker-image|otel-publish-docker-image|catalyst-operator-publish-docker-image)\.yaml@refs/tags/.+/v.+$' \
+  us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/sidecar@sha256:<digest>
+```
+
+The Dapr control plane image (`dapr`) is built and signed in Diagrid's Dapr repository, from `1.19.0-20261030-catalyst.2`, so it has its own identity:
+
+```bash
+cosign verify --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity-regexp '^https://github\.com/diagridio/dapr-dapr/\.github/workflows/diagrid-dapr\.yaml@refs/tags/v.+$' \
+  us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr@sha256:<digest>
+```
+
+Not signed: `diagrid-piko`, `k8s-tools` and Dapr builds before `1.19.0-20261030-catalyst.2`. Third-party images (Envoy, Alpine k8s, the OpenTelemetry add-ons) carry whatever their publishers attach.
+
+[Verify Diagrid's artifacts](https://docs.diagrid.io/operate/hosting/enterprise-self-hosted/verify-artifacts) covers the rest: reading an image's SBOM and provenance, applying the VEX statements in Trivy, an admission policy that checks images as pods start, and verifying a mirror or an offline cluster.
 
 ### Private Image Registry
 
@@ -332,7 +367,7 @@ global:
     registry: my-registry.example.com
 ```
 
-Released charts pin every Diagrid image by digest (`<registry>/<repository>@sha256:…`) and this override changes only the registry part, so the mirror has to serve the same manifests as the source registry. Copy images with a digest-preserving tool such as `crane copy` or `skopeo copy --all`. A `docker pull` followed by `docker push` can re-encode layers, and the chart then references digests the mirror does not have, which fails the pull with a manifest-unknown error.
+Released charts pin every Diagrid image by digest (`<registry>/<repository>@sha256:…`) and this override changes only the registry part, so the mirror has to serve the same manifests as the source registry. Copy images with a digest-preserving tool. The [`mirror-images.sh` script](../../guides/air-gapped/README.md) keeps everything needed to verify the mirror when ORAS and jq are installed. `oras cp --recursive` on its own copies an image's signature, build provenance and SBOMs, but not its SLSA Build L3 provenance or VEX statements: those sit under a `sha256-<hex>.att` tag for the index and for each per-architecture image, which the script copies as well. `crane copy` and `skopeo copy --all` keep the digest but copy the image alone. A `docker pull` followed by `docker push` can re-encode layers, and the chart then references digests the mirror does not have, which fails the pull with a manifest-unknown error.
 
 If using OpenTelemetry addons:
 
@@ -365,7 +400,7 @@ global:
     # Or use existingSecret, clientCert, clientKey, customCA
 ```
 
-See the [Air-gapped installs guide](../../guides/air-gapped/README.md) for the steps to mirror the chart itself.
+See the [Air-gapped installs guide](../../guides/air-gapped/README.md) for the steps to mirror the chart itself. That guide copies the chart with `oras cp`, because `helm push` gives it a new digest, which its signature does not cover.
 
 ### Dapr PKI
 
@@ -1287,6 +1322,40 @@ agent:
 
 Leave both sources empty to trust only public roots (the default). This setting
 composes with `global.trustedCA`: sidecars trust the union of the two.
+
+### LLM Proxy
+
+Every sidecar serves an LLM proxy on its HTTP API at `/v1.0/diagrid/llm/<host>/<path>`. An app keeps its provider SDK
+and points the SDK's base URL at the proxy; the sidecar authenticates the call by the app's `dapr-api-token`, removes
+that header, and forwards the call over HTTPS to `<host>` with the app's own provider key. See
+[Call LLM providers through Catalyst](https://docs.diagrid.io/develop/llm-proxy) for the client side.
+
+The proxy only forwards to the hosts in `agent.config.sidecar.llm_proxy_allowed_hosts`, and refuses any other host with
+`403`. The default allows OpenAI and Anthropic. Replace the list to add a provider or to route through your own LLM
+gateway:
+
+```yaml
+agent:
+  config:
+    sidecar:
+      llm_proxy: true
+      llm_proxy_allowed_hosts:
+        - api.openai.com
+        - my-resource.openai.azure.com
+        - llm-gateway.internal.example.com:8443
+```
+
+- Each entry is a bare hostname with an optional port: no scheme, path or wildcard.
+- Helm replaces lists rather than merging them, so list the defaults again if you still want them.
+- An empty list refuses every call. Set `llm_proxy: false` to stop serving the proxy at all.
+- Changes to the list reach running sidecars without a restart. Turning `llm_proxy` on or off also takes effect
+  without a restart.
+- Proxied calls count against token budgets only when `agent.config.sidecar.tokenbudget` is `local` or `global`; it is
+  empty (off) by default. Each call is recorded in API logs with its model and total tokens either way.
+
+A host inside your network may also need a hole in the project network policies (see
+[Allowing specific destinations](#allowing-specific-destinations)), and a host with a private CA needs that CA in the
+sidecars' trust (see [Sidecar Outbound TLS Trust](#sidecar-outbound-tls-trust)).
 
 ### Gateway TLS
 

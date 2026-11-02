@@ -1,0 +1,129 @@
+suite: Test post-install NOTES
+templates:
+  - NOTES.txt
+release:
+  namespace: cra-agent
+tests:
+  - it: should tell a ClusterIP gateway how to expose the region
+    set:
+      join_token: "test-token"
+    asserts:
+      - matchRegexRaw:
+          pattern: "kubectl -n cra-agent wait --for=condition=ready pod --all"
+      - matchRegexRaw:
+          pattern: "diagrid region list"
+      - matchRegexRaw:
+          pattern: "The gateway is a ClusterIP Service, reachable only inside the cluster"
+      - notMatchRegexRaw:
+          pattern: "jsonpath"
+
+  - it: should print the LoadBalancer address command
+    set:
+      join_token: "test-token"
+      gateway.envoy.service.type: LoadBalancer
+    asserts:
+      - matchRegexRaw:
+          pattern: "kubectl -n cra-agent get svc gateway-envoy -o jsonpath='\\{.status.loadBalancer.ingress\\[0\\]\\}'"
+      - notMatchRegexRaw:
+          pattern: "reachable only inside the cluster"
+
+  - it: should ask a NodePort gateway for a static ingress address
+    set:
+      join_token: "test-token"
+      gateway.envoy.service.type: NodePort
+    asserts:
+      - matchRegexRaw:
+          pattern: "set agent.config.host.ingress.ip_addr"
+      - notMatchRegexRaw:
+          pattern: "jsonpath"
+
+  - it: should report a static ingress address over the Service type
+    set:
+      join_token: "test-token"
+      gateway.envoy.service.type: NodePort
+      agent.config.host.ingress.ip_addr: 203.0.113.10
+    asserts:
+      - matchRegexRaw:
+          pattern: "The agent reports 203.0.113.10, port 443"
+      - notMatchRegexRaw:
+          pattern: "NodePort Service"
+
+  - it: should query a separate ingress Service instead of the gateway
+    set:
+      join_token: "test-token"
+      agent.config.host.ingress.service.name: ingress-nginx-controller
+      agent.config.host.ingress.service.namespace: ingress-nginx
+    asserts:
+      - matchRegexRaw:
+          pattern: "kubectl -n ingress-nginx get svc ingress-nginx-controller -o jsonpath"
+      - notMatchRegexRaw:
+          pattern: "reachable only inside the cluster"
+
+  - it: should query a separate ingress Service even when the gateway is a LoadBalancer
+    set:
+      join_token: "test-token"
+      gateway.envoy.service.type: LoadBalancer
+      agent.config.host.ingress.service.name: ingress-nginx-controller
+    asserts:
+      - matchRegexRaw:
+          pattern: "kubectl -n cra-agent get svc ingress-nginx-controller -o jsonpath"
+      - notMatchRegexRaw:
+          pattern: "get svc gateway-envoy"
+
+  - it: should prefer a static ingress address over a separate ingress Service
+    set:
+      join_token: "test-token"
+      agent.config.host.ingress.ip_addr: 203.0.113.10
+      agent.config.host.ingress.service.name: ingress-nginx-controller
+    asserts:
+      - matchRegexRaw:
+          pattern: "The agent reports 203.0.113.10"
+      - notMatchRegexRaw:
+          pattern: "jsonpath"
+
+  - it: should warn that the cleanup hook deletes the generated Dapr CA
+    set:
+      join_token: "test-token"
+    asserts:
+      - matchRegexRaw:
+          pattern: "The region\\s+stays registered with Diagrid"
+      - matchRegexRaw:
+          pattern: "rejoining after it needs Diagrid support"
+      - matchRegexRaw:
+          pattern: "set cleanup.enabled=false before uninstalling"
+
+  - it: should not claim rejoining needs support when the Dapr PKI is the install's own
+    set:
+      join_token: "test-token"
+      agent.config.internal_dapr.pki.issuer.secret.name: dapr-trust-bundle
+    asserts:
+      - matchRegexRaw:
+          pattern: "only while Dapr's root CA is unchanged"
+      - notMatchRegexRaw:
+          pattern: "needs Diagrid support"
+
+  - it: should not warn about the cleanup hook when it is disabled
+    set:
+      join_token: "test-token"
+      cleanup.enabled: false
+    asserts:
+      - notMatchRegexRaw:
+          pattern: "WARNING"
+
+  - it: should point diagrid diagnose at a non-default namespace
+    release:
+      namespace: my-catalyst
+    set:
+      join_token: "test-token"
+    asserts:
+      - matchRegexRaw:
+          pattern: "diagrid diagnose --agent-namespace my-catalyst"
+      - matchRegexRaw:
+          pattern: "kubectl -n my-catalyst logs deploy/agent"
+
+  - it: should not add a namespace flag to diagrid diagnose in cra-agent
+    set:
+      join_token: "test-token"
+    asserts:
+      - matchRegexRaw:
+          pattern: "diagrid diagnose\\n"

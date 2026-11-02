@@ -1,0 +1,52 @@
+{{- $ns := .Release.Namespace -}}
+{{- $svc := .Values.gateway.envoy.service -}}
+{{- $ingress := .Values.agent.config.host.ingress -}}
+{{- $docs := "https://github.com/diagridio/charts/blob/main" -}}
+{{- $ownPKI := dig "internal_dapr" "pki" "issuer" "secret" "name" "" .Values.agent.config -}}
+Catalyst {{ .Chart.Version }} is {{ if .Release.IsInstall }}installed{{ else }}upgraded{{ end }} in namespace {{ $ns }}.
+
+1. Wait for the pods, then check the region reports itself connected:
+
+  kubectl -n {{ $ns }} wait --for=condition=ready pod --all --timeout=5m
+  diagrid region list
+
+2. Point DNS for the region wildcard (*.<region-domain>) at the gateway:
+{{- if $ingress.ip_addr }}
+
+  The agent reports {{ $ingress.ip_addr }}, port {{ $ingress.port }} (agent.config.host.ingress).
+{{- else if $ingress.service.name }}
+
+  kubectl -n {{ $ingress.service.namespace | default $ns }} get svc {{ $ingress.service.name }} -o jsonpath='{.status.loadBalancer.ingress[0]}'
+{{- else if eq $svc.type "LoadBalancer" }}
+
+  kubectl -n {{ $ns }} get svc {{ $svc.name }} -o jsonpath='{.status.loadBalancer.ingress[0]}'
+{{- else if eq $svc.type "NodePort" }}
+
+  The gateway is a NodePort Service. Put a TCP load balancer in front of the
+  nodes and set agent.config.host.ingress.ip_addr to its address: the agent
+  cannot read an address from a NodePort Service.
+{{- else }}
+
+  The gateway is a {{ $svc.type }} Service, reachable only inside the cluster.
+  Set gateway.envoy.service.type=LoadBalancer to expose the region.
+{{- end }}
+
+  See {{ $docs }}/guides/gateway-exposure/README.md
+{{- if .Values.cleanup.enabled }}
+
+WARNING: `helm uninstall` runs a cleanup hook that deletes Dapr, every project
+namespace and their data, and this cluster's record of the region. The region
+stays registered with Diagrid, and a reinstall rejoins it with the same join
+token only while Dapr's root CA is unchanged.
+{{- if not $ownPKI }} This install uses the CA Dapr
+generates, which the hook deletes, so rejoining after it needs Diagrid support.
+{{- end }}
+To keep everything, set cleanup.enabled=false before uninstalling.
+{{- end }}
+
+Troubleshoot:
+
+  kubectl -n {{ $ns }} logs deploy/{{ include "agent.name" . }}
+  diagrid diagnose{{ if ne $ns "cra-agent" }} --agent-namespace {{ $ns }}{{ end }}
+
+Chart reference: {{ $docs }}/charts/catalyst/README.md

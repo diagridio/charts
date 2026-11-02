@@ -90,7 +90,7 @@ diagrid region list
 helm uninstall catalyst -n cra-agent
 ```
 
-> **WARNING:** The `region` resource is intended for a single installation. Once you uninstall Catalyst, the region is no longer valid. If you want to uninstall but allow re-installation, disable the cleanup hook:
+> **WARNING:** By default, `helm uninstall` runs a cleanup hook that deletes Dapr, every project namespace and their data, and the cluster's record of the region. The region stays registered with Diagrid, and installing again with the same join token rejoins it only while the region's Dapr root CA is unchanged. With the CA Dapr generates (the default, unless you set up [Dapr PKI](../../charts/catalyst/README.md#dapr-pki)), the hook deletes that CA, and rejoining afterwards needs Diagrid support. To uninstall and keep the option of reinstalling, disable the cleanup hook first:
 >
 > ```yaml
 > cleanup:

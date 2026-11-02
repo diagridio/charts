@@ -1,0 +1,24 @@
+suite: Test sidecar token budgets in the agent ConfigMap
+templates:
+  - agent/configmap.yaml
+
+tests:
+  # The agent reads an empty counter as disabled, so an install that sets
+  # nothing enforces no budget.
+  - it: leaves token budgets off by default
+    set:
+      join_token: "test-token"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "\n  tokenbudget: \"\"\n"
+
+  # A self-managed region opts in through its own values.
+  - it: passes an opted-in counter through to the agent
+    set:
+      join_token: "test-token"
+      agent.config.sidecar.tokenbudget: local
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "\n  tokenbudget: local\n"

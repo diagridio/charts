@@ -46,10 +46,14 @@ opentelemetry-daemonset:
 
 ## 2. Mirror the Helm Chart
 
+Copy the chart with ORAS, which keeps its digest and its signature:
+
 ```bash
-helm pull oci://public.ecr.aws/diagrid/catalyst --version <version>
-helm push catalyst-<version>.tgz oci://my-registry.example.com/diagrid/catalyst
+oras cp --recursive public.ecr.aws/diagrid/catalyst:<version> \
+  my-registry.example.com/diagrid/catalyst/catalyst:<version>
 ```
+
+This is the path `helm push catalyst-<version>.tgz oci://my-registry.example.com/diagrid/catalyst` would write. `helm pull` and `helm push` work too, but `helm push` gives the chart a new digest, which its signature does not cover.
 
 Configure authentication in `values.yaml`:
 

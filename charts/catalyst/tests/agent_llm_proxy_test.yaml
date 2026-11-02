@@ -1,0 +1,37 @@
+suite: Test agent LLM proxy config
+templates:
+  - agent/configmap.yaml
+
+tests:
+  - it: serves the LLM proxy to OpenAI and Anthropic by default
+    set:
+      join_token: "test-token"
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "llm_proxy: true"
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "llm_proxy_allowed_hosts:\\n\\s*- api.openai.com\\n\\s*- api.anthropic.com\\n"
+
+  - it: replaces the allowed hosts with the region's own list
+    set:
+      join_token: "test-token"
+      agent.config.sidecar.llm_proxy_allowed_hosts:
+        - llm-gateway.internal.example.com:8443
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "llm_proxy_allowed_hosts:\\n\\s*- llm-gateway.internal.example.com:8443\\n"
+      - notMatchRegex:
+          path: data["config.yaml"]
+          pattern: "api.openai.com"
+
+  - it: can turn the LLM proxy off
+    set:
+      join_token: "test-token"
+      agent.config.sidecar.llm_proxy: false
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "llm_proxy: false"

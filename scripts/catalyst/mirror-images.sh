@@ -12,7 +12,8 @@
 # as that registry. ORAS is preferred when it is installed: `oras cp
 # --recursive` preserves digests and also copies each image's signature, build
 # provenance and SBOMs, so the mirror can be verified (see
-# guides/image-verification). ORAS also needs jq, to find the per-architecture
+# https://docs.diagrid.io/operate/hosting/enterprise-self-hosted/verify-artifacts).
+# ORAS also needs jq, to find the per-architecture
 # images whose legacy attestation tags it copies. crane also preserves digests but copies the image
 # alone. docker and podman re-push through the local daemon, which can
 # re-encode layers and change digests, and a digest-pinned chart then fails to
