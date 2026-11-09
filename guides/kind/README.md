@@ -171,46 +171,16 @@ Import-Certificate -FilePath "ca.pem" -CertStoreLocation Cert:\LocalMachine\Root
 
 ## Step 5: Configure and Install Catalyst ⚡️
 
-Create a Helm values file for the Catalyst installation:
+The chart ships a values file for this guide,
+[`examples/kind.yaml`](../../charts/catalyst/examples/kind.yaml). Pull the chart to get it:
 
 ```bash
-# If you installed PostgreSQL (external, provided by you)
-# NOTE: the Bitnami PostgreSQL installed above does not serve TLS, so we set
-# disable_tls: true. Omit it (default false) only when your Postgres serves TLS.
-cat > catalyst-values.yaml << EOF
-global:
-  postgresql:
-    create: false
-    external:
-      auth_type: connectionString
-      connection_string_host: postgres-postgresql.postgres.svc.cluster.local
-      connection_string_port: 5432
-      connection_string_username: postgres
-      connection_string_password: postgres
-      disable_tls: true
-gateway:
-  tls:
-    enabled: true
-EOF
-
-# If you did not install PostgreSQL: turn Postgres off and run the scheduler on
-# etcd (a managed-postgresql scheduler cannot run without a Postgres).
-cat > catalyst-values.yaml << EOF
-global:
-  postgresql:
-    disabled: true
-agent:
-  config:
-    internal_dapr:
-      scheduler:
-        backend_type: etcd
-        storage_size: 8Gi
-gateway:
-  tls:
-    enabled: true
-EOF
-
+helm pull oci://public.ecr.aws/diagrid/catalyst --version 1.137.2 --untar
 ```
+
+It points Catalyst at the PostgreSQL you installed in step 3 and turns on HTTPS for the
+gateway. If you skipped PostgreSQL, edit `catalyst/examples/kind.yaml` as its comments
+describe: Postgres off, and the scheduler on etcd.
 
 Install the Catalyst Helm chart:
 
@@ -219,11 +189,11 @@ Install the Catalyst Helm chart:
 helm install catalyst oci://public.ecr.aws/diagrid/catalyst \
      -n cra-agent \
      --create-namespace \
-     -f catalyst-values.yaml \
+     -f catalyst/examples/kind.yaml \
      --set join_token="${JOIN_TOKEN}" \
      --set-file gateway.tls.cert=server.pem \
      --set-file gateway.tls.key=server-key.pem \
-     --version 1.137.1
+     --version 1.137.2
 ```
 
 ## Step 5: Verify the Installation ✅

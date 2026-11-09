@@ -588,6 +588,10 @@
                                 "image_digest": {
                                     "$ref": "#/definitions/imageDigest"
                                 },
+                                "logs_priority_class_name": {
+                                    "$ref": "#/definitions/priorityClassName",
+                                    "description": "PriorityClass for the logs collector DaemonSet the agent installs, e.g. system-node-critical. Empty leaves the cluster's default priority."
+                                },
                                 "metrics_private_export": {
                                     "type": "object",
                                     "description": "Forward a subset of collected metrics to a private, customer-owned OTLP endpoint, in addition to the Diagrid Cortex path. Private-region only; inert unless enabled.",
@@ -724,6 +728,10 @@
                                     "type": "boolean",
                                     "description": "Run root Dapr's operator, sentry and placement with one replica each instead of three. For evaluation regions."
                                 },
+                                "root_dapr_priority_class_name": {
+                                    "$ref": "#/definitions/priorityClassName",
+                                    "description": "PriorityClass for the root Dapr control plane in root-dapr-system (sentry, operator, placement, scheduler). Per-project Dapr never gets it. The class must already exist."
+                                },
                                 "sentry": {
                                     "type": "object",
                                     "properties": {
@@ -852,6 +860,9 @@
                 "affinity": {
                     "type": "object",
                     "default": {}
+                },
+                "priorityClassName": {
+                    "$ref": "#/definitions/priorityClassName"
                 },
                 "goSoftLimit": {
                     "type": "object",
@@ -1026,6 +1037,9 @@
                         "tolerations": {
                             "type": "array",
                             "default": []
+                        },
+                        "priorityClassName": {
+                            "$ref": "#/definitions/priorityClassName"
                         }
                     }
                 },
@@ -1063,6 +1077,9 @@
                         "config": {
                             "type": "object",
                             "default": {}
+                        },
+                        "priorityClassName": {
+                            "$ref": "#/definitions/priorityClassName"
                         }
                     }
                 }
@@ -1141,6 +1158,9 @@
                 "affinity": {
                     "type": "object",
                     "default": {}
+                },
+                "priorityClassName": {
+                    "$ref": "#/definitions/priorityClassName"
                 },
                 "goSoftLimit": {
                     "type": "object",
@@ -1461,6 +1481,11 @@
         }
     },
     "definitions": {
+        "priorityClassName": {
+            "type": "string",
+            "pattern": "^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*)?$",
+            "description": "Name of an existing PriorityClass for these pods. Empty leaves priorityClassName unset, so the pods run at the cluster's default priority. The chart does not create the class."
+        },
         "imageDigest": {
             "type": "string",
             "pattern": "^(sha256:[0-9a-f]{64})?$",

@@ -1,0 +1,59 @@
+# AKS with Microsoft Entra Workload ID: app secrets kept in PostgreSQL and
+# envelope-encrypted with a key held in Azure Key Vault, which every Catalyst
+# pod reaches as one managed identity. No credential appears in these values.
+# Layer after ../values-production.yaml and external-postgresql.yaml.
+#
+# The chart cannot do these for you; "Holding the KEK in Azure Key Vault" in
+# the chart README has the detail:
+#   1. Workload identity enabled on the cluster.
+#   2. The identity granted Key Vault Crypto User on the key.
+#   3. A federated credential on the identity for each service account below
+#      (agent, management, gateway control plane), and one for each app's
+#      sidecar, with audience api://AzureADTokenExchange. An identity holds
+#      at most 20, so a shared one runs out at 17 apps.
+#
+# The secrets provider reads all of its settings from one Kubernetes secret,
+# so the database password stays out of this file. Replace <client-id> below,
+# and the vault URL and key name in the secret, with yours:
+#
+#   kubectl create secret generic catalyst-pg-secrets -n cra-agent \
+#     --from-literal=connection_string="postgres://<user>:<password>@<host>:5432/<db>" \
+#     --from-literal=kek_provider=azurekeyvault \
+#     --from-literal=azure_key_vault_url="https://my-vault.vault.azure.net/" \
+#     --from-literal=azure_key_vault_key_name=catalyst-kek
+
+global:
+  secrets:
+    provider: postgresql
+    postgresql:
+      existingSecret: catalyst-pg-secrets
+  serviceAccount:
+    # The agent and management service accounts.
+    annotations:
+      azure.workload.identity/client-id: "<client-id>"
+
+agent:
+  podLabels:
+    azure.workload.identity/use: "true"
+  config:
+    # Each app's Dapr sidecar unwraps keys itself, so it needs the identity
+    # too. An app's own annotation overrides this default.
+    sidecar:
+      pod_labels:
+        - key: azure.workload.identity/use
+          value: "true"
+      service_account_annotations:
+        - key: azure.workload.identity/client-id
+          value: "<client-id>"
+
+management:
+  podLabels:
+    azure.workload.identity/use: "true"
+
+gateway:
+  controlplane:
+    podLabels:
+      azure.workload.identity/use: "true"
+    serviceAccount:
+      annotations:
+        azure.workload.identity/client-id: "<client-id>"

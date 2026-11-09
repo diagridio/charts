@@ -1,0 +1,32 @@
+# EKS with IAM roles for service accounts (IRSA): app secrets kept in
+# PostgreSQL and envelope-encrypted with an AWS KMS key that the agent and
+# management service reach through their service account's role. No AWS
+# credential appears in these values. Layer after ../values-production.yaml
+# and external-postgresql.yaml.
+#
+# The reference terraform under ../../../guides/aws/terraform creates the key
+# and the role when kek_kms_enabled is true: its kek_kms_key_id and
+# kek_kms_role_arn outputs fill the placeholders below. Its role trusts the
+# service accounts of a release named `catalyst` in `cra-agent`; change
+# kek_kms_service_account_subjects if you install under other names.
+#
+# The secrets provider reads all of its settings from one Kubernetes secret,
+# so the database password stays out of this file. Every member of a region
+# group configures the same aws_kms_key_id: a multi-region key and its
+# replicas share it.
+#
+#   kubectl create secret generic catalyst-pg-secrets -n cra-agent \
+#     --from-literal=connection_string="postgres://<user>:<password>@<host>:5432/<db>" \
+#     --from-literal=kek_provider=awskms \
+#     --from-literal=aws_kms_key_id="<kek_kms_key_id>" \
+#     --from-literal=aws_region=us-east-1
+
+global:
+  secrets:
+    provider: postgresql
+    postgresql:
+      existingSecret: catalyst-pg-secrets
+  serviceAccount:
+    # The agent and management service accounts.
+    annotations:
+      eks.amazonaws.com/role-arn: "<kek_kms_role_arn>"

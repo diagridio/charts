@@ -157,6 +157,9 @@ spec:
         {{- include "catalyst.affinity" (dict "shared" .Values.shared.scheduling "component" .Values.gateway.envoy) | nindent 8 }}
       tolerations:
         {{- include "catalyst.tolerations" (dict "shared" .Values.shared.scheduling "component" .Values.gateway.envoy) | nindent 8 }}
+      {{- with .Values.gateway.envoy.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
       {{- include "catalyst.topologySpread" (dict "replicas" (include "gateway.envoy.replicas" .) "selectorLabels" (include "gateway.envoy.selectorLabels" .) "availability" .Values.shared.availability) | nindent 6 }}
 ---
 apiVersion: apps/v1
@@ -432,4 +435,7 @@ spec:
         {{- include "catalyst.affinity" (dict "shared" .Values.shared.scheduling "component" .Values.gateway.controlplane) | nindent 8 }}
       tolerations:
         {{- include "catalyst.tolerations" (dict "shared" .Values.shared.scheduling "component" .Values.gateway.controlplane) | nindent 8 }}
+      {{- with .Values.gateway.controlplane.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
       {{- include "catalyst.topologySpread" (dict "replicas" (include "gateway.controlplane.replicas" .) "selectorLabels" (include "gateway.controlplane.selectorLabels" .) "availability" .Values.shared.availability) | nindent 6 }}

@@ -24,7 +24,7 @@ for your workload.
 | `agent.resources.limits` | `memory: 1200Mi` | dropped | Avoid OOMKill / GC throttling |
 | `agent.config.sidecar.log_level` | unset | `error` | Cut sidecar log volume |
 | `agent.config.sidecar.autoscaling.enabled` | `false` | `true` (min 2 / max 10) | Real traffic needs headroom |
-| `agent.config.sidecar.resources.limits` | `cpu: 1, memory: 512Mi` | dropped | Same as agent |
+| `agent.config.sidecar.resources.limits` | `cpu: 300m, memory: 256Mi` | dropped | Same as agent |
 | `agent.config.internal_dapr.scheduler_resources.limits` | `memory: 175Mi` | dropped | OOMKill under job fanout |
 | `management.logLevel` | `info` | `error` | Cut log volume |
 | `management.autoscaling.enabled` | `false` | `true` | Match real load |

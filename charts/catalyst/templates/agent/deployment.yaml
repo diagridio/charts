@@ -287,3 +287,6 @@ spec:
       {{- end }}
       tolerations:
         {{- include "catalyst.tolerations" (dict "shared" .Values.shared.scheduling "component" .Values.agent "componentMerge" .Values.agent.merge) | nindent 8 }}
+      {{- with .Values.agent.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}

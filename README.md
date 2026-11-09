@@ -44,6 +44,7 @@ Catalyst supports the following Dapr APIs:
 #### Chart Reference & Guides
 
 - [Catalyst chart reference](./charts/catalyst/README.md) — all configurable Helm values
+- [Example values](./charts/catalyst/examples/README.md) — starting points per scenario, checked against the chart
 - [Getting Started](./guides/getting-started/README.md) — signup, join token, first install
 - [Deploying to KinD](./guides/kind/README.md)
 - [Deploying to Azure Kubernetes Service (AKS)](./guides/azure/README.md)

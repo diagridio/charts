@@ -100,6 +100,26 @@ helm-template: helm-prereqs ## Render helm chart
 		--debug \
 		--set join_token="fake_token" > rendered.yaml
 
+# Lint and render every example values file the chart ships, layered the way
+# examples/README.md tells customers to: kind.yaml alone, every other example on
+# values-production.yaml and, unless it is the database file itself,
+# external-postgresql.yaml. TestNewNamedConfig_ChartExamples in
+# services/catalyst/agent/pkg/config layers them the same way. Rendering
+# validates against values.schema.json.
+.PHONY: helm-examples
+helm-examples: helm-prereqs ## Lint and render each example values file
+	cd $(CHART_DIR) && \
+	for f in values-production.yaml examples/*.yaml; do \
+		case "$$f" in \
+			values-production.yaml|examples/kind.yaml) layers="" ;; \
+			examples/external-postgresql.yaml) layers="-f values-production.yaml" ;; \
+			*) layers="-f values-production.yaml -f examples/external-postgresql.yaml" ;; \
+		esac; \
+		echo "==> $$layers -f $$f"; \
+		helm lint . --quiet $$layers -f "$$f" --set join_token="fake_token" || exit 1; \
+		helm template catalyst . $$layers -f "$$f" --set join_token="fake_token" > /dev/null || exit 1; \
+	done
+
 .PHONY: helm-validate
 helm-validate: helm-lint helm-test ## Run lint and tests on the helm chart
 

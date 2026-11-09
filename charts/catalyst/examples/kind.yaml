@@ -1,0 +1,47 @@
+# Evaluation on a local kind cluster, as in the KinD guide
+# (../../../guides/kind/README.md).
+#
+#   helm install catalyst oci://public.ecr.aws/diagrid/catalyst \
+#     -n cra-agent --create-namespace \
+#     -f catalyst/examples/kind.yaml \
+#     --set join_token="${JOIN_TOKEN}" \
+#     --set-file gateway.tls.cert=server.pem \
+#     --set-file gateway.tls.key=server-key.pem
+#
+# Not for production: the database credentials are inline and the gateway
+# certificate is self-signed. Start from ../values-production.yaml instead.
+
+global:
+  # The PostgreSQL the guide installs with the Bitnami chart, in the
+  # `postgres` namespace. It has logical replication enabled, which the
+  # Postgres-backed Dapr scheduler needs.
+  #
+  # Skipped that step? Replace this block with
+  #   postgresql:
+  #     disabled: true
+  # and uncomment agent.config.internal_dapr.scheduler below: a
+  # Postgres-backed scheduler cannot run without a Postgres.
+  postgresql:
+    create: false
+    external:
+      auth_type: connectionString
+      connection_string_host: postgres-postgresql.postgres.svc.cluster.local
+      connection_string_port: 5432
+      connection_string_username: postgres
+      connection_string_password: postgres
+      # The Bitnami PostgreSQL from the guide does not serve TLS. Remove this
+      # line when yours does.
+      disable_tls: true
+
+# agent:
+#   config:
+#     internal_dapr:
+#       scheduler:
+#         backend_type: etcd
+#         storage_size: 8Gi
+
+gateway:
+  # Serve the region over HTTPS. The certificate and key are passed with
+  # --set-file at install time (see the command above).
+  tls:
+    enabled: true

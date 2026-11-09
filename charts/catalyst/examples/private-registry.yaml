@@ -1,0 +1,62 @@
+# Install from your own registry: an air-gapped cluster, or one that may pull
+# only from an approved registry. Replace registry.example.internal/catalyst
+# with yours. Layer after ../values-production.yaml and
+# external-postgresql.yaml.
+#
+# Mirror the images and this chart there first, with a copy that keeps their
+# digests: the air-gapped guide (../../../guides/air-gapped/README.md) has the
+# steps and the mirror script.
+
+global:
+  image:
+    # Every image this chart renders, and every image the agent deploys. Only
+    # the registry part of each reference changes; the pinned digests stay.
+    registry: registry.example.internal/catalyst
+    # Pull secrets for every pod this chart renders. They must exist in the
+    # install namespace. The agent's own settings below name the secret for
+    # the images it deploys.
+    imagePullSecrets:
+      - name: diagrid-container-registry
+  charts:
+    # The charts the agent installs, such as Dapr, pulled as
+    # <registry>/dapr. Keep charts under their own path: the Dapr image has
+    # the same name and tag.
+    registry: oci://registry.example.internal/catalyst/charts
+    # A secret in the install namespace with keys username and password for
+    # that registry. Needed when it requires credentials: image pull secrets
+    # do not cover the charts the agent pulls. clientCert, clientKey and
+    # customCA cover certificate authentication and a private CA.
+    existingSecret: catalyst-chart-registry
+    # The Bitnami charts and images for any backend the agent provisions in
+    # the cluster, such as PostgreSQL when you do not bring your own. Charts
+    # are pulled from oci://<bitnamiChartRegistry>/bitnamicharts, images from
+    # <bitnamiImageRegistry>/bitnami/<name>.
+    bitnamiChartRegistry: registry.example.internal/catalyst
+    bitnamiImageRegistry: registry.example.internal/catalyst
+
+agent:
+  config:
+    # Drop these three when your registry needs no credentials.
+    otel:
+      # The pull secret for the OpenTelemetry collectors the agent deploys.
+      image_pull_secret: diagrid-container-registry
+    project:
+      # The pull secret copied into each project's namespace, for its sidecars.
+      image_pull_secret: diagrid-container-registry
+      image_pull_secret_namespace: cra-agent
+    internal_dapr:
+      # The pull secret for the Dapr control plane and the JWT key rotation job.
+      image_pull_secret: diagrid-container-registry
+      image_pull_secret_namespace: cra-agent
+
+# The optional upstream OpenTelemetry collectors take their image from their
+# own subchart, which global.image.registry does not reach. Only needed when
+# you enable them.
+# opentelemetry-deployment:
+#   enabled: true
+#   image:
+#     repository: registry.example.internal/catalyst/opentelemetry-collector-k8s
+# opentelemetry-daemonset:
+#   enabled: true
+#   image:
+#     repository: registry.example.internal/catalyst/opentelemetry-collector-k8s

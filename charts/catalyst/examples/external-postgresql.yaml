@@ -1,0 +1,34 @@
+# An external PostgreSQL you run, such as Amazon RDS, Cloud SQL or Azure
+# Database for PostgreSQL, in place of the one Catalyst provisions in the
+# cluster. Recommended for production; layer it after
+# ../values-production.yaml.
+#
+# Create the secret first, in the namespace you install into:
+#
+#   kubectl create secret generic catalyst-postgres -n cra-agent \
+#     --from-literal=host=<host> --from-literal=port=5432 \
+#     --from-literal=username=<user> --from-literal=password=<password>
+#
+# The server needs logical replication enabled. The chart README lists the
+# settings: "Logical replication requirements (external PostgreSQL)".
+
+global:
+  postgresql:
+    create: false
+    external:
+      auth_type: connectionString
+      # A secret with keys host, port, username and password (and optionally
+      # proxy_host). Preferred over the inline connection_string_* values.
+      existing_secret_name: catalyst-postgres
+      existing_secret_namespace: cra-agent
+      disable_tls: false
+      max_conns: 2
+  # Optional: keep the secrets of your Catalyst apps in the same PostgreSQL,
+  # envelope-encrypted, instead of in Kubernetes secrets. Required for every
+  # member of a region group. The secret holds connection_string, kek_provider,
+  # primary_encryption_key and primary_key_version; see "PostgreSQL Secrets
+  # Provider" in the chart README.
+  # secrets:
+  #   provider: postgresql
+  #   postgresql:
+  #     existingSecret: catalyst-pg-secrets

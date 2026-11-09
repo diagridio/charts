@@ -225,4 +225,7 @@ spec:
         {{- include "catalyst.affinity" (dict "shared" .Values.shared.scheduling "component" .Values.management "componentMerge" .Values.management.merge) | nindent 8 }}
       tolerations:
         {{- include "catalyst.tolerations" (dict "shared" .Values.shared.scheduling "component" .Values.management "componentMerge" .Values.management.merge) | nindent 8 }}
+      {{- with .Values.management.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
       {{- include "catalyst.topologySpread" (dict "replicas" (include "management.replicas" .) "selectorLabels" (include "management.selectorLabels" .) "availability" .Values.shared.availability) | nindent 6 }}

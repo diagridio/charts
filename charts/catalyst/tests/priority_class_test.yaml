@@ -1,0 +1,96 @@
+suite: Test priorityClassName on the region-critical workloads
+templates:
+  - agent/deployment.yaml
+  - agent/configmap.yaml
+  - gateway/deployment.yaml
+  - gateway/configmap.yaml
+  - management/deployment.yaml
+  - management/configmap.yaml
+
+tests:
+  # The chart cannot know whether the class exists in this cluster, and in a
+  # private region it is the customer's call, so nothing is set by default.
+  - it: leaves priorityClassName unset by default
+    set:
+      join_token: "test-token"
+    asserts:
+      - notExists:
+          path: spec.template.spec.priorityClassName
+        template: agent/deployment.yaml
+      - notExists:
+          path: spec.template.spec.priorityClassName
+        template: gateway/deployment.yaml
+        documentIndex: 0
+      - notExists:
+          path: spec.template.spec.priorityClassName
+        template: gateway/deployment.yaml
+        documentIndex: 1
+      - notExists:
+          path: spec.template.spec.priorityClassName
+        template: management/deployment.yaml
+
+  - it: sets each workload's own priorityClassName
+    set:
+      join_token: "test-token"
+      agent.priorityClassName: agent-class
+      gateway.envoy.priorityClassName: envoy-class
+      gateway.controlplane.priorityClassName: controlplane-class
+      management.priorityClassName: management-class
+    asserts:
+      - equal:
+          path: spec.template.spec.priorityClassName
+          value: agent-class
+        template: agent/deployment.yaml
+      - equal:
+          path: spec.template.spec.priorityClassName
+          value: envoy-class
+        template: gateway/deployment.yaml
+        documentIndex: 0
+      - equal:
+          path: spec.template.spec.priorityClassName
+          value: controlplane-class
+        template: gateway/deployment.yaml
+        documentIndex: 1
+      - equal:
+          path: spec.template.spec.priorityClassName
+          value: management-class
+        template: management/deployment.yaml
+
+  - it: rejects a name that is not a valid PriorityClass name
+    set:
+      join_token: "test-token"
+      agent.priorityClassName: Not_A_Name
+    asserts:
+      - failedTemplate: {}
+        template: agent/deployment.yaml
+
+  # An agent older than these keys warns about a key it does not know, so the
+  # chart sends them only when they are set.
+  - it: does not send the agent priority class keys by default
+    set:
+      join_token: "test-token"
+    asserts:
+      - notMatchRegex:
+          path: data["config.yaml"]
+          pattern: "priority_class_name"
+        template: agent/configmap.yaml
+
+  - it: passes the root Dapr priority class to the agent
+    set:
+      join_token: "test-token"
+      agent.config.internal_dapr.root_dapr_priority_class_name: diagrid-platform-critical
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "root_dapr_priority_class_name: diagrid-platform-critical"
+        template: agent/configmap.yaml
+
+  - it: passes the logs collector priority class to the agent
+    set:
+      join_token: "test-token"
+      agent.config.otel.logs_priority_class_name: my-class
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "logs_priority_class_name: my-class"
+        template: agent/configmap.yaml

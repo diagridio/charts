@@ -20,29 +20,12 @@ Use the provided script to mirror every image Catalyst needs, from the registrie
 
 Install ORAS if you want to verify the mirrored images: see [Verify Diagrid's artifacts](https://docs.diagrid.io/operate/hosting/enterprise-self-hosted/verify-artifacts#check-a-mirrored-copy).
 
-Then point the chart at your registry. The override changes only the registry part of each image reference; the digest the chart pins stays the same, which is why the copy above has to preserve it:
-
-```yaml
-global:
-  image:
-    registry: my-registry.example.com
-```
-
-If you use OpenTelemetry addons, override their image repositories too:
-
-```yaml
-opentelemetry-deployment:
-  enabled: true
-  image:
-    repository: my-registry.example.com/opentelemetry-collector-k8s
-    tag: "0.112.0"
-
-opentelemetry-daemonset:
-  enabled: true
-  image:
-    repository: my-registry.example.com/opentelemetry-collector-k8s
-    tag: "0.112.0"
-```
+Then point the chart at your registry with
+[`examples/private-registry.yaml`](../../charts/catalyst/examples/private-registry.yaml), which
+the chart ships (`helm pull --untar` gives you a copy). It sets the image and chart registries,
+the pull secrets for the images the agent deploys, and the registry for the Bitnami charts behind
+the in-cluster PostgreSQL. The override changes only the registry part of each image reference;
+the digest the chart pins stays the same, which is why the copy above has to preserve it.
 
 ## 2. Mirror the Helm Chart
 
@@ -55,13 +38,7 @@ oras cp --recursive public.ecr.aws/diagrid/catalyst:<version> \
 
 This is the path `helm push catalyst-<version>.tgz oci://my-registry.example.com/diagrid/catalyst` would write. `helm pull` and `helm push` work too, but `helm push` gives the chart a new digest, which its signature does not cover.
 
-Configure authentication in `values.yaml`:
-
-```yaml
-global:
-  charts:
-    registry: "oci://my-registry.example.com/diagrid/catalyst"
-    username: "my-username"
-    password: "my-password"
-    # Or use existingSecret, clientCert, clientKey, customCA
-```
+The agent also pulls charts while it runs, such as the Dapr chart it installs, from
+`global.charts.registry`. `global.charts` in
+[`examples/private-registry.yaml`](../../charts/catalyst/examples/private-registry.yaml) sets
+that registry and the secret holding its credentials.
