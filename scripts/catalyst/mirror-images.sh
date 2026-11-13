@@ -3,21 +3,26 @@
 #
 # Mirror Catalyst Helm Chart Images
 #
-# This script pulls all images used by the Catalyst Helm chart from their default
-# registries and pushes them to a target registry with the same repository paths
-# and tags preserved.
+# This script copies every image a Catalyst install pulls to a target registry,
+# at the path the chart asks for once global.image.registry names that
+# registry. It finds them by rendering the chart you install with the
+# values files you install it with: the images its templates render, and the
+# ones the agent deploys after installation, which the chart names in the
+# agent's config. An image or tag your values override is the one copied.
+# Subchart images (metrics-server, the OpenTelemetry add-ons) do not follow
+# global.image.registry: the script lists them instead of copying them.
 #
-# Released Catalyst charts pin every Diagrid image by digest, resolved from
-# the production registry below, so the mirror has to hold the same manifests
-# as that registry. ORAS is preferred when it is installed: `oras cp
-# --recursive` preserves digests and also copies each image's signature, build
-# provenance and SBOMs, so the mirror can be verified (see
+# Released Catalyst charts pin every Diagrid image by digest, so the mirror has
+# to hold the same manifests as the source registry. ORAS is preferred when it
+# is installed: `oras cp --recursive` preserves digests and also copies each
+# image's signature, build provenance and SBOMs, so the mirror can be verified
+# (see
 # https://docs.diagrid.io/operate/hosting/enterprise-self-hosted/verify-artifacts).
-# ORAS also needs jq, to find the per-architecture
-# images whose legacy attestation tags it copies. crane also preserves digests but copies the image
-# alone. docker and podman re-push through the local daemon, which can
-# re-encode layers and change digests, and a digest-pinned chart then fails to
-# pull from the mirror.
+# ORAS also needs jq, to find the
+# per-architecture images whose legacy attestation tags it copies. crane also
+# preserves digests but copies the image alone. docker and podman re-push
+# through the local daemon, which can re-encode layers and change digests, and
+# a digest-pinned chart then fails to pull from the mirror.
 #
 # Usage:
 #   ./mirror-images.sh <target-registry> [OPTIONS]
@@ -26,22 +31,29 @@
 #   target-registry: The destination registry (e.g., my-registry.example.com)
 #
 # Options:
-#   --catalyst-version VERSION    Catalyst image version (default: 0.469.0)
-#   --dapr-version VERSION        Dapr version (default: 1.16.2)
-#   --internal-dapr-version VERSION  Internal Dapr version (default: 1.16.2-rc.1-catalyst.2)
-#   --envoy-version VERSION       Envoy version (default: distroless-v1.33.0)
-#   --piko-version VERSION        Piko version (default: v0.8.2)
-#   --otel-version VERSION        OpenTelemetry Collector version (default: 0.112.0)
+#   --chart CHART                 The chart to read the image list from: a directory,
+#                                 a .tgz, or oci://public.ecr.aws/diagrid/catalyst
+#                                 (default: the chart in this repository, ../../charts/catalyst)
+#   --chart-version VERSION       The chart version, with an oci:// --chart
+#   --values FILE                 A values file you install the chart with. Repeat it for
+#                                 each file, in the order you pass them to helm
+#                                 (default: the chart's own defaults)
+#   --charts-registry REGISTRY    Also copy the Dapr Helm chart the agent installs to this
+#                                 oci:// path, the value you give global.charts.registry
 #   --dry-run                     Print what would be done without executing
 #   --skip-pull                   Skip pulling images, only tag and push
 #
 # Examples:
-#   ./mirror-images.sh my-registry.example.com
-#   ./mirror-images.sh my-registry.example.com --catalyst-version 0.470.0
-#   ./mirror-images.sh my-registry.example.com --otel-version 0.112.0
+#   ./mirror-images.sh my-registry.example.com \
+#     --chart oci://public.ecr.aws/diagrid/catalyst --chart-version 1.137.0
+#   ./mirror-images.sh my-registry.example.com \
+#     --chart oci://public.ecr.aws/diagrid/catalyst --chart-version 1.137.0 \
+#     --values catalyst-values.yaml \
+#     --charts-registry oci://my-registry.example.com/diagrid/catalyst
 #   ./mirror-images.sh my-registry.example.com --dry-run
-#   ./mirror-images.sh my-registry.example.com --skip-pull
 #
+# Requires helm, to render the chart. A chart directory needs its dependencies
+# built first (helm dependency build).
 #
 
 set -euo pipefail
@@ -53,45 +65,42 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Default options
 DRY_RUN=false
 SKIP_PULL=false
 TARGET_REGISTRY=""
-
-# Default versions(these won't be updated frequently and should be passed explicitly)
-CATALYST_VERSION="0.469.0"
-DAPR_VERSION="1.16.2"
-INTERNAL_DAPR_VERSION="1.16.2-catalyst.3"
-ENVOY_VERSION="distroless-v1.33.0"
-PIKO_VERSION="v0.8.2"
-OTEL_VERSION="0.112.0"
+CHART="${SCRIPT_DIR}/../../charts/catalyst"
+CHART_VERSION=""
+CHARTS_REGISTRY=""
+VALUES_ARGS=()
+DAPR_CHART_SOURCE="oci://public.ecr.aws/diagrid/dapr"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
   case $1 in
-    --catalyst-version)
-      CATALYST_VERSION="$2"
+    --chart)
+      CHART="${2:?--chart needs a value}"
       shift 2
       ;;
-    --dapr-version)
-      DAPR_VERSION="$2"
+    --chart-version)
+      CHART_VERSION="${2:?--chart-version needs a value}"
       shift 2
       ;;
-    --internal-dapr-version)
-      INTERNAL_DAPR_VERSION="$2"
+    --values)
+      [[ -f "${2:?--values needs a file}" ]] || { echo -e "${RED}Error: no such values file: $2${NC}" >&2; exit 1; }
+      VALUES_ARGS+=(--values "$2")
       shift 2
       ;;
-    --envoy-version)
-      ENVOY_VERSION="$2"
+    --charts-registry)
+      CHARTS_REGISTRY="${2:?--charts-registry needs a value}"; CHARTS_REGISTRY="${CHARTS_REGISTRY%/}"
       shift 2
       ;;
-    --piko-version)
-      PIKO_VERSION="$2"
-      shift 2
-      ;;
-    --otel-version)
-      OTEL_VERSION="$2"
-      shift 2
+    --catalyst-version|--dapr-version|--internal-dapr-version|--envoy-version|--piko-version|--otel-version)
+      echo -e "${RED}Error: $1 was removed. The image list now comes from the chart itself:${NC}" >&2
+      echo "  $0 <target-registry> --chart oci://public.ecr.aws/diagrid/catalyst --chart-version <version>" >&2
+      exit 1
       ;;
     --dry-run)
       DRY_RUN=true
@@ -121,9 +130,19 @@ done
 # Validate target registry
 if [[ -z "$TARGET_REGISTRY" ]]; then
   echo -e "${RED}Error: Target registry is required${NC}" >&2
-  echo "Usage: $0 <target-registry> [--dry-run] [--skip-pull]" >&2
+  echo "Usage: $0 <target-registry> [--chart <chart>] [--chart-version <version>] [--values <file>]... [--dry-run] [--skip-pull]" >&2
   exit 1
 fi
+if [[ -n "$CHARTS_REGISTRY" && "$CHARTS_REGISTRY" != oci://* ]]; then
+  echo -e "${RED}Error: --charts-registry takes an oci:// reference, e.g. oci://my-registry.example.com/diagrid/catalyst${NC}" >&2
+  exit 1
+fi
+if [[ -n "$CHARTS_REGISTRY" && "${CHARTS_REGISTRY#oci://}" == "${TARGET_REGISTRY%/}" ]]; then
+  # The Dapr chart and the Dapr image share a name and a tag.
+  echo -e "${RED}Error: give --charts-registry a path of its own, e.g. oci://${TARGET_REGISTRY%/}/charts: the Dapr chart would replace the dapr image${NC}" >&2
+  exit 1
+fi
+command -v helm > /dev/null || { echo -e "${RED}Error: helm is required to render the chart${NC}" >&2; exit 1; }
 
 # Remove trailing slash from registry if present
 TARGET_REGISTRY="${TARGET_REGISTRY%/}"
@@ -197,68 +216,216 @@ elif [[ "$RUNTIME" != "oras" ]]; then
   echo -e "${YELLOW}Released Catalyst charts pin Diagrid images by digest; install oras (or crane) for a digest-preserving mirror.${NC}"
 fi
 echo -e "${BLUE}Target registry: ${TARGET_REGISTRY}${NC}"
-echo -e "${BLUE}Catalyst version: ${CATALYST_VERSION}${NC}"
-echo -e "${BLUE}Dapr version: ${DAPR_VERSION}${NC}"
-echo -e "${BLUE}Internal Dapr version: ${INTERNAL_DAPR_VERSION}${NC}"
-echo -e "${BLUE}OpenTelemetry Collector version: ${OTEL_VERSION}${NC}"
+echo -e "${BLUE}Chart: ${CHART}${CHART_VERSION:+ ${CHART_VERSION}}${NC}"
 
-# The registries the released chart's defaults name: Diagrid's production
-# public registry, whose digests the release pipeline pins and signs, and
-# Diagrid's production Docker Hub proxy for third-party images.
-DIAGRID_REGISTRY="us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public"
-DOCKER_HUB_PROXY="us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy"
-
-# Define all images from the Catalyst Helm chart
-# Format: "SOURCE_IMAGE"
-#
-# The Diagrid-built entries must stay aligned with the release image table in
-# deploy/tools/pkg/catalystimages, which is what the release pipeline pins by
-# digest. An image in that table and missing here mirrors to nothing, and the
-# released chart then fails against the mirror with "manifest unknown".
-declare -a IMAGES=(
-  # Primary Component Images (Default Mode)
-  "${DIAGRID_REGISTRY}/cra-agent:${CATALYST_VERSION}"
-  "${DIAGRID_REGISTRY}/catalyst-management:${CATALYST_VERSION}"
-  "${DIAGRID_REGISTRY}/catalyst-gateway:${CATALYST_VERSION}"
-  "${DIAGRID_REGISTRY}/identity-injector:${CATALYST_VERSION}"
-  "${DIAGRID_REGISTRY}/catalyst-mcp:${CATALYST_VERSION}"
-
-  # Consolidated Image (Alternative Mode)
-  "${DIAGRID_REGISTRY}/catalyst-all:${CATALYST_VERSION}"
-  
-  # External Component Images
-  "${DOCKER_HUB_PROXY}/envoyproxy/envoy:${ENVOY_VERSION}"
-  "${DIAGRID_REGISTRY}/diagrid-piko:${PIKO_VERSION}"
-  
-  # OpenTelemetry Collector Images (Optional)
-  "ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-k8s:${OTEL_VERSION}"
-  
-  # Agent Nested Images
-  "${DIAGRID_REGISTRY}/sidecar:${CATALYST_VERSION}"
-  "${DIAGRID_REGISTRY}/catalyst-otel-collector:${CATALYST_VERSION}"
-  "${DIAGRID_REGISTRY}/private-sentry:${CATALYST_VERSION}"
-  
-  # Upstream Dapr Images
-  "${DOCKER_HUB_PROXY}/daprio/dapr:${DAPR_VERSION}"
-  
-  # Internal Dapr Images
-  "${DIAGRID_REGISTRY}/dapr:${INTERNAL_DAPR_VERSION}"
-)
-
-# Function to extract repository path and tag from full image reference
-extract_repo_and_tag() {
-  local image="$1"
-  local image_name_tag="${image##*/}"
-  echo "$image_name_tag"
+# The images a data plane render names outside any pod spec: the ones the agent
+# deploys after installation, which the chart writes into the agent's
+# config.yaml. agent_config flattens the config.yaml of every ConfigMap in a
+# render read on stdin to "<path>\t<value>" lines; agent_images turns those
+# into "<section> <image>" lines. They read the same fields as
+# deploy/tools/pkg/catalystimages in the Catalyst repository and
+# deploy/selfhosted/work/mirror-to-registry.sh in the self-hosted package (AgentComposedImages,
+# AgentPinnedImages); keep them in step.
+agent_config() {
+  awk '
+    function indent(s) { match(s, /^ */); return RLENGTH }
+    /^---/ { inblock = 0; next }
+    inblock && /^[[:space:]]*$/ { next }
+    inblock && indent($0) < base { inblock = 0 }
+    inblock {
+      ind = indent($0) - base
+      line = substr($0, base + 1)
+      # The lines of a multi-line scalar (a PEM bundle) are not keys.
+      if (skip >= 0 && ind > skip) next
+      skip = -1
+      if (line ~ /^ *- /) next
+      if (line !~ /^ *[^ :][^:]*:( |$)/) next
+      key = line; sub(/^ */, "", key); sub(/:( .*)?$/, "", key); gsub(/^["\047]|["\047]$/, "", key)
+      val = line; sub(/^ *[^ :][^:]*:/, "", val); sub(/^ */, "", val); sub(/ *$/, "", val)
+      while (n > 0 && depth[n] >= ind) n--
+      path = ""
+      for (i = 1; i <= n; i++) path = path keys[i] "."
+      if (val == "") { n++; depth[n] = ind; keys[n] = key; next }
+      if (val ~ /^[|>]/) { skip = ind; next }
+      gsub(/^["\047]|["\047]$/, "", val)
+      print path key "\t" val
+      next
+    }
+    /^ *"?config\.yaml"?: *[|]/ { inblock = 1; base = indent($0) + 2; n = 0; skip = -1 }
+  '
 }
+
+# agent_images FILE DAPR_VERSION ROTATION_IMAGE: the last two are the chart's
+# catalyst.diagrid.io/dapr-version and catalyst.diagrid.io/jwt-rotation-image
+# annotations, what the agent deploys where the values leave the Dapr image tag
+# or the rotation image empty. A value the render sets wins.
+agent_images() {
+  awk -F'\t' -v dapr_default="$2" -v rotation_default="$3" '
+    { v[$1] = $2 }
+    function img(section, reg, name, tag, digest,   ref) {
+      if (name == "" || (tag == "" && digest == "")) return
+      ref = (reg != "" ? reg "/" : "") name
+      if (tag != "") ref = ref ":" tag
+      if (digest != "") ref = ref "@" digest
+      print section, ref
+    }
+    function either(a, b) { return a != "" ? a : b }
+    END {
+      img("sidecar", v["sidecar.image_registry"], v["sidecar.image_name"], v["sidecar.image_tag"], v["sidecar.image_digest"])
+      img("otel", v["otel.image_registry"], v["otel.image_name"], v["otel.image_tag"], v["otel.image_digest"])
+      img("internal_dapr.sentry", v["internal_dapr.sentry.image.registry"], v["internal_dapr.sentry.image.name"], v["internal_dapr.sentry.image.tag"], v["internal_dapr.sentry.image.digest"])
+      if (v["internal_dapr.container_registry"] != "")
+        img("internal_dapr", v["internal_dapr.container_registry"], either(v["internal_dapr.image_name"], "dapr"), either(v["internal_dapr.image_tag"], dapr_default), "")
+      # The rotation default, split into registry, name and tag.
+      d_reg = ""; d_name = rotation_default; d_tag = ""
+      if (match(d_name, /:[^:\/]+$/)) { d_tag = substr(d_name, RSTART + 1); d_name = substr(d_name, 1, RSTART - 1) }
+      if (match(d_name, /.*\//)) { d_reg = substr(d_name, 1, RLENGTH - 1); d_name = substr(d_name, RLENGTH + 1) }
+      p = "internal_dapr.sentry.jwt."
+      reg = either(v[p "rotation_image_registry"], either(v[p "rotation_image.registry"], d_reg))
+      if (reg != "")
+        img("internal_dapr.sentry.jwt", reg, either(v[p "rotation_image.name"], d_name), either(v[p "rotation_image.tag"], d_tag), "")
+    }
+  ' "$1"
+}
+
+# chart_annotation KEY: one annotation's value from `helm show chart` on stdin.
+chart_annotation() {
+  awk -v key="$1" '$1 == key ":" { v = $2; gsub(/^["\047]|["\047]$/, "", v); print v }'
+}
+
+images_in() {
+  { grep -oE 'image: *"?[^" ]+' || true; } | sed -E 's/image: *"?//'
+}
+
+# A reference with both a tag and a digest is pushed under its tag; the copy
+# keeps the digest. One with only a digest is pushed by digest.
+by_tag() {
+  local ref="$1" name="${1%@*}"
+  if [[ "$ref" == *@* && "${name##*/}" == *:* ]]; then echo "$name"; else echo "$ref"; fi
+}
+
+# The chart rendered as you install it twice: against Diagrid's registries,
+# with global.image.registry cleared since a values file written for the
+# mirror names the mirror, to find each image; and against the target, to find
+# where the install will pull that image from.
+WORK=$(mktemp -d)
+trap 'rm -rf "$WORK"' EXIT
+render() {
+  helm template catalyst "$CHART" ${CHART_VERSION:+--version "$CHART_VERSION"} \
+    ${VALUES_ARGS[@]+"${VALUES_ARGS[@]}"} --set join_token=mirror "$@"
+}
+if ! render --set global.image.registry= > "$WORK/render.yaml" \
+  || ! render --set global.image.registry="$TARGET_REGISTRY" > "$WORK/render-mirror.yaml"; then
+  echo -e "${RED}Error: could not render ${CHART}. A chart directory needs \`helm dependency build\` first, or pass --chart oci://public.ecr.aws/diagrid/catalyst --chart-version <version>${NC}" >&2
+  exit 1
+fi
+agent_config < "$WORK/render.yaml" > "$WORK/agent-config.txt"
+agent_config < "$WORK/render-mirror.yaml" > "$WORK/agent-config-mirror.txt"
+# Where your values leave the Dapr control plane or the JWT key rotation job to
+# the agent, the chart's annotations name what the agent deploys. A chart
+# released before them lists those two under Runtime Images in its README.
+helm show chart "$CHART" ${CHART_VERSION:+--version "$CHART_VERSION"} > "$WORK/chart.yaml"
+DAPR_DEFAULT=$(chart_annotation catalyst.diagrid.io/dapr-version < "$WORK/chart.yaml")
+ROTATION_DEFAULT=$(chart_annotation catalyst.diagrid.io/jwt-rotation-image < "$WORK/chart.yaml")
+agent_images "$WORK/agent-config.txt" "$DAPR_DEFAULT" "$ROTATION_DEFAULT" > "$WORK/agent-images.txt"
+agent_images "$WORK/agent-config-mirror.txt" "$DAPR_DEFAULT" "$ROTATION_DEFAULT" > "$WORK/agent-images-mirror.txt"
+
+for section in internal_dapr internal_dapr.sentry.jwt; do
+  grep -q "^${section} " "$WORK/agent-images.txt" && continue
+  case "$section" in
+    internal_dapr) name=dapr ;;
+    internal_dapr.sentry.jwt) name=k8s-tools ;;
+  esac
+  helm show readme "$CHART" ${CHART_VERSION:+--version "$CHART_VERSION"} \
+    | awk '/^#+ Runtime Images/ {f = 1; next} /^#+ / {f = 0} f' \
+    | { grep -oE '`[^`]+/'"${name}"'[:@][^`]+`' || true; } | tr -d '`' | head -n1 \
+    | sed "s|^|${section} |" >> "$WORK/agent-images.txt"
+done
+
+# Where an image goes in the target registry: its path on its source registry,
+# with Diagrid's registry prefixes dropped. Used only for the images an older
+# chart lists in its README, which no render names.
+destination() {
+  local ref="$1" path first
+  case "$ref" in
+    # reg-[dp]-common-docker, -docker-public and -docker-hub-proxy
+    */reg-[dp]-common-docker*/*) path="${ref#*/reg-[dp]-common-docker*/}" ;;
+    */*)
+      first="${ref%%/*}"
+      if [[ "$first" == *.* || "$first" == *:* || "$first" == localhost ]]; then
+        path="${ref#*/}"
+      else
+        path="$ref"
+      fi
+      ;;
+    *) path="$ref" ;;
+  esac
+  echo "${TARGET_REGISTRY}/${path#library/}"
+}
+
+# Each image paired with where the install pulls it from: a pod-spec image with
+# the one in the same place in the render against the target, an agent image
+# with the one in the same agent config section. global.image.registry
+# replaces an image's whole registry, path included, so the destination cannot
+# be worked out from the source alone.
+images_in < "$WORK/render.yaml" > "$WORK/pod-images.txt"
+images_in < "$WORK/render-mirror.yaml" > "$WORK/pod-images-mirror.txt"
+if [[ $(wc -l < "$WORK/pod-images.txt") -ne $(wc -l < "$WORK/pod-images-mirror.txt") ]]; then
+  echo -e "${RED}Error: ${CHART} renders a different set of images once global.image.registry is ${TARGET_REGISTRY}, so they cannot be paired${NC}" >&2
+  exit 1
+fi
+{
+  paste -d' ' "$WORK/pod-images.txt" "$WORK/pod-images-mirror.txt"
+  while read -r section src; do
+    dst=$(awk -v s="$section" '$1 == s {print $2; exit}' "$WORK/agent-images-mirror.txt")
+    echo "$src ${dst:-$(destination "$src")}"
+  done < "$WORK/agent-images.txt"
+} > "$WORK/pairs.txt"
+
+# One copy per destination. An image the target render still pulls from
+# elsewhere is a subchart's (metrics-server, the OpenTelemetry add-ons), which
+# global.image.registry does not reach; one your values already pull from the
+# target needs no copy.
+SOURCES=()
+DESTINATIONS=()
+NOT_RELOCATED=()
+ALREADY_THERE=()
+while read -r src dst; do
+  if [[ "$src" == "${TARGET_REGISTRY}/"* ]]; then
+    ALREADY_THERE+=("$src")
+  elif [[ "$dst" != "${TARGET_REGISTRY}/"* ]]; then
+    NOT_RELOCATED+=("$src")
+  else
+    SOURCES+=("$src")
+    DESTINATIONS+=("$(by_tag "$dst")")
+  fi
+done < <(awk 'NF && !seen[$0]++' "$WORK/pairs.txt")
+IMAGES=()
+TARGETS=()
+for i in "${!SOURCES[@]}"; do
+  dup=false
+  for t in ${TARGETS[@]+"${TARGETS[@]}"}; do
+    [[ "$t" == "${DESTINATIONS[$i]}" ]] && { dup=true; break; }
+  done
+  $dup && continue
+  IMAGES+=("${SOURCES[$i]}")
+  TARGETS+=("${DESTINATIONS[$i]}")
+done
+if [[ ${#IMAGES[@]} -eq 0 && ${#ALREADY_THERE[@]} -eq 0 ]]; then
+  echo -e "${RED}Error: the render of ${CHART} names no images${NC}" >&2
+  exit 1
+fi
+# The Dapr chart the agent installs: the version your values pin, else the one
+# the chart records, else, in a release that records none, the Dapr image's tag.
+DAPR_CHART_VERSION=$(awk -F'\t' '$1 == "internal_dapr.chart_version" {print $2}' "$WORK/agent-config.txt" | tail -n1)
+[[ -n "$DAPR_CHART_VERSION" ]] || DAPR_CHART_VERSION="$DAPR_DEFAULT"
+[[ -n "$DAPR_CHART_VERSION" ]] || DAPR_CHART_VERSION=$(sed -nE 's|^internal_dapr .*/dapr:([^@]+).*|\1|p' "$WORK/agent-images.txt" | head -n1)
 
 # Function to pull, tag, and push an image
 mirror_image() {
   local source_image="$1"
-  local repo_and_tag
-  repo_and_tag=$(extract_repo_and_tag "$source_image")
-  local target_image="${TARGET_REGISTRY}/${repo_and_tag}"
-  
+  local target_image="$2"
+
   echo ""
   echo -e "${YELLOW}=== Processing: ${source_image} ===${NC}"
   
@@ -340,14 +507,49 @@ fi
 FAILED_IMAGES=()
 SUCCESS_COUNT=0
 
+if [[ ${#ALREADY_THERE[@]} -gt 0 ]]; then
+  echo ""
+  echo -e "${YELLOW}Your values already pull these from ${TARGET_REGISTRY}, so they are not copied; make sure they are there:${NC}"
+  printf '  %s\n' "${ALREADY_THERE[@]}"
+fi
+if [[ ${#NOT_RELOCATED[@]} -gt 0 ]]; then
+  echo ""
+  echo -e "${YELLOW}global.image.registry does not reach these subchart images, so they are not copied.${NC}"
+  echo -e "${YELLOW}Copy them yourself and point the subchart's own image values at ${TARGET_REGISTRY}:${NC}"
+  printf '  %s\n' "${NOT_RELOCATED[@]}"
+fi
+
 # Process each image
-for image in "${IMAGES[@]}"; do
-  if mirror_image "$image"; then
+for i in ${IMAGES[@]+"${!IMAGES[@]}"}; do
+  if mirror_image "${IMAGES[$i]}" "${TARGETS[$i]}"; then
     SUCCESS_COUNT=$((SUCCESS_COUNT + 1))
   else
-    FAILED_IMAGES+=("$image")
+    FAILED_IMAGES+=("${IMAGES[$i]}")
   fi
 done
+
+# The agent installs Diagrid's Dapr chart from global.charts.registry, at the
+# version found above. It is a chart, not an image, so it is copied with helm.
+if [[ -n "$CHARTS_REGISTRY" ]]; then
+  echo ""
+  if [[ -z "$DAPR_CHART_VERSION" ]]; then
+    echo -e "${RED}✗ The chart names no Dapr chart version or dapr image${NC}" >&2
+    FAILED_IMAGES+=("${DAPR_CHART_SOURCE} (chart)")
+  elif [[ "$DRY_RUN" == "true" ]]; then
+    echo -e "${BLUE}[DRY RUN] Would copy chart: ${DAPR_CHART_SOURCE}:${DAPR_CHART_VERSION} -> ${CHARTS_REGISTRY}/dapr${NC}"
+  else
+    echo -e "${YELLOW}=== Processing chart: ${DAPR_CHART_SOURCE}:${DAPR_CHART_VERSION} ===${NC}"
+    CHART_TMP=$(mktemp -d)
+    if helm pull "$DAPR_CHART_SOURCE" --version "$DAPR_CHART_VERSION" -d "$CHART_TMP" \
+      && helm push "$CHART_TMP/dapr-${DAPR_CHART_VERSION}.tgz" "$CHARTS_REGISTRY"; then
+      echo -e "${GREEN}✓ Mirrored chart successfully${NC}"
+    else
+      echo -e "${RED}✗ Failed to copy the Dapr chart${NC}" >&2
+      FAILED_IMAGES+=("${DAPR_CHART_SOURCE}:${DAPR_CHART_VERSION} (chart)")
+    fi
+    rm -rf "$CHART_TMP"
+  fi
+fi
 
 # Print summary
 echo ""
@@ -376,6 +578,10 @@ if [[ "$DRY_RUN" == "false" ]]; then
   echo -e "     ${YELLOW}global:${NC}"
   echo -e "       ${YELLOW}image:${NC}"
   echo -e "         ${YELLOW}registry: ${TARGET_REGISTRY}${NC}"
+  if [[ -n "$CHARTS_REGISTRY" ]]; then
+    echo -e "       ${YELLOW}charts:${NC}"
+    echo -e "         ${YELLOW}registry: ${CHARTS_REGISTRY}${NC}"
+  fi
   echo ""
   echo -e "  2. Install the Helm chart:"
   echo -e "     ${YELLOW}helm install catalyst ./charts/catalyst -f values.yaml${NC}"

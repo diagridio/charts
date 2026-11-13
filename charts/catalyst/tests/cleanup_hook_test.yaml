@@ -191,17 +191,41 @@ tests:
           path: kind
           value: ClusterRoleBinding
 
-  - it: should use configurable dapr namespace in cleanup script
+  - it: deletes the default Dapr namespace, which the agent created
     set:
       join_token: "test-token"
       cleanup.enabled: true
-      cleanup.namespaces.dapr: "custom-dapr-ns"
-    release:
-      namespace: "my-catalyst-ns"
+    documentSelector:
+      path: kind
+      value: Job
     asserts:
       - matchRegex:
           path: spec.template.spec.containers[0].command[2]
+          pattern: "kubectl delete namespace root-dapr-system"
+
+  - it: keeps a Dapr namespace chosen at install, which may have existed before
+    set:
+      join_token: "test-token"
+      cleanup.enabled: true
+      global.namespaces.dapr: "custom-dapr-ns"
+    release:
+      namespace: "my-catalyst-ns"
+    asserts:
+      - notMatchRegex:
+          path: spec.template.spec.containers[0].command[2]
           pattern: "kubectl delete namespace custom-dapr-ns"
+        documentSelector:
+          path: kind
+          value: Job
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: "helm uninstall dapr -n custom-dapr-ns"
+        documentSelector:
+          path: kind
+          value: Job
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: "dapr-scheduler-data-dir-dapr-scheduler-server-"
         documentSelector:
           path: kind
           value: Job
@@ -211,3 +235,45 @@ tests:
         documentSelector:
           path: kind
           value: Job
+
+  - it: keeps a Dapr namespace it shares with the release
+    set:
+      join_token: "test-token"
+      cleanup.enabled: true
+      global.namespaces.dapr: catalyst
+    release:
+      namespace: catalyst
+    documentSelector:
+      path: kind
+      value: Job
+    asserts:
+      - notMatchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: "kubectl delete namespace catalyst "
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: "kubectl delete secret,configmap dapr-trust-bundle -n catalyst"
+
+  - it: keeps a Dapr namespace it shares with the data backends
+    set:
+      join_token: "test-token"
+      cleanup.enabled: true
+      global.namespaces.dapr: cat-infra
+      global.namespaces.postgresql: cat-infra
+      global.namespaces.kafka: cat-infra
+      global.namespaces.redis: cat-infra
+    release:
+      namespace: catalyst
+    documentSelector:
+      path: kind
+      value: Job
+    asserts:
+      - notMatchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: "kubectl delete namespace cat-infra"
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: "helm uninstall jwt-key-rotation -n cat-infra"
+      - matchRegex:
+          path: spec.template.spec.containers[0].command[2]
+          pattern: "kubectl delete configmap catalyst-trusted-ca -n cat-infra"

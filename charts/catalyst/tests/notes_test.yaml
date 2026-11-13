@@ -121,6 +121,14 @@ tests:
       - matchRegexRaw:
           pattern: "kubectl -n my-catalyst logs deploy/agent"
 
+  - it: should add the Dapr namespace flag to diagrid diagnose when it is not the default
+    set:
+      join_token: "test-token"
+      global.namespaces.dapr: catalyst-dapr
+    asserts:
+      - matchRegexRaw:
+          pattern: "diagrid diagnose --root-dapr-namespace catalyst-dapr"
+
   - it: should not add a namespace flag to diagrid diagnose in cra-agent
     set:
       join_token: "test-token"

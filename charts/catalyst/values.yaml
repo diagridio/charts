@@ -195,6 +195,25 @@ global:
         azure_key_vault_key_version: "azure_key_vault_key_version"
         max_conns: "max_conns"
         timeout: "timeout"
+  # namespaces are where the agent installs what runs beside this release. Each
+  # may be any namespace, including the release namespace: set them all to it
+  # to run the whole data plane in one namespace. None may start with "prj-",
+  # which is reserved for project namespaces. See "Installing into other
+  # namespaces" in the chart README. Choose them before the first install.
+  # The defaults are also constants in services/catalyst/pkg/agent/defaults.go
+  # and the default Piko JWKS URL (templates/piko/_helpers.tpl); change all
+  # three together.
+  namespaces:
+    # dapr is the region's own Dapr control plane: Sentry, operator,
+    # placement and scheduler.
+    dapr: root-dapr-system
+    # postgresql is the shared self-hosted PostgreSQL (global.postgresql.create).
+    postgresql: shared-postgresql
+    # kafka is the shared self-hosted Kafka (global.kafka.create).
+    kafka: shared-kafka
+    # redis is the managed Redis and the rate-limit service beside it
+    # (global.redis.create).
+    redis: shared-ratelimit-redis
   # Global control plane URL
   control_plane_namespace: controlplane
   control_plane_url: catalyst-cloud.r1.diagrid.io:443
@@ -208,12 +227,18 @@ global:
   # Global sentry configuration
   sentry:
     enabled: true
+    # endpoint is the in-cluster address of the region's Sentry. Left at this
+    # default (or empty) it follows global.namespaces.dapr:
+    # dapr-sentry.<namespace>.svc.cluster.local:443.
     endpoint: dapr-sentry.root-dapr-system.svc.cluster.local:443
     remote_endpoint: sentry.r1.diagrid.io:443
     remote_namespace: "controlplane"
     trust_anchors_endpoint: https://trust.r1.diagrid.io
     trust_anchors_endpoint_insecure: false
     trust_domain: prj-root.trust.diagrid.io
+    # namespace is deprecated: the region's Dapr namespace is
+    # global.namespaces.dapr. Left at this default (or empty) it follows
+    # global.namespaces.dapr; any other value must equal it.
     namespace: root-dapr-system
     trust_anchors_file: "/var/run/secrets/diagrid.io/trust/ca.crt"
     # jwt_audiences are extra audiences embedded in the JWT-SVIDs that sidecars
@@ -637,8 +662,8 @@ agent:
       allowed_egress: []
       # allowed_ingress is an additive list of ingress sources permitted into
       # project namespaces. Each rule may combine cidrs and namespaces, and may
-      # be scoped to specific ports. The agent namespace (cra-agent) and the
-      # monitoring namespace are always permitted implicitly — you do not need
+      # be scoped to specific ports. The release namespace (cra-agent by default) and
+      # the monitoring namespace are always permitted implicitly — you do not need
       # to list them here.
       #
       # Example:
@@ -720,7 +745,7 @@ agent:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       image_name: "{{ ternary .Values.global.consolidated_image.repository \"sidecar\" .Values.global.consolidated_image.enabled }}"
       # image_tag is the sidecar image version
-      image_tag: "1.137.2"
+      image_tag: "1.137.3"
       # image_digest pins the sidecar to an immutable content digest
       # ("sha256:<64 hex>"), which wins over image_tag. Empty = pin by tag.
       # global.consolidated_image.digest, when set, overrides this.
@@ -811,7 +836,7 @@ agent:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       image_name: "{{ ternary .Values.global.consolidated_image.repository \"catalyst-otel-collector\" .Values.global.consolidated_image.enabled }}"
       # image_tag is the otel collector image version
-      image_tag: "1.137.2"
+      image_tag: "1.137.3"
       # image_digest pins the otel collector to an immutable content digest
       # ("sha256:<64 hex>"), which wins over image_tag. Empty = pin by tag.
       # global.consolidated_image.digest, when set, overrides this.
@@ -903,6 +928,14 @@ agent:
       # Override per overlay when the destination registry hosts the dapr
       # multi-binary image under a different name.
       # image_name: ""
+      # image_tag and chart_version are the Dapr control-plane image tag and
+      # Helm chart version the agent installs. Empty follows the agent: it
+      # installs the Dapr it was built with, which this chart's
+      # catalyst.diagrid.io/dapr-version annotation names. Setting them pins it
+      # across chart upgrades; set both or neither, normally to the same
+      # version, since the chart fails a render that sets only one.
+      image_tag: ""
+      chart_version: ""
       # disable_root_dapr_ha runs the region's root Dapr control plane, in
       # root-dapr-system, without high availability: one operator, one sentry
       # and one placement instead of three of each. The scheduler runs three
@@ -962,7 +995,7 @@ agent:
           registry: us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public
           # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
           name: "{{ ternary .Values.global.consolidated_image.repository \"private-sentry\" .Values.global.consolidated_image.enabled }}"
-          tag: "1.137.2"
+          tag: "1.137.3"
           # digest pins the private sentry to an immutable content digest
           # ("sha256:<64 hex>"), which wins over tag. Empty = pin by tag.
           # global.consolidated_image.digest, when set, overrides this.
@@ -977,6 +1010,15 @@ agent:
           secret_name: "jwt-signing-keys"
           key_filename: "jwt.key"
           jwks_filename: "jwks.json"
+          # rotation_image is the image of the job that rotates the JWT signing
+          # keys. An empty field follows the agent, which runs the image this
+          # chart's catalyst.diagrid.io/jwt-rotation-image annotation names;
+          # setting one pins it across chart upgrades. global.image.registry,
+          # when set, replaces the registry.
+          rotation_image:
+            registry: ""
+            name: ""
+            tag: ""
         oidc:
           enabled: true
           # Validates inbound user JWTs against IDPFederation resources. Requires mtls.enabled.
@@ -996,10 +1038,15 @@ agent:
     # ConfigMap in this namespace, for your own tooling to read. Diagrid does
     # NOT apply the upgrade; the ConfigMap is a fact to act on, and applying it
     # stays yours. Off by default. See the release channels guide for the
-    # endpoint, the ConfigMap's contents, and `readers`, which names the
-    # identities the chart grants read access to it.
+    # ConfigMap's contents, and `readers`, which names the identities the chart
+    # grants read access to it.
     release_availability:
       enabled: false
+      # Diagrid's release resolver for the control plane this region joined.
+      # Defaults to production's, like control_plane_url above; a region joined
+      # to staging sets https://catalyst-releases.staging.diagrid.dev instead,
+      # since each resolver answers only for regions of its own control plane.
+      endpoint: https://catalyst-releases.r1.diagrid.io
     # Feature flags for the agent. Merged over global.featureflags and wins on key collision,
     # use this to override a chart-wide flag for the agent alone.
     # e.g. featureflags: {sidecar: {graceful_config_reload: false}}
@@ -1069,12 +1116,13 @@ agent:
               # allow_public_internet, or name a range inside the
               # private ranges or blocked_egress_cidrs. Unset by default.
               # allowed_egress_cidrs: []
-    # Report the region's public OIDC documents to the control plane
-    # fetched through the region ingress (real wildcard cert,
-    # so no insecure_skip_verify needed).
+    # Report the region's public OIDC documents, read from the region's
+    # Sentry inside the cluster, to the control plane.
     oidc:
       collector:
         enabled: true
+        # Deprecated and ignored: the collector no longer goes through the
+        # region ingress, so there is no certificate to verify.
         insecure_skip_verify: false
   metrics:
     port: 9090
@@ -1093,7 +1141,7 @@ agent:
     # Example: "diagrid/cra-agent" or "cra-agent"
     repository: cra-agent
     # tag is the image tag/version to use
-    tag: "1.137.2"
+    tag: "1.137.3"
     # digest, if set, wins over tag (see global.consolidated_image.digest above).
     digest: ""
     # pullPolicy is the image pull policy for this specific image.
@@ -1228,7 +1276,7 @@ gateway:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       repository: identity-injector
       # tag is the image tag/version to use
-      tag: "1.137.2"
+      tag: "1.137.3"
       # digest, if set, wins over tag (see global.consolidated_image.digest above).
       digest: ""
       # pullPolicy is the image pull policy for this specific image.
@@ -1385,7 +1433,7 @@ gateway:
       # When consolidated_image.enabled is true, uses consolidated_image.repository instead.
       repository: catalyst-gateway
       # tag is the image tag/version to use
-      tag: "1.137.2"
+      tag: "1.137.3"
       # digest, if set, wins over tag (see global.consolidated_image.digest above).
       digest: ""
       # pullPolicy is the image pull policy for this specific image.
@@ -1509,7 +1557,7 @@ management:
     # Deprecated: This field supports template evaluation for backwards compatibility.
     repository: "{{ ternary .Values.global.consolidated_image.repository \"catalyst-management\" .Values.global.consolidated_image.enabled }}"
     # tag is the image tag/version to use
-    tag: "1.137.2"
+    tag: "1.137.3"
     # digest, if set, wins over tag (see global.consolidated_image.digest above).
     digest: ""
     # pullPolicy is the image pull policy for this specific image.
@@ -1747,7 +1795,7 @@ mcp:
     # OpenAPI spec, so this component never uses global.consolidated_image.
     repository: catalyst-mcp
     # tag is the image tag/version to use
-    tag: "1.137.2"
+    tag: "1.137.3"
     # digest, if set, wins over tag (see global.consolidated_image.digest above).
     digest: ""
     # pullPolicy is the image pull policy for this specific image.
@@ -1827,8 +1875,9 @@ piko:
   replicaCount: 1
   pikoName: "piko"
   releaseName: "diagrid-piko"
-  # Sets the configmap name and the key in the config map
-  # that contains the public key to validate the JWT.
+  # publicToken.url is the JWKS endpoint piko validates tunnel tokens against:
+  # the region's Sentry. Left at this default it follows global.namespaces.dapr;
+  # any other value is used as given.
   publicToken:
     url: http://dapr-sentry.root-dapr-system.svc.cluster.local:9080/jwks.json
     cacheTTL: "5m"
@@ -1839,7 +1888,7 @@ piko:
     # repository is the image name/path within the registry.
     repository: diagrid-piko
     # tag is the image tag/version to use
-    tag: "v1.0.1"
+    tag: "v1.0.2"
     # digest, if set, wins over tag (see global.consolidated_image.digest above).
     digest: ""
     # pullPolicy is the image pull policy for this specific image.
@@ -2198,8 +2247,11 @@ cleanup:
   ttlSecondsAfterFinished: 300
   # namespaces that are created by Catalyst at runtime and should be cleaned up
   namespaces:
-    # dapr is the namespace where internal Dapr components are installed
-    dapr: "root-dapr-system"
+    # dapr is deprecated: the internal Dapr namespace is global.namespaces.dapr.
+    # Left empty (or at root-dapr-system, its old default) it follows
+    # global.namespaces.dapr; any other value must equal it, so the cleanup
+    # never targets a namespace the agent did not use.
+    dapr: ""
   image:
     # registry is the container registry for the cleanup job image
     # The cleanup job needs both kubectl and helm CLI tools.
@@ -2235,8 +2287,11 @@ networkPolicies:
     port: 443
   # postgres.namespace adds an egress allow on 5432 to the namespace hosting
   # PostgreSQL (the agent initializes the scheduler and managed-state-store
-  # databases there). Empty omits the rule (e.g. postgres reached via public
-  # endpoint, or no postgres-backed features in use).
+  # databases there). Empty follows global.namespaces.postgresql when the chart
+  # creates PostgreSQL (global.postgresql.create), and otherwise omits the rule
+  # (e.g. postgres reached via public endpoint, or no postgres-backed features
+  # in use). A Kafka the chart creates (global.kafka.create) gets the same
+  # allow on 9092 to global.namespaces.kafka.
   postgres:
     namespace: ""
   # extraEgress appends namespace-wide egress allows for install-specific

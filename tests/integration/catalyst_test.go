@@ -31,7 +31,8 @@ const (
 	pollInterval  = 2 * time.Second
 	pollTimeout   = 2 * time.Minute
 	testNamespace = "catalyst-test"
-	k3sImage      = "rancher/k3s:v1.27.1-k3s1"
+	// Pulled through the Docker Hub proxy; see deploy/config/approved-image-registries.txt.
+	k3sImage = "us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy/rancher/k3s:v1.27.1-k3s1"
 )
 
 // TestCatalystChart is the main test suite for the Catalyst Helm chart

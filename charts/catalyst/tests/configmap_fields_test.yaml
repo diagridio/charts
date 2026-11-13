@@ -190,7 +190,7 @@ tests:
       global.sentry.remote_endpoint: "sentry.r1.diagrid.io:443"
       global.sentry.remote_namespace: "controlplane"
       global.sentry.trust_domain: "prj-root.trust.diagrid.io"
-      global.sentry.namespace: "root-dapr-system"
+      global.namespaces.dapr: "root-dapr-system"
     asserts:
       - matchRegex:
           path: data["config.yaml"]
@@ -249,7 +249,7 @@ tests:
       global.sentry.endpoint: "dapr-sentry.mgmt-ns.svc.cluster.local:443"
       global.sentry.remote_endpoint: "sentry.r1.diagrid.io:443"
       global.sentry.trust_domain: "prj-root.trust.diagrid.io"
-      global.sentry.namespace: "root-dapr-system"
+      global.namespaces.dapr: "root-dapr-system"
     asserts:
       - matchRegex:
           path: data["config.yaml"]

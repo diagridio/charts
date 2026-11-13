@@ -78,3 +78,27 @@ tests:
     asserts:
       - isKind:
           of: ConfigMap
+
+  - it: should fail when only the Dapr image tag is pinned
+    set:
+      join_token: "test-token"
+      agent.config.internal_dapr.image_tag: "1.20.0-catalyst.1"
+    asserts:
+      - failedTemplate:
+          errorMessage: "agent.config.internal_dapr.image_tag and agent.config.internal_dapr.chart_version pin the Dapr control plane together: set both, normally to the same version, or leave both empty to follow the agent"
+
+  - it: should fail when only the Dapr chart version is pinned
+    set:
+      join_token: "test-token"
+      agent.config.internal_dapr.chart_version: "1.20.0-catalyst.1"
+    asserts:
+      - failedTemplate:
+          errorMessage: "agent.config.internal_dapr.image_tag and agent.config.internal_dapr.chart_version pin the Dapr control plane together: set both, normally to the same version, or leave both empty to follow the agent"
+
+  - it: should render a Dapr pin that sets both
+    set:
+      join_token: "test-token"
+      agent.config.internal_dapr.image_tag: "1.20.0-catalyst.1"
+      agent.config.internal_dapr.chart_version: "1.20.0-catalyst.1"
+    asserts:
+      - notFailedTemplate: {}

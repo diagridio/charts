@@ -47,7 +47,7 @@ spec:
           args:
             - --exit-on-success
           env:
-            {{- include "gateway.identityInjector.env" (dict "appID" "gateway") | nindent 12 }}
+            {{- include "gateway.identityInjector.env" (dict "appID" "gateway" "context" .) | nindent 12 }}
           image: {{ include "catalyst.image" (dict "image" .Values.gateway.identityInjector.image "consolidated" .Values.global.consolidated_image "global" .Values.global.image "context" .) }}
           imagePullPolicy: {{ include "catalyst.imagePullPolicy" (dict "image" .Values.gateway.identityInjector.image "consolidated" .Values.global.consolidated_image "global" .Values.global.image) }}
           resources:
@@ -64,7 +64,7 @@ spec:
           command:
             - ./identity-injector
           env:
-            {{- include "gateway.identityInjector.env" (dict "appID" "gateway") | nindent 12 }}
+            {{- include "gateway.identityInjector.env" (dict "appID" "gateway" "context" .) | nindent 12 }}
           image: {{ include "catalyst.image" (dict "image" .Values.gateway.identityInjector.image "consolidated" .Values.global.consolidated_image "global" .Values.global.image "context" .) }}
           imagePullPolicy: {{ include "catalyst.imagePullPolicy" (dict "image" .Values.gateway.identityInjector.image "consolidated" .Values.global.consolidated_image "global" .Values.global.image) }}
           resources:
@@ -206,7 +206,7 @@ spec:
           args:
             - --exit-on-success
           env:
-            {{- include "gateway.identityInjector.env" (dict "appID" "gateway-controlplane") | nindent 12 }}
+            {{- include "gateway.identityInjector.env" (dict "appID" "gateway-controlplane" "context" .) | nindent 12 }}
           image: {{ include "catalyst.image" (dict "image" .Values.gateway.identityInjector.image "consolidated" .Values.global.consolidated_image "global" .Values.global.image "context" .) }}
           imagePullPolicy: {{ include "catalyst.imagePullPolicy" (dict "image" .Values.gateway.identityInjector.image "consolidated" .Values.global.consolidated_image "global" .Values.global.image) }}
           resources:
@@ -223,7 +223,7 @@ spec:
           command:
             - ./identity-injector
           env:
-            {{- include "gateway.identityInjector.env" (dict "appID" "gateway-controlplane") | nindent 12 }}
+            {{- include "gateway.identityInjector.env" (dict "appID" "gateway-controlplane" "context" .) | nindent 12 }}
           image: {{ include "catalyst.image" (dict "image" .Values.gateway.identityInjector.image "consolidated" .Values.global.consolidated_image "global" .Values.global.image "context" .) }}
           imagePullPolicy: {{ include "catalyst.imagePullPolicy" (dict "image" .Values.gateway.identityInjector.image "consolidated" .Values.global.consolidated_image "global" .Values.global.image) }}
           resources:

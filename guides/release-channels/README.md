@@ -25,10 +25,10 @@ What does not differ is who applies the upgrade. In all three it is you.
 >
 > **Which environments serve it:** both. A region joined to production uses
 > `https://catalyst-releases.r1.diagrid.io`, and one joined to staging uses
-> `https://catalyst-releases.staging.diagrid.dev`. Configure the address of the
-> control plane your region actually joined; the other will refuse your
-> certificate, because the resolver answers only for regions of its own control
-> plane.
+> `https://catalyst-releases.staging.diagrid.dev`. The chart defaults to
+> production's; a region joined to staging must set staging's, because the
+> other will refuse your certificate — the resolver answers only for regions of
+> its own control plane.
 >
 > What Diagrid does with the answer is the same in both: nothing. It publishes
 > what your region should install and never installs it. **Pattern A works in
@@ -81,7 +81,7 @@ Pinning the version narrows the blast radius but does not change the level:
 
 ```bash
 helm upgrade --install catalyst oci://public.ecr.aws/diagrid/stable/catalyst \
-     --version 1.137.2 \
+     --version 1.137.3 \
      -n cra-agent \
      -f catalyst-values.yaml
 ```
@@ -236,9 +236,9 @@ Your region's agent calls this; you do not. It is documented here because the
 answer it returns is exactly what lands in the ConfigMap your tooling reads, so
 the field reference below is the reference for both. The address is a property
 of the control plane your region joined — `catalyst-releases.r1.diagrid.io` for
-production, `catalyst-releases.staging.diagrid.dev` for staging — and you give
-it to the agent through one chart value, see
-[The published answer](#the-published-answer).
+production, `catalyst-releases.staging.diagrid.dev` for staging. The chart
+defaults to production's, and a region joined to staging overrides it with one
+chart value, see [The published answer](#the-published-answer).
 
 #### Who may call the resolver
 
@@ -460,7 +460,7 @@ responsibility for keeping your region up to date.
 
 #### Turning it on
 
-Two values, plus an optional third, in your `catalyst-values.yaml`.
+For a region joined to production, one value in your `catalyst-values.yaml`:
 
 ```yaml
 agent:
@@ -469,33 +469,30 @@ agent:
       # Off by default.
       enabled: true
       # The address Diagrid published for the resolver, for the control plane
-      # this region joined. Required: there is no default, and the publisher
-      # does not start without one. Use catalyst-releases.staging.diagrid.dev
-      # for a region joined to staging instead — the resolver answers only for
-      # regions of its own control plane, so the wrong one refuses you.
-      endpoint: https://catalyst-releases.r1.diagrid.io
+      # this region joined. Defaults to production's, so a production region
+      # can leave it out. A region joined to staging sets
+      # https://catalyst-releases.staging.diagrid.dev instead — the resolver
+      # answers only for regions of its own control plane, so the wrong one
+      # refuses you.
+      # endpoint: https://catalyst-releases.r1.diagrid.io
       # Optional. How often to refresh, in seconds. Keep it well inside the
       # fifteen minutes an answer is good for, so a failed refresh or two does
       # not leave you with an expired answer. Five minutes is the default.
-      interval_in_sec: 300
+      # interval_in_sec: 300
 ```
 
 Then upgrade the chart as you normally would. Within a minute of the agent
 restarting there is a ConfigMap called `catalyst-release-availability` in the
 `cra-agent` namespace.
 
-**Both `enabled` and `endpoint` are needed.** `enabled: true` on its own does
-not start the publisher: the agent logs a warning, writes no ConfigMap at all,
-and everything else about the region carries on unaffected. Until an address is
-configured there is nothing to read.
+If the endpoint cannot be reached or refuses the region — a staging region left
+on the production default, say — the ConfigMap still appears and says
+`state: unavailable` with the failure in `refreshError`. Your region runs
+exactly as it did either way.
 
-A region joined to staging has an address to put here today. For a production
-region there is none yet — see the note at the top of this page — so `endpoint`
-stays empty and no ConfigMap appears. Once an address is configured but not yet
-served, the ConfigMap does appear and says `state: unavailable` with the failure
-in `refreshError`. Either way your region runs exactly as it did, so wiring the
-values in ahead of time is safe and is how to have your pipeline written before
-then.
+Setting `endpoint` to an empty string keeps the publisher from starting even
+with `enabled: true`: the agent logs a warning, writes no ConfigMap at all, and
+everything else about the region carries on unaffected.
 
 #### What it looks like
 
@@ -792,7 +789,7 @@ test "${PUBLISHED}" = "${CHART_DIGEST}" \
   || { echo "the ${VERSION} tag no longer points at the chart Diagrid named; refusing to install"; exit 1; }
 
 helm upgrade --install catalyst oci://public.ecr.aws/diagrid/catalyst \
-     --version 1.137.2"${VERSION}" \
+     --version 1.137.3"${VERSION}" \
      -n cra-agent -f catalyst-values.yaml
 ```
 

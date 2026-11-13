@@ -2,6 +2,8 @@
 
 The Catalyst gateway terminates TLS for HTTP traffic entering Catalyst from your apps and from outside the cluster. It passes the region's gRPC control plane services (Sentry, management, the Dapr API, placement and scheduler) through without terminating TLS; they present their own certificates, so the certificate in this guide is not used for them. The [Gateway TLS](../../charts/catalyst/README.md#gateway-tls) section of the chart README lists those hostnames. This guide covers the supported ways to provision the gateway certificate — self-signed (dev), bring-your-own (production), and cert-manager — plus the values you need when the cert is signed by a [private/internal CA](#private-or-self-signed-ca).
 
+The gateway certificate covers the region's wildcard, `*.<region-domain>`. A region served on [one hostname](../gateway-exposure/README.md#one-hostname-for-all-projects) needs no wildcard: its certificate names that one hostname, such as `catalyst-api.mycompany.com`, and the examples below work the same with that name in place of the wildcard.
+
 For the underlying chart values, see the [`gateway.tls`](../../charts/catalyst/README.md#gateway-tls) reference.
 
 ## How the chart consumes the certificate

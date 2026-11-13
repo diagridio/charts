@@ -78,9 +78,19 @@ Identity-injector env block, shared by the long-running sidecar and the
 initContainer for both gateway and gateway-controlplane deployments.
 
 Usage:
-  {{- include "gateway.identityInjector.env" (dict "appID" "gateway") | nindent 12 }}
+  {{- include "gateway.identityInjector.env" (dict "appID" "gateway" "context" .) | nindent 12 }}
+
+The Sentry endpoint and namespace come from catalyst.sentryConfig, so they
+follow global.namespaces.dapr. The binary's defaults are root-dapr-system's.
 */}}
 {{- define "gateway.identityInjector.env" -}}
+{{- $sentry := include "catalyst.sentryConfig" .context | fromYaml }}
+- name: IDENTITY_SENTRY_ENDPOINT
+  value: {{ $sentry.endpoint | quote }}
+{{- /* The namespace the region's Sentry runs in: the injector pins Sentry's
+       SPIFFE ID to it. */}}
+- name: IDENTITY_CONTROLPLANE_NAMESPACE
+  value: {{ $sentry.namespace | quote }}
 - name: IDENTITY_TRUST_DOMAIN
   value: prj-root.trust.diagrid.io
 - name: IDENTITY_APPID

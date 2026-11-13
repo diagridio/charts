@@ -1,0 +1,42 @@
+suite: Test the gateway's identity injectors follow the Dapr namespace
+templates:
+  - gateway/deployment.yaml
+  - gateway/configmap.yaml
+set:
+  join_token: "test-token"
+  gateway.controlplane.xds.mtls.enabled: true
+tests:
+  - it: points the injectors at the default Dapr namespace's Sentry
+    template: gateway/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers[?(@.name == "identity-injector-init")].env
+          content:
+            name: IDENTITY_SENTRY_ENDPOINT
+            value: dapr-sentry.root-dapr-system.svc.cluster.local:443
+      - contains:
+          path: spec.template.spec.containers[?(@.name == "identity-injector")].env
+          content:
+            name: IDENTITY_CONTROLPLANE_NAMESPACE
+            value: root-dapr-system
+
+  - it: points the injectors at a chosen Dapr namespace's Sentry
+    set:
+      global.namespaces.dapr: catalyst
+    template: gateway/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers[?(@.name == "identity-injector-init")].env
+          content:
+            name: IDENTITY_SENTRY_ENDPOINT
+            value: dapr-sentry.catalyst.svc.cluster.local:443
+      - contains:
+          path: spec.template.spec.initContainers[?(@.name == "identity-injector-init")].env
+          content:
+            name: IDENTITY_CONTROLPLANE_NAMESPACE
+            value: catalyst
+      - contains:
+          path: spec.template.spec.containers[?(@.name == "identity-injector")].env
+          content:
+            name: IDENTITY_CONTROLPLANE_NAMESPACE
+            value: catalyst

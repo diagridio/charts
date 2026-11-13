@@ -74,6 +74,7 @@
     {{- $_ := set $configMap "region_postgresql" (dict
         "enabled" true
         "managed_state_store_type" $ss.type
+        "selfhosted_namespace" (include "catalyst.systemNamespace" (list . "postgresql"))
       ) -}}
   {{- /* External path: the agent uses project.external_postgresql whenever it is
          enabled, and management reuses the same region master credentials to
@@ -119,9 +120,8 @@
        the only component permitted to reach it — its NetworkPolicy admits this
        namespace alone, because the Envoy rate-limit protocol authorizes no
        caller. The endpoint is deterministic: the agent pins the release name
-       and namespace (services/catalyst/agent/internal/infra/ratelimitshared),
-       so there is no value to plumb through and nothing to keep in sync beyond
-       these names.
+       (services/catalyst/agent/internal/infra/ratelimitshared) and installs it
+       in global.namespaces.redis, which both read.
 
        An explicit management.config.token_budget_counter always wins, which is
        the escape hatch for a counter deployed outside the agent's control. */ -}}
@@ -129,7 +129,7 @@
 {{- if and (not (hasKey $configMap "token_budget_counter")) (dig "enabled" false $rls) -}}
   {{- $_ := set $configMap "token_budget_counter" (dict
       "enabled" true
-      "endpoint" "shared-ratelimit-rls.shared-ratelimit-redis.svc.cluster.local:8081"
+      "endpoint" (printf "shared-ratelimit-rls.%s.svc.cluster.local:8081" (include "catalyst.systemNamespace" (list . "redis")))
     ) -}}
 {{- end -}}
 {{- /* Derive the address ranges a customer's own state store, or the secret

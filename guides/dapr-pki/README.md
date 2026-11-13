@@ -75,6 +75,7 @@ spec:
   # leaf whose issuer DN is empty ("Unable to form certificate ID").
   commonName: dapr-sentry
   uris:
+    # The namespace segment is global.namespaces.dapr in the Catalyst chart.
     - "spiffe://prj-root.trust.diagrid.io/ns/root-dapr-system/dapr-sentry"
   isCA: true
   usages:

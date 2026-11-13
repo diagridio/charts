@@ -1,0 +1,368 @@
+suite: Test install namespaces
+templates:
+  - agent/configmap.yaml
+  - management/configmap.yaml
+  - gateway/gateway-controlplane-configmap.yaml
+  - network-policies.yaml
+tests:
+  # -------------------------------------------------------------------------
+  # global.namespaces reach every consumer
+  # -------------------------------------------------------------------------
+  - it: derives the Sentry endpoint from the default Dapr namespace
+    set:
+      join_token: "test-token"
+    template: agent/configmap.yaml
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "endpoint: dapr-sentry.root-dapr-system.svc.cluster.local:443"
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "namespace: root-dapr-system"
+
+  - it: derives the Sentry endpoint from a chosen Dapr namespace
+    set:
+      join_token: "test-token"
+      global.namespaces.dapr: catalyst-dapr
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "endpoint: dapr-sentry.catalyst-dapr.svc.cluster.local:443"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "endpoint: dapr-sentry.catalyst-dapr.svc.cluster.local:443"
+        template: gateway/gateway-controlplane-configmap.yaml
+      - notMatchRegex:
+          path: data["config.yaml"]
+          pattern: "root-dapr-system"
+        template: agent/configmap.yaml
+
+  - it: keeps an explicit Sentry endpoint
+    set:
+      join_token: "test-token"
+      global.namespaces.dapr: catalyst-dapr
+      global.sentry.endpoint: sentry.example.internal:443
+    template: agent/configmap.yaml
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "endpoint: sentry.example.internal:443"
+
+  - it: tells the agent the default data backend namespaces
+    set:
+      join_token: "test-token"
+    template: agent/configmap.yaml
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "namespaces:\\n\\s+kafka: shared-kafka\\n\\s+postgresql: shared-postgresql\\n\\s+redis: shared-ratelimit-redis"
+
+  - it: tells the agent and management chosen data backend namespaces
+    set:
+      join_token: "test-token"
+      global.namespaces.postgresql: data
+      global.namespaces.kafka: data
+      global.namespaces.redis: data
+      global.postgresql.create: true
+      agent.config.project.ratelimit_service.enabled: true
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "namespaces:\\n\\s+kafka: data\\n\\s+postgresql: data\\n\\s+redis: data"
+        template: agent/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "selfhosted_namespace: data"
+        template: management/configmap.yaml
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "endpoint: shared-ratelimit-rls.data.svc.cluster.local:8081"
+        template: management/configmap.yaml
+
+  - it: places the Dapr namespace policies in a chosen namespace
+    set:
+      join_token: "test-token"
+      networkPolicies.enabled: true
+      global.namespaces.dapr: catalyst-dapr
+    template: network-policies.yaml
+    documentSelector:
+      path: kind
+      value: Namespace
+    asserts:
+      - equal:
+          path: metadata.name
+          value: catalyst-dapr
+
+  # -------------------------------------------------------------------------
+  # The whole data plane in one namespace
+  # -------------------------------------------------------------------------
+  - it: installs everything into the release namespace
+    release:
+      namespace: catalyst
+    set:
+      join_token: "test-token"
+      global.namespaces.dapr: catalyst
+      global.namespaces.postgresql: catalyst
+      global.namespaces.kafka: catalyst
+      global.namespaces.redis: catalyst
+    template: agent/configmap.yaml
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "endpoint: dapr-sentry.catalyst.svc.cluster.local:443"
+      - notMatchRegex:
+          path: data["config.yaml"]
+          pattern: "root-dapr-system|shared-postgresql|shared-kafka|shared-ratelimit-redis"
+
+  - it: renders each system network policy once when Dapr shares the release namespace
+    release:
+      namespace: catalyst
+    set:
+      join_token: "test-token"
+      networkPolicies.enabled: true
+      global.namespaces.dapr: catalyst
+    template: network-policies.yaml
+    asserts:
+      - containsDocument:
+          kind: Namespace
+          apiVersion: v1
+        not: true
+      # A documentSelector matching two documents fails: this is rendered once.
+      - equal:
+          path: metadata.namespace
+          value: catalyst
+        documentSelector:
+          path: metadata.name
+          value: deny-all
+      # Projects reach Dapr's pods, not every pod in the shared namespace.
+      - equal:
+          path: spec.podSelector
+          value:
+            matchLabels:
+              app.kubernetes.io/name: dapr
+        documentSelector:
+          path: metadata.name
+          value: allow-ingress-from-projects
+      # A documentSelector matching two documents fails: this is rendered once.
+      - equal:
+          path: metadata.namespace
+          value: catalyst
+        documentSelector:
+          path: metadata.name
+          value: allow-ingress-webhooks
+
+  - it: admits projects only to Dapr's pods in a Dapr namespace shared with the rate-limit service
+    set:
+      join_token: "test-token"
+      networkPolicies.enabled: true
+      global.namespaces.dapr: cat-infra
+      global.namespaces.redis: cat-infra
+    template: network-policies.yaml
+    documentSelector:
+      path: metadata.name
+      value: allow-ingress-from-projects
+    asserts:
+      - equal:
+          path: metadata.namespace
+          value: cat-infra
+      - equal:
+          path: spec.podSelector.matchLabels
+          value:
+            app.kubernetes.io/name: dapr
+
+  - it: admits projects to every pod of a Dapr namespace that holds Dapr alone, as before
+    set:
+      join_token: "test-token"
+      networkPolicies.enabled: true
+    template: network-policies.yaml
+    documentSelector:
+      path: metadata.name
+      value: allow-ingress-from-projects
+    asserts:
+      - equal:
+          path: spec.podSelector
+          value: {}
+
+  - it: admits projects to data backends in the release namespace
+    release:
+      namespace: catalyst
+    set:
+      join_token: "test-token"
+      networkPolicies.enabled: true
+      global.namespaces.postgresql: catalyst
+      global.namespaces.kafka: catalyst
+    template: network-policies.yaml
+    documentSelector:
+      path: metadata.name
+      value: allow-ingress-from-projects-data
+    asserts:
+      - equal:
+          path: spec.podSelector.matchExpressions[0].values
+          value: [shared-postgresql, shared-kafka]
+
+  - it: admits projects to data backends that share Dapr's namespace
+    set:
+      join_token: "test-token"
+      networkPolicies.enabled: true
+      global.namespaces.dapr: cat-infra
+      global.namespaces.postgresql: cat-infra
+      global.namespaces.kafka: cat-infra
+    template: network-policies.yaml
+    documentSelector:
+      path: metadata.name
+      value: allow-ingress-from-projects-data
+    asserts:
+      - equal:
+          path: metadata.namespace
+          value: cat-infra
+      - equal:
+          path: spec.podSelector.matchExpressions[0].values
+          value: [shared-postgresql, shared-kafka]
+
+  - it: adds no data backend policy while the backends have namespaces of their own
+    set:
+      join_token: "test-token"
+      networkPolicies.enabled: true
+    template: network-policies.yaml
+    asserts:
+      - containsDocument:
+          kind: NetworkPolicy
+          apiVersion: networking.k8s.io/v1
+          name: allow-ingress-from-projects-data
+          namespace: NAMESPACE
+        not: true
+
+  - it: lets the agent reach the PostgreSQL the chart creates in its default namespace
+    set:
+      join_token: "test-token"
+      networkPolicies.enabled: true
+    template: network-policies.yaml
+    asserts:
+      - equal:
+          path: spec.egress[0].to[0].namespaceSelector.matchLabels["kubernetes.io/metadata.name"]
+          value: shared-postgresql
+        documentSelector:
+          path: metadata.name
+          value: allow-egress-postgres
+      # Kafka is off by default.
+      - containsDocument:
+          kind: NetworkPolicy
+          apiVersion: networking.k8s.io/v1
+          name: allow-egress-kafka
+          namespace: NAMESPACE
+        not: true
+
+  - it: lets the agent reach the PostgreSQL and Kafka the chart creates in chosen namespaces
+    set:
+      join_token: "test-token"
+      networkPolicies.enabled: true
+      global.namespaces.postgresql: data-pg
+      global.namespaces.kafka: data-kafka
+      global.kafka.create: true
+      global.kafka.disabled: false
+    template: network-policies.yaml
+    asserts:
+      - equal:
+          path: spec.egress[0].to[0].namespaceSelector.matchLabels["kubernetes.io/metadata.name"]
+          value: data-pg
+        documentSelector:
+          path: metadata.name
+          value: allow-egress-postgres
+      - equal:
+          path: spec.egress[0]
+          value:
+            to:
+              - namespaceSelector:
+                  matchLabels:
+                    kubernetes.io/metadata.name: data-kafka
+            ports:
+              - port: 9092
+                protocol: TCP
+        documentSelector:
+          path: metadata.name
+          value: allow-egress-kafka
+
+  - it: keeps an explicit PostgreSQL namespace for the egress allow
+    set:
+      join_token: "test-token"
+      networkPolicies.enabled: true
+      networkPolicies.postgres.namespace: my-postgres
+      global.namespaces.postgresql: data-pg
+    template: network-policies.yaml
+    documentSelector:
+      path: metadata.name
+      value: allow-egress-postgres
+    asserts:
+      - equal:
+          path: spec.egress[0].to[0].namespaceSelector.matchLabels["kubernetes.io/metadata.name"]
+          value: my-postgres
+
+  - it: adds no backend egress allow for a PostgreSQL the chart does not create
+    set:
+      join_token: "test-token"
+      networkPolicies.enabled: true
+      global.postgresql.disabled: true
+      agent.config.internal_dapr.scheduler.backend_type: etcd
+    template: network-policies.yaml
+    asserts:
+      - containsDocument:
+          kind: NetworkPolicy
+          apiVersion: networking.k8s.io/v1
+          name: allow-egress-postgres
+          namespace: NAMESPACE
+        not: true
+
+  - it: adds no backend egress allow when the backends share the release namespace
+    release:
+      namespace: catalyst
+    set:
+      join_token: "test-token"
+      networkPolicies.enabled: true
+      global.namespaces.postgresql: catalyst
+      global.namespaces.kafka: catalyst
+      global.kafka.create: true
+      global.kafka.disabled: false
+    template: network-policies.yaml
+    asserts:
+      - containsDocument:
+          kind: NetworkPolicy
+          apiVersion: networking.k8s.io/v1
+          name: allow-egress-postgres
+          namespace: catalyst
+        not: true
+      - containsDocument:
+          kind: NetworkPolicy
+          apiVersion: networking.k8s.io/v1
+          name: allow-egress-kafka
+          namespace: catalyst
+        not: true
+
+  - it: allows that release name while Dapr has a namespace of its own
+    release:
+      name: dapr
+      namespace: catalyst
+    set:
+      join_token: "test-token"
+    template: agent/configmap.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+
+  # A values file copied from an older chart keeps the old Sentry defaults;
+  # they mean "not chosen", so they follow global.namespaces.dapr.
+  - it: follows a chosen Dapr namespace when the Sentry keys keep their old defaults
+    set:
+      join_token: "test-token"
+      global.namespaces.dapr: catalyst-dapr
+      global.sentry.namespace: root-dapr-system
+      global.sentry.endpoint: dapr-sentry.root-dapr-system.svc.cluster.local:443
+      cleanup.namespaces.dapr: root-dapr-system
+    template: agent/configmap.yaml
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "endpoint: dapr-sentry.catalyst-dapr.svc.cluster.local:443"
+      - notMatchRegex:
+          path: data["config.yaml"]
+          pattern: "root-dapr-system"

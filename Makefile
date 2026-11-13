@@ -236,6 +236,18 @@ update-catalyst-digests: ## Stamp every Diagrid image's registry digest into val
 validate-image-digests: ## Fail unless every Diagrid image in values.yaml carries a digest
 	cd $(REPO_ROOT) && go run ./deploy/tools/cmd/release/image-digests check -chart $(abspath $(CHART_DIR))
 
+# The README's image tables: every image an install with the chart's defaults
+# pulls, read from the chart's render. Run it after anything that changes an
+# image: a values.yaml edit, dapr-sync, or a release stamping tags, registries
+# and digests.
+.PHONY: update-catalyst-images
+update-catalyst-images: ## Write the chart's image tables into the README
+	cd $(REPO_ROOT) && go run ./deploy/tools/cmd/release/chart-images -chart $(abspath $(CHART_DIR))
+
+.PHONY: check-catalyst-images
+check-catalyst-images: ## Fail if the chart README's image tables are out of date
+	cd $(REPO_ROOT) && go run ./deploy/tools/cmd/release/chart-images -chart $(abspath $(CHART_DIR)) -check
+
 # The keys below are held to the table of Diagrid images in
 # deploy/tools/pkg/catalystimages by a test there
 # (TestUpdateCatalystTagsRecipeMatchesTable): a new image added to the chart is

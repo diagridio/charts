@@ -77,7 +77,7 @@ spec:
             - {{ .Values.piko.httpproxy.upstreamHostName }}
 {{- end }}
             - --upstream.auth.jwks.endpoint
-            - {{ .Values.piko.publicToken.url }}
+            - {{ include "piko.jwksURL" . }}
             - --upstream.auth.jwks.cache-ttl
             - {{ .Values.piko.publicToken.cacheTTL }}
             - --upstream.auth.require-endpoints

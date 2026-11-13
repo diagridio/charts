@@ -431,15 +431,10 @@ Validate global values shared by agent and management.
 Both services require sentry and correct secrets provider configuration.
 */}}
 {{- define "catalyst.validateGlobalValues" -}}
-    {{- if not .Values.global.sentry.endpoint -}}
-        {{- fail "global.sentry.endpoint is required!" -}}
-    {{- end -}}
     {{- if not .Values.global.sentry.trust_domain -}}
         {{- fail "global.sentry.trust_domain is required!" -}}
     {{- end -}}
-    {{- if not .Values.global.sentry.namespace -}}
-        {{- fail "global.sentry.namespace is required!" -}}
-    {{- end -}}
+    {{- include "catalyst.validateNamespaces" . -}}
     {{- if eq .Values.global.secrets.provider "redis" -}}
         {{- if not .Values.global.secrets.redis -}}
             {{- fail "global.secrets.redis must be configured when global.secrets.provider is redis!" -}}
@@ -739,7 +734,87 @@ Usage: {{- $_ := set $configMap "sentry" (include "catalyst.sentryConfig" . | fr
 */}}
 {{- define "catalyst.sentryConfig" -}}
 {{- $sentry := deepCopy (.Values.global.sentry | default dict) -}}
+{{- $_ := set $sentry "namespace" (include "catalyst.daprNamespace" .) -}}
+{{- /* The endpoint's default is the default Dapr namespace's Sentry, so it
+       follows global.namespaces.dapr unless someone set another. */ -}}
+{{- if or (not $sentry.endpoint) (eq $sentry.endpoint "dapr-sentry.root-dapr-system.svc.cluster.local:443") -}}
+{{- $_ := set $sentry "endpoint" (printf "dapr-sentry.%s.svc.cluster.local:443" $sentry.namespace) -}}
+{{- end -}}
 {{- $insecureSkipVerify := eq (include "catalyst.tls.insecureSkipVerify" .) "true" -}}
 {{- $_ := set $sentry "trust_anchors_endpoint_insecure" (or $insecureSkipVerify ($sentry.trust_anchors_endpoint_insecure | default false)) -}}
 {{- toYaml $sentry -}}
+{{- end -}}
+
+{{/*
+catalyst.systemNamespace is the namespace the agent installs one of the things
+that run beside this release into: global.namespaces.<name>, or its default.
+Usage: include "catalyst.systemNamespace" (list . "postgresql")
+*/}}
+{{- define "catalyst.systemNamespace" -}}
+{{- $root := index . 0 -}}
+{{- $name := index . 1 -}}
+{{- $defaults := dict "dapr" "root-dapr-system" "postgresql" "shared-postgresql" "kafka" "shared-kafka" "redis" "shared-ratelimit-redis" -}}
+{{- $set := (($root.Values.global | default dict).namespaces | default dict) -}}
+{{- index $set $name | default (index $defaults $name) -}}
+{{- end -}}
+
+{{/*
+catalyst.daprNamespace is the namespace the agent installs the region's own
+Dapr control plane, and so its Sentry, into: global.namespaces.dapr. The agent,
+the gateway, management and the sidecars read it as sentry.namespace, which
+catalyst.sentryConfig sets from here. The deprecated global.sentry.namespace and
+cleanup.namespaces.dapr may only repeat it, so nothing can name a namespace the
+agent did not use.
+*/}}
+{{- define "catalyst.daprNamespace" -}}
+{{- $ns := include "catalyst.systemNamespace" (list . "dapr") -}}
+{{- $legacy := dict
+      "global.sentry.namespace" ((.Values.global.sentry | default dict).namespace)
+      "cleanup.namespaces.dapr" (((.Values.cleanup | default dict).namespaces | default dict).dapr) -}}
+{{- range $key, $value := $legacy -}}
+{{- /* root-dapr-system was these keys' default, so it means "not chosen". */ -}}
+{{- if and $value (ne $value "root-dapr-system") (ne $value $ns) -}}
+{{- fail (printf "%s (%q) is deprecated and must be empty or equal global.namespaces.dapr (%q), the namespace the agent installs Dapr into" $key $value $ns) -}}
+{{- end -}}
+{{- end -}}
+{{- $ns -}}
+{{- end -}}
+
+{{/*
+catalyst.validateNamespaces refuses namespace choices the region cannot run
+with. "prj-" is reserved for project namespaces: the control plane never
+accepts a region service's identity from one, and uninstalling deletes them.
+The self-hosted control plane's namespace, kube-system and default hold
+workloads the data plane's network policies and uninstall must not touch.
+Any of the namespaces may be the release namespace, but then the Helm releases
+the agent installs there share it with this one, so this release may not take
+one of their names.
+*/}}
+{{- define "catalyst.validateNamespaces" -}}
+{{- $namespaces := dict "the release namespace" .Release.Namespace -}}
+{{- $releases := dict
+      "dapr" (list "dapr" "dapr-ext" "jwt-key-rotation")
+      "postgresql" (list "shared-postgresql")
+      "kafka" (list "shared-kafka")
+      "redis" (list "shared-ratelimit-redis" "shared-ratelimit-rls") -}}
+{{- range $name, $names := $releases -}}
+{{- $ns := include "catalyst.systemNamespace" (list $ $name) -}}
+{{- $_ := set $namespaces (printf "global.namespaces.%s" $name) $ns -}}
+{{- if and (eq $ns $.Release.Namespace) (has $.Release.Name $names) -}}
+{{- fail (printf "the release name %q is taken by a release the agent installs into %s, which is the release namespace %q; choose another release name" $.Release.Name (printf "global.namespaces.%s" $name) $.Release.Namespace) -}}
+{{- end -}}
+{{- end -}}
+{{- $controlPlane := .Values.global.control_plane_namespace | default "controlplane" -}}
+{{- range $key, $ns := $namespaces -}}
+{{- if hasPrefix "prj-" $ns -}}
+{{- fail (printf "%s %q may not start with \"prj-\": that prefix is reserved for project namespaces" $key $ns) -}}
+{{- end -}}
+{{- if eq $ns $controlPlane -}}
+{{- fail (printf "%s %q is the self-hosted control plane's namespace (global.control_plane_namespace), which the data plane may not share: both install a Service named dapr-sentry, and uninstalling would delete it" $key $ns) -}}
+{{- end -}}
+{{- /* default stays allowed as the release namespace: helm template renders into it unless told otherwise, and the chart's CI and tooling render it that way. */ -}}
+{{- if or (eq $ns "kube-system") (and (eq $ns "default") (ne $key "the release namespace")) -}}
+{{- fail (printf "%s %q is a Kubernetes namespace the data plane may not take: its network policies would apply to everything there, and uninstalling may delete it" $key $ns) -}}
+{{- end -}}
+{{- end -}}
 {{- end -}}

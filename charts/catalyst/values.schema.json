@@ -242,6 +242,37 @@
                         }
                     }
                 },
+                "namespaces": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "description": "Namespaces the agent installs into beside the release namespace. Any of them may be the release namespace. None may start with prj-, which the chart checks.",
+                    "properties": {
+                        "dapr": {
+                            "type": "string",
+                            "default": "root-dapr-system",
+                            "pattern": "^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$",
+                            "description": "The region's Dapr control plane: Sentry, operator, placement and scheduler."
+                        },
+                        "postgresql": {
+                            "type": "string",
+                            "default": "shared-postgresql",
+                            "pattern": "^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$",
+                            "description": "The shared self-hosted PostgreSQL."
+                        },
+                        "kafka": {
+                            "type": "string",
+                            "default": "shared-kafka",
+                            "pattern": "^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$",
+                            "description": "The shared self-hosted Kafka."
+                        },
+                        "redis": {
+                            "type": "string",
+                            "default": "shared-ratelimit-redis",
+                            "pattern": "^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$",
+                            "description": "The managed Redis and the rate-limit service."
+                        }
+                    }
+                },
                 "control_plane_url": {
                     "type": "string",
                     "default": "catalyst-cloud.r1.diagrid.io:443",
@@ -305,7 +336,8 @@
                         },
                         "endpoint": {
                             "type": "string",
-                            "default": "dapr-sentry.root-dapr-system.svc.cluster.local:443"
+                            "default": "dapr-sentry.root-dapr-system.svc.cluster.local:443",
+                            "description": "In-cluster address of the region's Sentry. Left at the default, or empty, it follows global.namespaces.dapr."
                         },
                         "remote_endpoint": {
                             "type": "string",
@@ -325,7 +357,8 @@
                         },
                         "namespace": {
                             "type": "string",
-                            "default": "root-dapr-system"
+                            "default": "root-dapr-system",
+                            "description": "Deprecated: the Dapr namespace is global.namespaces.dapr. Left at the default, or empty, it follows that; otherwise it must equal it."
                         },
                         "trust_anchors_file": {
                             "type": "string",
@@ -1469,8 +1502,8 @@
                     "properties": {
                         "dapr": {
                             "type": "string",
-                            "default": "root-dapr-system",
-                            "description": "Namespace where internal Dapr components are installed"
+                            "default": "",
+                            "description": "Deprecated: the internal Dapr namespace is global.namespaces.dapr. Empty, or equal to it."
                         }
                     }
                 },

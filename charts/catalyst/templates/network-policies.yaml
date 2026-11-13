@@ -238,8 +238,21 @@ spec:
   - to:
     - namespaceSelector:
         matchLabels:
-          kubernetes.io/metadata.name: {{ .Values.cleanup.namespaces.dapr }}
-{{- if .Values.networkPolicies.postgres.namespace }}
+          kubernetes.io/metadata.name: {{ include "catalyst.daprNamespace" . }}
+{{- /* The PostgreSQL and Kafka the agent installs (global.postgresql.create,
+       global.kafka.create) live in global.namespaces; the agent reaches them
+       there, so their egress allows follow those namespaces. In the release
+       namespace allow-internal already covers them. networkPolicies.postgres.namespace
+       names a PostgreSQL of the operator's own and wins when set. */}}
+{{- $infra := include "catalyst.resolvedInfra" . | fromYaml }}
+{{- $pgNs := .Values.networkPolicies.postgres.namespace }}
+{{- if and (not $pgNs) (eq $infra.stateStore.type "postgresql-shared-selfhosted") }}
+{{- $created := include "catalyst.systemNamespace" (list . "postgresql") }}
+{{- if ne $created .Release.Namespace }}
+{{- $pgNs = $created }}
+{{- end }}
+{{- end }}
+{{- if $pgNs }}
 ---
 # the agent creates/initializes the scheduler and managed-state-store
 # databases. Only the egress side: if the postgres namespace is itself
@@ -257,9 +270,29 @@ spec:
   - to:
     - namespaceSelector:
         matchLabels:
-          kubernetes.io/metadata.name: {{ .Values.networkPolicies.postgres.namespace }}
+          kubernetes.io/metadata.name: {{ $pgNs }}
     ports:
     - { port: 5432, protocol: TCP }
+{{- end }}
+{{- $kafkaNs := include "catalyst.systemNamespace" (list . "kafka") }}
+{{- if and (eq $infra.pubsub.type "kafka-shared-selfhosted") (ne $kafkaNs .Release.Namespace) }}
+---
+# the agent creates each project's Kafka users and topics through the brokers
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress-kafka
+  namespace: {{ .Release.Namespace }}
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: {{ $kafkaNs }}
+    ports:
+    - { port: 9092, protocol: TCP }
 {{- end }}
 {{- range $i, $rule := .Values.networkPolicies.extraEgress }}
 ---
@@ -284,6 +317,44 @@ spec:
     {{- end }}
     {{- end }}
 {{- end }}
+{{- $daprNs := include "catalyst.daprNamespace" . }}
+{{- $merged := eq $daprNs .Release.Namespace }}
+{{- /* The namespaces this chart denies by default: the release's, and Dapr's when it has its own. */}}
+{{- $denied := list .Release.Namespace }}
+{{- if not $merged }}
+{{- $denied = append $denied $daprNs }}
+{{- end }}
+{{- range $ns := $denied }}
+{{- $backends := list }}
+{{- range $name := list "postgresql" "kafka" }}
+{{- if eq (include "catalyst.systemNamespace" (list $ $name)) $ns }}
+{{- $backends = append $backends (printf "shared-%s" $name) }}
+{{- end }}
+{{- end }}
+{{- if $backends }}
+---
+# the shared data backends the agent installs into a namespace this chart
+# denies by default (global.namespaces): project sidecars connect to them
+# directly — mirror of the generated allow-egress policies on the project side
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-from-projects-data
+  namespace: {{ $ns }}
+spec:
+  podSelector:
+    matchExpressions:
+    - key: app.kubernetes.io/instance
+      operator: In
+      values: {{ toJson $backends }}
+  policyTypes: [Ingress]
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          cra.diagrid.io/project-namespace: "true"
+{{- end }}
+{{- end }}
 ---
 # ─────────────────────────────────────────────────────────────────────────────
 # Internal Dapr namespace. The agent installs Dapr there at runtime, but the
@@ -294,11 +365,16 @@ spec:
 # it out from under the runtime install on uninstall or on upgrades that drop
 # it from the release; the cleanup post-delete hook owns its teardown.
 # ─────────────────────────────────────────────────────────────────────────────
-{{- if not (lookup "v1" "Namespace" "" .Values.cleanup.namespaces.dapr) }}
+# When it is the release namespace (global.namespaces.dapr), the release's own
+# policies above already cover what the namespace-wide ones here would, so
+# only the policies naming Dapr's pods are rendered.
+# ─────────────────────────────────────────────────────────────────────────────
+{{- if not $merged }}
+{{- if not (lookup "v1" "Namespace" "" $daprNs) }}
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: {{ .Values.cleanup.namespaces.dapr }}
+  name: {{ $daprNs }}
   annotations:
     helm.sh/resource-policy: keep
 ---
@@ -307,7 +383,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: deny-all
-  namespace: {{ .Values.cleanup.namespaces.dapr }}
+  namespace: {{ $daprNs }}
 spec:
   podSelector: {}
   policyTypes: [Ingress, Egress]
@@ -317,7 +393,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: allow-internal
-  namespace: {{ .Values.cleanup.namespaces.dapr }}
+  namespace: {{ $daprNs }}
 spec:
   podSelector: {}
   policyTypes: [Ingress, Egress]
@@ -328,22 +404,39 @@ spec:
   - to:
     - podSelector: {}
 ---
+{{- end }}
 # daprd sidecars dial sentry (certs), operator (component streams), placement
 # (actors), scheduler (jobs/workflows) — mirror of the generated
-# allow-dapr-root-access egress in every project namespace
+# allow-dapr-root-access egress in every project namespace. In a namespace that
+# holds anything else (the release, a data backend, the rate-limit service), it
+# admits Dapr's pods alone: policies add up, so a wider one would let projects
+# reach whatever shares the namespace.
+{{- $daprShared := $merged }}
+{{- range $name := list "postgresql" "kafka" "redis" }}
+{{- if eq (include "catalyst.systemNamespace" (list $ $name)) $daprNs }}
+{{- $daprShared = true }}
+{{- end }}
+{{- end }}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: allow-ingress-from-projects
-  namespace: {{ .Values.cleanup.namespaces.dapr }}
+  namespace: {{ $daprNs }}
 spec:
+  {{- if $daprShared }}
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: dapr
+  {{- else }}
   podSelector: {}
+  {{- end }}
   policyTypes: [Ingress]
   ingress:
   - from:
     - namespaceSelector:
         matchLabels:
           cra.diagrid.io/project-namespace: "true"
+{{- if not $merged }}
 ---
 # gateway identity-injector fetches certs from sentry; otel collectors in the
 # release namespace scrape control-plane metrics
@@ -351,7 +444,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: allow-ingress-from-{{ .Release.Namespace }}
-  namespace: {{ .Values.cleanup.namespaces.dapr }}
+  namespace: {{ $daprNs }}
 spec:
   podSelector: {}
   policyTypes: [Ingress]
@@ -360,6 +453,7 @@ spec:
     - namespaceSelector:
         matchLabels:
           kubernetes.io/metadata.name: {{ .Release.Namespace }}
+{{- end }}
 ---
 # the sidecar-injector (mutating webhook) and operator (conversion/validating
 # webhooks) are called BY the API server; that traffic originates outside the
@@ -369,7 +463,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: allow-ingress-webhooks
-  namespace: {{ .Values.cleanup.namespaces.dapr }}
+  namespace: {{ $daprNs }}
 spec:
   podSelector:
     matchExpressions:
@@ -380,13 +474,14 @@ spec:
   ingress:
   - from:
     {{- include "catalyst.netpol.privateRanges" . | nindent 4 }}
+{{- if not $merged }}
 ---
 # operator/injector/sentry watch Kubernetes resources; DNS for service lookups
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: allow-egress-dns-apiserver
-  namespace: {{ .Values.cleanup.namespaces.dapr }}
+  namespace: {{ $daprNs }}
 spec:
   podSelector: {}
   policyTypes: [Egress]
@@ -410,7 +505,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: allow-egress-to-projects
-  namespace: {{ .Values.cleanup.namespaces.dapr }}
+  namespace: {{ $daprNs }}
 spec:
   podSelector: {}
   policyTypes: [Egress]
@@ -419,4 +514,5 @@ spec:
     - namespaceSelector:
         matchLabels:
           cra.diagrid.io/project-namespace: "true"
+{{- end }}
 {{- end }}

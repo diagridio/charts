@@ -3,7 +3,7 @@ name: catalyst
 icon: https://storage.googleapis.com/bkt-n-assets-common-us-central1/Diagrid_Logos/Diagrid.png
 description: Helm chart for Diagrid Catalyst
 type: application
-version: '1.137.2'
+version: '1.137.3'
 appVersion: '0.0.1'
 home: https://catalyst.diagrid.io
 dependencies:
@@ -29,3 +29,12 @@ dependencies:
     version: "~3.12.x"
     repository: "https://kubernetes-sigs.github.io/metrics-server/"
     condition: metrics-server.enabled
+# The images the agent deploys by its own default, which no template renders
+# while agent.config.internal_dapr.image_tag and .sentry.jwt.rotation_image
+# are empty. Read by tooling only (the mirror scripts and the README image
+# tables), never by the chart. dapr-version is written by `make dapr-sync`;
+# a test in services/catalyst/agent/pkg/config holds both to what the agent
+# deploys.
+annotations:
+  catalyst.diagrid.io/dapr-version: "1.20.0-20261112-catalyst.1"
+  catalyst.diagrid.io/jwt-rotation-image: "us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/k8s-tools:1.0.0"

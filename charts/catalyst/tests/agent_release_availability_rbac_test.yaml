@@ -223,3 +223,32 @@ tests:
       - matchRegex:
           path: data["config.yaml"]
           pattern: "release_availability"
+
+  # A region joined to production, the common case, turns the publisher on
+  # with `enabled` alone: the chart defaults the endpoint to production's
+  # resolver, as it does every other control-plane address.
+  - it: defaults the resolver endpoint to production's
+    template: agent/configmap.yaml
+    set:
+      join_token: "test-token"
+      agent.config.release_availability.enabled: true
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "endpoint: https://catalyst-releases\\.r1\\.diagrid\\.io"
+
+  # A region joined to staging must point at staging's resolver, which answers
+  # only for regions of its own control plane; the override has to win.
+  - it: lets a region joined elsewhere override the endpoint
+    template: agent/configmap.yaml
+    set:
+      join_token: "test-token"
+      agent.config.release_availability.enabled: true
+      agent.config.release_availability.endpoint: https://catalyst-releases.staging.diagrid.dev
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "endpoint: https://catalyst-releases\\.staging\\.diagrid\\.dev"
+      - notMatchRegex:
+          path: data["config.yaml"]
+          pattern: "catalyst-releases\\.r1\\.diagrid\\.io"

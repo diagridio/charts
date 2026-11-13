@@ -6,17 +6,20 @@ For the full image list that the chart depends on, see the [Images reference](..
 
 ## 1. Mirror Container Images
 
-Use the provided script to mirror every image Catalyst needs, from the registries the released chart names. Released charts pin every Diagrid image by digest, so the mirror has to serve the same manifests as the source registry. The script uses `oras cp --recursive` when ORAS and jq are installed, which preserves digests and also copies each image's signature, provenance and SBOMs, and `crane copy` otherwise, which preserves digests but copies the image alone. A `docker pull` followed by `docker push` can re-encode layers and change digests, and a digest-pinned chart then fails to pull from the mirror.
+Use the provided script to mirror every image Catalyst needs, from the registries the released chart names. It renders the chart version you install with the values files you install it with, so an image or tag your values override is the one it copies, and reads the images the agent deploys after installation from the agent's config in that render. Where your values leave the Dapr control plane or the JWT key rotation image to the agent, it copies what the chart's annotations say the agent deploys. Without `--values` it renders the chart's defaults. It needs Helm. Released charts pin every Diagrid image by digest, so the mirror has to serve the same manifests as the source registry. The script uses `oras cp --recursive` when ORAS and jq are installed, which preserves digests and also copies each image's signature, provenance and SBOMs, and `crane copy` otherwise, which preserves digests but copies the image alone. A `docker pull` followed by `docker push` can re-encode layers and change digests, and a digest-pinned chart then fails to pull from the mirror.
 
 ```bash
 ./scripts/catalyst/mirror-images.sh my-registry.example.com \
-  --catalyst-version 0.469.0 \
-  --dapr-version 1.16.2 \
-  --internal-dapr-version 1.16.2-catalyst.1 \
-  --envoy-version distroless-v1.33.0 \
-  --piko-version v0.8.2 \
-  --otel-version 0.112.0
+  --chart oci://public.ecr.aws/diagrid/catalyst --chart-version <version> \
+  --values catalyst-values.yaml \
+  --charts-registry oci://my-registry.example.com/diagrid/catalyst
 ```
+
+Pass `--values` once for each file you give `helm install`, in the same order. A values file that already sets `global.image.registry` to your mirror is fine: the script renders against Diagrid's registries to find where to copy from.
+
+`--charts-registry` also copies Diagrid's Dapr chart, which the agent installs from `global.charts.registry` (step 2), at the version your values pin or, if they pin none, the one the chart records. Give it a path of its own: the Dapr chart and the Dapr image share a name and a tag.
+
+Turn on in your values everything you plan to use before you mirror: an image a setting adds later, such as `mcp.enabled`, is copied only when the render names it. A chart released before those annotations lists the Dapr control plane and the JWT key rotation images under "Runtime Images" in its README, and the script reads them from there.
 
 Install ORAS if you want to verify the mirrored images: see [Verify Diagrid's artifacts](https://docs.diagrid.io/operate/hosting/enterprise-self-hosted/verify-artifacts#check-a-mirrored-copy).
 

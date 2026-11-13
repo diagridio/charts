@@ -1,4 +1,5 @@
 {{- $ns := .Release.Namespace -}}
+{{- $daprNs := include "catalyst.daprNamespace" . -}}
 {{- $svc := .Values.gateway.envoy.service -}}
 {{- $ingress := .Values.agent.config.host.ingress -}}
 {{- $docs := "https://github.com/diagridio/charts/blob/main" -}}
@@ -47,6 +48,6 @@ To keep everything, set cleanup.enabled=false before uninstalling.
 Troubleshoot:
 
   kubectl -n {{ $ns }} logs deploy/{{ include "agent.name" . }}
-  diagrid diagnose{{ if ne $ns "cra-agent" }} --agent-namespace {{ $ns }}{{ end }}
+  diagrid diagnose{{ if ne $ns "cra-agent" }} --agent-namespace {{ $ns }}{{ end }}{{ if ne $daprNs "root-dapr-system" }} --root-dapr-namespace {{ $daprNs }}{{ end }}
 
 Chart reference: {{ $docs }}/charts/catalyst/README.md

@@ -131,6 +131,13 @@
 {{- $insecureSkipVerify := eq (include "catalyst.tls.insecureSkipVerify" .) "true" -}}
 {{- $_ := set $agentConfig "control_plane_http_insecure" (or $insecureSkipVerify .Values.global.control_plane_http_insecure) -}}
 {{- $_ := set $agentConfig "sentry" (include "catalyst.sentryConfig" . | fromYaml) -}}
+{{- /* Where the agent installs the shared data backends. The Dapr namespace
+       reaches it as sentry.namespace, above. */ -}}
+{{- $_ := set $agentConfig "namespaces" (dict
+      "postgresql" (include "catalyst.systemNamespace" (list . "postgresql"))
+      "kafka" (include "catalyst.systemNamespace" (list . "kafka"))
+      "redis" (include "catalyst.systemNamespace" (list . "redis"))
+    ) -}}
 {{- /* Passed on to the workloads the agent provisions. The namespace is
        explicit: the agent would otherwise default to control_plane_namespace,
        which names a namespace in the control plane, not this release's. */ -}}
@@ -163,6 +170,24 @@
        templates/management/configmap.yaml. deepCopy guards against merge mutating
        .Values for later templates. */ -}}
 {{- $_ := set $agentConfig "featureflags" (merge (deepCopy (.Values.agent.config.featureflags | default dict)) (.Values.global.featureflags | default dict)) -}}
+{{- /* Empty Dapr and rotation-image pins follow the agent's built-ins. Drop
+       them rather than render "", which an agent older than these keys reads
+       as a set chart_version and refuses. */ -}}
+{{- /* The Dapr chart's templates and its image are released together, so a pin
+       of one alone would leave them apart after the next agent upgrade. */ -}}
+{{- if ne (not $agentConfig.internal_dapr.image_tag) (not $agentConfig.internal_dapr.chart_version) -}}
+  {{- fail "agent.config.internal_dapr.image_tag and agent.config.internal_dapr.chart_version pin the Dapr control plane together: set both, normally to the same version, or leave both empty to follow the agent" -}}
+{{- end -}}
+{{- range $key := list "image_tag" "chart_version" -}}
+  {{- if not (index $agentConfig.internal_dapr $key) -}}{{- $_ := unset $agentConfig.internal_dapr $key -}}{{- end -}}
+{{- end -}}
+{{- with $agentConfig.internal_dapr.sentry -}}{{- with .jwt -}}
+  {{- $rotation := .rotation_image | default dict -}}
+  {{- range $key := list "registry" "name" "tag" -}}
+    {{- if not (index $rotation $key) -}}{{- $_ := unset $rotation $key -}}{{- end -}}
+  {{- end -}}
+  {{- if $rotation -}}{{- $_ := set . "rotation_image" $rotation -}}{{- else -}}{{- $_ := unset . "rotation_image" -}}{{- end -}}
+{{- end -}}{{- end -}}
 {{- /* Apply global registry override to nested image configurations */ -}}
 {{- if .Values.global.image.registry -}}
   {{- $_ := set $agentConfig.sidecar "image_registry" .Values.global.image.registry -}}

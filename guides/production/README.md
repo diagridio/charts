@@ -248,8 +248,10 @@ link-local) and an allow-list mechanism for explicit destinations. This is
 on by default and well-suited for production — see the **Network Policies**
 section of the [chart README](../../charts/catalyst/README.md) for the
 allow/deny model and how to extend it. Note that enforcement requires a CNI
-that supports `NetworkPolicy` (Calico, Cilium, Azure NPM, AWS VPC CNI with
-`ENABLE_NETWORK_POLICY=true`, or kube-router).
+that supports `NetworkPolicy` (Calico, Cilium, Azure NPM, AWS VPC CNI, or
+kube-router). For the AWS VPC CNI on EKS, set the `vpc-cni` add-on setting
+`enableNetworkPolicy: "true"`; on a self-managed install, set
+`ENABLE_NETWORK_POLICY=true` on the `aws-node` DaemonSet.
 
 ## Deployment-specific values not in the overlay
 

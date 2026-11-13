@@ -1,4 +1,7 @@
 {{- if .Values.cleanup.enabled }}
+{{- $daprNamespace := include "catalyst.daprNamespace" . }}
+{{- /* Only the default Dapr namespace is the agent's to delete: a namespace chosen at install may have existed before it, or hold the release or a data backend. */}}
+{{- $keepDaprNamespace := ne $daprNamespace "root-dapr-system" }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -116,9 +119,9 @@ spec:
 
           # Uninstall Dapr Helm releases to clean up CRDs, ClusterRoles, etc.
           echo "Uninstalling Dapr Helm releases..."
-          if helm status dapr -n {{ .Values.cleanup.namespaces.dapr }} >/dev/null 2>&1; then
-            echo "Uninstalling dapr release from {{ .Values.cleanup.namespaces.dapr }}..."
-            DAPR_OUTPUT=$(helm uninstall dapr -n {{ .Values.cleanup.namespaces.dapr }} --wait --debug 2>&1)
+          if helm status dapr -n {{ $daprNamespace }} >/dev/null 2>&1; then
+            echo "Uninstalling dapr release from {{ $daprNamespace }}..."
+            DAPR_OUTPUT=$(helm uninstall dapr -n {{ $daprNamespace }} --wait --debug 2>&1)
             DAPR_EXIT_CODE=$?
             if [ $DAPR_EXIT_CODE -ne 0 ]; then
               echo "Error uninstalling dapr (exit code: $DAPR_EXIT_CODE):"
@@ -127,12 +130,12 @@ spec:
               echo "Successfully uninstalled dapr release"
             fi
           else
-            echo "dapr Helm release not found in {{ .Values.cleanup.namespaces.dapr }}"
+            echo "dapr Helm release not found in {{ $daprNamespace }}"
           fi
 
-          if helm status dapr-ext -n {{ .Values.cleanup.namespaces.dapr }} >/dev/null 2>&1; then
-            echo "Uninstalling dapr-ext release from {{ .Values.cleanup.namespaces.dapr }}..."
-            DAPR_EXT_OUTPUT=$(helm uninstall dapr-ext -n {{ .Values.cleanup.namespaces.dapr }} --wait --debug 2>&1)
+          if helm status dapr-ext -n {{ $daprNamespace }} >/dev/null 2>&1; then
+            echo "Uninstalling dapr-ext release from {{ $daprNamespace }}..."
+            DAPR_EXT_OUTPUT=$(helm uninstall dapr-ext -n {{ $daprNamespace }} --wait --debug 2>&1)
             DAPR_EXT_EXIT_CODE=$?
             if [ $DAPR_EXT_EXIT_CODE -ne 0 ]; then
               echo "Error uninstalling dapr-ext (exit code: $DAPR_EXT_EXIT_CODE):"
@@ -141,7 +144,7 @@ spec:
               echo "Successfully uninstalled dapr-ext release"
             fi
           else
-            echo "dapr-ext Helm release not found in {{ .Values.cleanup.namespaces.dapr }}"
+            echo "dapr-ext Helm release not found in {{ $daprNamespace }}"
           fi
 
           
@@ -181,9 +184,28 @@ spec:
           echo "Deleting region configmap from {{ .Release.Namespace }}..."
           kubectl delete configmap region-details -n {{ .Release.Namespace }} --ignore-not-found=true || echo "Warning: Failed to delete region-details configmap"
 
+          {{- if $keepDaprNamespace }}
+          # Dapr is in a namespace chosen at install, which may have existed
+          # before Catalyst or hold the release or a data backend, so it is not
+          # this hook's to delete: remove what deleting a namespace of its own
+          # would have, the JWT key rotation, Sentry's trust bundle and CA, and
+          # the trusted CA bundle the agent mounts into Sentry.
+          echo "Removing Dapr's remaining resources from {{ $daprNamespace }}..."
+          if helm status jwt-key-rotation -n {{ $daprNamespace }} >/dev/null 2>&1; then
+            helm uninstall jwt-key-rotation -n {{ $daprNamespace }} --wait || echo "Warning: Failed to uninstall jwt-key-rotation"
+          fi
+          kubectl delete secret,configmap dapr-trust-bundle -n {{ $daprNamespace }} --ignore-not-found=true || echo "Warning: Failed to delete dapr-trust-bundle"
+          kubectl delete configmap catalyst-trusted-ca -n {{ $daprNamespace }} --ignore-not-found=true || echo "Warning: Failed to delete catalyst-trusted-ca"
+          # Uninstalling the scheduler's StatefulSet leaves the volumes it
+          # claimed, which deleting the namespace would have removed.
+          for pvc in $(kubectl get pvc -n {{ $daprNamespace }} -o name 2>/dev/null | grep '^persistentvolumeclaim/dapr-scheduler-data-dir-dapr-scheduler-server-'); do
+            kubectl delete -n {{ $daprNamespace }} "$pvc" --ignore-not-found=true || echo "Warning: Failed to delete $pvc"
+          done
+          {{- else }}
           # Delete Dapr namespace
-          echo "Deleting {{ .Values.cleanup.namespaces.dapr }} namespace..."
-          kubectl delete namespace {{ .Values.cleanup.namespaces.dapr }} --ignore-not-found=true --timeout=120s || echo "Warning: Failed to delete {{ .Values.cleanup.namespaces.dapr }} namespace"
+          echo "Deleting {{ $daprNamespace }} namespace..."
+          kubectl delete namespace {{ $daprNamespace }} --ignore-not-found=true --timeout=120s || echo "Warning: Failed to delete {{ $daprNamespace }} namespace"
+          {{- end }}
 
           # Delete project namespaces created by Catalyst
           echo "Deleting project namespaces with label cra.diagrid.io/project-namespace=true..."

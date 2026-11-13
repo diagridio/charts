@@ -1,0 +1,32 @@
+suite: Test piko validates tunnel tokens against the region's Sentry
+templates:
+  - piko/statefulset.yaml
+  - piko/configmap.yaml
+set:
+  join_token: "test-token"
+tests:
+  - it: uses the default Dapr namespace's Sentry by default
+    template: piko/statefulset.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: http://dapr-sentry.root-dapr-system.svc.cluster.local:9080/jwks.json
+
+  - it: follows a chosen Dapr namespace when the URL keeps its old default
+    template: piko/statefulset.yaml
+    set:
+      global.namespaces.dapr: catalyst
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: http://dapr-sentry.catalyst.svc.cluster.local:9080/jwks.json
+
+  - it: keeps an explicit URL
+    template: piko/statefulset.yaml
+    set:
+      global.namespaces.dapr: catalyst
+      piko.publicToken.url: https://keys.example.com/jwks.json
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].args
+          content: https://keys.example.com/jwks.json

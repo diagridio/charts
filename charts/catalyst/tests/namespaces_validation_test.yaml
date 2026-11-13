@@ -1,0 +1,105 @@
+suite: Test install namespace validation
+templates:
+  - agent/configmap.yaml
+tests:
+  - it: refuses a cleanup.namespaces.dapr that contradicts global.namespaces.dapr
+    set:
+      join_token: "test-token"
+      cleanup.namespaces.dapr: somewhere-else
+    asserts:
+      - failedTemplate:
+          errorPattern: "cleanup.namespaces.dapr .*is deprecated and must be empty or equal global.namespaces.dapr"
+
+
+  - it: refuses a global.sentry.namespace that contradicts global.namespaces.dapr
+    set:
+      join_token: "test-token"
+      global.sentry.namespace: somewhere-else
+    asserts:
+      - failedTemplate:
+          errorPattern: "global.sentry.namespace .*is deprecated and must be empty or equal global.namespaces.dapr"
+
+  - it: accepts deprecated keys that repeat global.namespaces.dapr
+    set:
+      join_token: "test-token"
+      global.namespaces.dapr: catalyst-dapr
+      global.sentry.namespace: catalyst-dapr
+      cleanup.namespaces.dapr: catalyst-dapr
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "namespace: catalyst-dapr"
+
+  # -------------------------------------------------------------------------
+  # Namespace choices the region cannot run with
+  # -------------------------------------------------------------------------
+  - it: refuses a release namespace in the project prefix
+    release:
+      namespace: prj-catalyst
+    set:
+      join_token: "test-token"
+    asserts:
+      - failedTemplate:
+          errorPattern: "the release namespace \"prj-catalyst\" may not start with"
+
+  - it: refuses a system namespace in the project prefix
+    set:
+      join_token: "test-token"
+      global.namespaces.kafka: prj-kafka
+    asserts:
+      - failedTemplate:
+          errorPattern: "global.namespaces.kafka \"prj-kafka\" may not start with"
+
+  - it: refuses the self-hosted control plane's namespace as a data plane namespace
+    set:
+      join_token: "test-token"
+      global.namespaces.dapr: controlplane
+    asserts:
+      - failedTemplate:
+          errorPattern: "global.namespaces.dapr \"controlplane\" is the self-hosted control plane's namespace"
+
+  - it: refuses a control plane namespace chosen with global.control_plane_namespace as the release namespace
+    release:
+      namespace: cp2
+    set:
+      join_token: "test-token"
+      global.control_plane_namespace: cp2
+    asserts:
+      - failedTemplate:
+          errorPattern: "the release namespace \"cp2\" is the self-hosted control plane's namespace"
+
+  - it: refuses kube-system
+    set:
+      join_token: "test-token"
+      global.namespaces.redis: kube-system
+    asserts:
+      - failedTemplate:
+          errorPattern: "global.namespaces.redis \"kube-system\" is a Kubernetes namespace the data plane may not take"
+
+  - it: refuses default as a data plane namespace
+    set:
+      join_token: "test-token"
+      global.namespaces.postgresql: default
+    asserts:
+      - failedTemplate:
+          errorPattern: "global.namespaces.postgresql \"default\" is a Kubernetes namespace the data plane may not take"
+
+  - it: still renders into default, as helm template does without a namespace
+    release:
+      namespace: default
+    set:
+      join_token: "test-token"
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: refuses a release name the agent's Dapr release takes in a shared namespace
+    release:
+      name: dapr
+      namespace: catalyst
+    set:
+      join_token: "test-token"
+      global.namespaces.dapr: catalyst
+    asserts:
+      - failedTemplate:
+          errorPattern: "the release name \"dapr\" is taken by a release the agent installs into global.namespaces.dapr"
+

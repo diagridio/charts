@@ -84,14 +84,17 @@ EOF
     fi
 }
 
-# Fixed SPIFFE path of the regional Catalyst management service. Management
+# SPIFFE path of the regional Catalyst management service. Management
 # resolves bring-your-own secret stores (e.g. Azure Key Vault) in-process for a
 # project's workflow / agent state stores, authenticating with its own regional
 # identity rather than any appid's. That identity shares the appid's region-host
 # trust domain and differs only in this path, so the app registration must trust
 # it too. Mirrors the Go constants ManagementSpiffeNamespace / ManagementSpiffeAppID
-# in services/catalyst/pkg/tls/tls.go.
-MANAGEMENT_SPIFFE_PATH="/ns/cra-agent/management"
+# in services/catalyst/pkg/tls/tls.go. The namespace segment is the catalyst
+# chart's release namespace; set MANAGEMENT_NAMESPACE if you installed it
+# somewhere other than cra-agent.
+MANAGEMENT_NAMESPACE="${MANAGEMENT_NAMESPACE:-cra-agent}"
+MANAGEMENT_SPIFFE_PATH="/ns/${MANAGEMENT_NAMESPACE}/management"
 
 # Defaults (override with the flags below or matching env vars)
 CATALYST_PROJECT="${CATALYST_PROJECT:-prj1}"
