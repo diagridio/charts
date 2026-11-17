@@ -47,16 +47,17 @@ resource "azurerm_resource_group" "this" {
 # down cannot answer one — which would make this stack unplannable exactly when
 # a member region has been lost and draining it is the thing you want to reach
 # for. So each member's frontend id can be given instead. Give both and this
-# stack reads nothing from either member region.
+# stack reads nothing from either member region. A drained member is not read
+# either: it is out of the pool, so its frontend is not needed.
 data "azurerm_lb" "primary_gateway" {
-  count = var.primary_gateway_frontend_ip_configuration_id == "" ? 1 : 0
+  count = var.primary_gateway_frontend_ip_configuration_id == "" && !var.primary_drained ? 1 : 0
 
   name                = "kubernetes"
   resource_group_name = var.primary_node_resource_group
 }
 
 data "azurerm_lb" "secondary_gateway" {
-  count = var.secondary_gateway_frontend_ip_configuration_id == "" ? 1 : 0
+  count = var.secondary_gateway_frontend_ip_configuration_id == "" && !var.secondary_drained ? 1 : 0
 
   name                = "kubernetes"
   resource_group_name = var.secondary_node_resource_group

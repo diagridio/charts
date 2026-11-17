@@ -74,7 +74,7 @@
     {{- $_ := set $configMap "region_postgresql" (dict
         "enabled" true
         "managed_state_store_type" $ss.type
-        "selfhosted_namespace" (include "catalyst.systemNamespace" (list . "postgresql"))
+        "selfhosted_namespace" (include "catalyst.namespacesValue" (list . "postgresql"))
       ) -}}
   {{- /* External path: the agent uses project.external_postgresql whenever it is
          enabled, and management reuses the same region master credentials to
@@ -129,7 +129,7 @@
 {{- if and (not (hasKey $configMap "token_budget_counter")) (dig "enabled" false $rls) -}}
   {{- $_ := set $configMap "token_budget_counter" (dict
       "enabled" true
-      "endpoint" (printf "shared-ratelimit-rls.%s.svc.cluster.local:8081" (include "catalyst.systemNamespace" (list . "redis")))
+      "endpoint" (printf "shared-ratelimit-rls.%s.svc.cluster.local:8081" (include "catalyst.namespacesValue" (list . "redis")))
     ) -}}
 {{- end -}}
 {{- /* Derive the address ranges a customer's own state store, or the secret

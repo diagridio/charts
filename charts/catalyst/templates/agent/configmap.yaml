@@ -131,12 +131,13 @@
 {{- $insecureSkipVerify := eq (include "catalyst.tls.insecureSkipVerify" .) "true" -}}
 {{- $_ := set $agentConfig "control_plane_http_insecure" (or $insecureSkipVerify .Values.global.control_plane_http_insecure) -}}
 {{- $_ := set $agentConfig "sentry" (include "catalyst.sentryConfig" . | fromYaml) -}}
+{{- $_ := set $agentConfig.project "namespace_prefix" (include "catalyst.namespacesValue" (list . "projectPrefix")) -}}
 {{- /* Where the agent installs the shared data backends. The Dapr namespace
        reaches it as sentry.namespace, above. */ -}}
 {{- $_ := set $agentConfig "namespaces" (dict
-      "postgresql" (include "catalyst.systemNamespace" (list . "postgresql"))
-      "kafka" (include "catalyst.systemNamespace" (list . "kafka"))
-      "redis" (include "catalyst.systemNamespace" (list . "redis"))
+      "postgresql" (include "catalyst.namespacesValue" (list . "postgresql"))
+      "kafka" (include "catalyst.namespacesValue" (list . "kafka"))
+      "redis" (include "catalyst.namespacesValue" (list . "redis"))
     ) -}}
 {{- /* Passed on to the workloads the agent provisions. The namespace is
        explicit: the agent would otherwise default to control_plane_namespace,

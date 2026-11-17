@@ -12,9 +12,27 @@
 #
 # Commands:
 #   status    Which member is the writer, and what share of traffic each takes
-#   promote   Promote this region's databases to writers (the failover step)
+#   promote   Promote this region's databases to writers (the failover step),
+#             then drain the other member, the old writer, in the front door
 #   follow    Rebuild this region's databases as replicas of the other region's
-#             (the failback step; it DESTROYS this region's databases)
+#             (the failback step; it DESTROYS this region's databases), then
+#             put this region back in the front door
+#
+# The front door
+# --------------
+# The old writer's database is still a primary after a promotion. Its agent
+# fences it at 503, but that rests on the agent and on what the control plane
+# tells it, and the accelerator would otherwise send writes to two primaries.
+# So `promote` also sets the old writer's traffic dial to 0, which rests on
+# neither, and it stays there until `follow` has rebuilt that region as a
+# replica.
+#
+# Both write the group stack's failover.auto.tfvars.json rather than passing a
+# -var, so the next plain `make group-apply` keeps what they did: terraform
+# loads *.auto.tfvars.json by itself, after terraform.tfvars, so the file wins.
+# The file also pins the drained member's gateway Load Balancer ARN, from the
+# group's own state, so the apply reads nothing from that region — the old
+# writer's region is often the one that is unreachable.
 #
 # What it will not do
 # -------------------
@@ -57,6 +75,7 @@ TF_DIR="terraform"                 # this region's root, as the Makefile uses it
 GROUP_DIR="terraform/region-group" # the group's front door state
 ASSUME_YES=false
 ALLOW_OTHER_CHANGES=false
+DRAIN=true                         # promote drains the old writer; --no-drain skips it
 MAKE_ARGS=()                       # everything after `--`, forwarded to make
 
 usage() {
@@ -71,10 +90,14 @@ Commands:
              postgresql_replicate_source_db_arn and empty
              scheduler_postgresql_replicate_source_db_arns in this region's
              terraform.tfvars first — this reads that file, it does not edit it.
+             Then sets the other member's traffic dial to 0 in the front door,
+             through <group-dir>/failover.auto.tfvars.json, and applies it.
   follow     Rebuild this region's PostgreSQL instances as read replicas of the
              other region's. Set those same two variables to the other region's
              postgresql_arn and scheduler_postgresql_arns outputs first.
              DESTRUCTIVE: this region's database contents are discarded.
+             Then removes this region's drain from failover.auto.tfvars.json
+             and applies the front door.
 
 Options:
   --region REGION          AWS region this working directory deploys, e.g.
@@ -87,7 +110,10 @@ Options:
   --group-dir PATH         The group front door's root
                            (default: terraform/region-group)
   --allow-other-changes    Apply even though the plan changes resources other
-                           than the database instances. Read the plan first.
+                           than the database instances, or, in the front door,
+                           than the drain. Read the plan first.
+  --no-drain               promote only: leave the front door alone. The old
+                           writer keeps its traffic dial; drain it yourself.
   -y, --yes                Do not prompt for confirmation
   -h, --help               Show this help
 
@@ -115,12 +141,18 @@ while [[ $# -gt 0 ]]; do
     --dir) TF_DIR="$2"; shift 2 ;;
     --group-dir) GROUP_DIR="$2"; shift 2 ;;
     --allow-other-changes) ALLOW_OTHER_CHANGES=true; shift ;;
+    --no-drain) DRAIN=false; shift ;;
     -y | --yes) ASSUME_YES=true; shift ;;
     -h | --help) usage; exit 0 ;;
     --) shift; MAKE_ARGS=("$@"); break ;;
     *) echo "error: unknown argument: $1" >&2; usage >&2; exit 2 ;;
   esac
 done
+
+if ! $DRAIN && [[ "$COMMAND" != "promote" ]]; then
+  echo "error: --no-drain applies to promote only" >&2
+  exit 2
+fi
 
 for bin in terraform jq curl make; do
   command -v "$bin" >/dev/null 2>&1 || { echo "error: '$bin' not found on PATH" >&2; exit 1; }
@@ -129,6 +161,9 @@ done
 # Run from the guide directory whatever directory the caller is in, so the
 # relative Terraform roots and the Makefile resolve the same way every time.
 cd "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# What promote and follow change in the front door. See "The front door" above.
+OVERRIDES="${GROUP_DIR}/failover.auto.tfvars.json"
 
 # ---- helpers ---------------------------------------------------------------
 
@@ -243,6 +278,209 @@ cmd_status() {
     echo "note: a region with a traffic dial of 0% is drained — healthy, but taking"
     echo "      no new connections. The group cannot fail over to it while it is."
   fi
+
+  # The file overrides terraform.tfvars, so a dial set there is not the one to
+  # go looking for when this file holds the drain.
+  if [[ -f "$OVERRIDES" ]]; then
+    echo
+    echo "note: ${OVERRIDES}, which failover.sh promote wrote, sets:"
+    jq -r 'to_entries[] | "        \(.key) = \(.value)"' "$OVERRIDES"
+    echo "      It overrides terraform.tfvars, so it is what drains that member."
+    echo "      'failover.sh follow' in that region removes it once the region has"
+    echo "      been rebuilt as a replica."
+  fi
+}
+
+# ---- front door ------------------------------------------------------------
+
+# read_overrides prints the overrides file as compact JSON, or {} when there is
+# none.
+read_overrides() {
+  if [[ -f "$OVERRIDES" ]]; then jq -c . "$OVERRIDES"; else echo '{}'; fi
+}
+
+# write_overrides makes $1 the overrides file, and deletes the file when $1 is
+# empty, so an undone drain leaves nothing behind.
+write_overrides() {
+  if [[ "$1" == "{}" ]]; then rm -f "$OVERRIDES"; else jq . <<<"$1" >"$OVERRIDES"; fi
+}
+
+# this_member prints primary or secondary: which member of the group this
+# region is, found by its own hostname in the group stack's region_endpoints.
+# It explains on stderr and returns non-zero when it cannot tell.
+this_member() {
+  local cluster host endpoints member
+  cluster="$(terraform -chdir="$TF_DIR" output -raw eks_cluster_name 2>/dev/null || true)"
+  if [[ -z "$cluster" ]]; then
+    echo "warning: could not read eks_cluster_name from ${TF_DIR}, so cannot tell which" >&2
+    echo "         member of the group this region is." >&2
+    return 1
+  fi
+  host="${cluster}.${INGRESS_ENDPOINT}"
+  if [[ ! -d "$GROUP_DIR" ]] ||
+    ! endpoints="$(terraform -chdir="$GROUP_DIR" output -json region_endpoints 2>/dev/null)"; then
+    echo "warning: could not read region_endpoints from '${GROUP_DIR}'. The front door is" >&2
+    echo "         one state for the group, held in one of the two working directories." >&2
+    echo "         If it is the other one, pass --group-dir <its terraform/region-group>." >&2
+    return 1
+  fi
+  member="$(jq -r --arg h "$host" \
+    'to_entries[] | select((.value | ascii_downcase) == ($h | ascii_downcase)) | .key' <<<"$endpoints")"
+  if [[ "$member" != "primary" && "$member" != "secondary" ]]; then
+    echo "warning: ${host} is not one member of region_endpoints in '${GROUP_DIR}':" >&2
+    echo "         $(jq -c . <<<"$endpoints")" >&2
+    return 1
+  fi
+  echo "$member"
+}
+
+# apply_group_overrides makes $1 the overrides file, plans the group stack with
+# it, and applies that plan once confirmed. Declined, or a plan that fails,
+# puts the file back as it was, so a later `make group-apply` does not do what
+# was not done here. So does a plan that changes anything but the endpoint groups:
+# -y would otherwise apply whatever else has drifted in the front door.
+# Returns non-zero when the front door was not changed.
+apply_group_overrides() {
+  local new="$1" prompt="$2" old others rc=0
+  old="$(read_overrides)"
+  write_overrides "$new"
+
+  terraform -chdir="$GROUP_DIR" plan -input=false -detailed-exitcode \
+    -out="$GROUP_PLAN_FILE" || rc=$?
+  case "$rc" in
+    0) echo "    The front door already matches; nothing to apply."; return 0 ;;
+    2) ;;
+    *) write_overrides "$old"; return 1 ;;
+  esac
+
+  others="$(terraform -chdir="$GROUP_DIR" show -json "$GROUP_PLAN_FILE" |
+    jq -c '[.resource_changes[]? | select(.mode == "managed")
+             | select(.type != "aws_globalaccelerator_endpoint_group")
+             | select(.change.actions != ["no-op"])
+             | {address, actions: .change.actions}]')" || others=""
+  if [[ "$others" != "[]" ]]; then
+    echo >&2
+    echo "This front door plan changes more than the endpoint groups:" >&2
+    if [[ -n "$others" ]]; then summarize_changes "$others" >&2; fi
+    if ! $ALLOW_OTHER_CHANGES || [[ -z "$others" ]]; then
+      echo "error: not applying it. Run 'make group-apply' and read the plan, or re-run" >&2
+      echo "       with --allow-other-changes if those changes are ones you want." >&2
+      write_overrides "$old"
+      return 1
+    fi
+    echo "warning: applying them anyway (--allow-other-changes)." >&2
+  fi
+
+  if ! confirm "$prompt"; then
+    write_overrides "$old"
+    return 1
+  fi
+  if ! terraform -chdir="$GROUP_DIR" apply -input=false "$GROUP_PLAN_FILE"; then
+    echo "warning: the apply failed. ${OVERRIDES} already holds the change, so" >&2
+    echo "         'make group-apply' finishes it once the error above is fixed." >&2
+    return 1
+  fi
+}
+
+# drain_old_writer sets the other member's traffic dial to 0 after this region
+# has been promoted, and pins that member's gateway Load Balancer ARN from the
+# group's state so the apply does not have to look it up in that region. It
+# never fails the promotion that has already happened: when it cannot drain, it
+# says what to do by hand.
+drain_old_writer() {
+  echo
+  if ! $DRAIN; then
+    echo "Not draining the old writer in the front door (--no-drain). Until you do,"
+    echo "only its agent's 503 keeps traffic off it."
+    return 0
+  fi
+
+  echo "==> Draining the old writer in the front door"
+  local this other dials arn new
+  if ! this="$(this_member)"; then
+    explain_manual_drain
+    return 0
+  fi
+  if [[ "$this" == "primary" ]]; then other="secondary"; else other="primary"; fi
+
+  # Both dials at 0 leaves the group with nowhere to send traffic.
+  dials="$(terraform -chdir="$GROUP_DIR" output -json traffic_dial_percentages 2>/dev/null || echo '{}')"
+  if [[ "$(jq -r --arg m "$this" '.[$m] // empty' <<<"$dials")" == "0" ]]; then
+    echo "warning: this region, the ${this}, is drained itself. Draining the ${other} as" >&2
+    echo "         well would leave the group taking no traffic, so nothing was changed." >&2
+    echo "         Set ${this}_traffic_dial_percentage back to 100 first; './failover.sh" >&2
+    echo "         status' says whether failover.auto.tfvars.json is what sets it." >&2
+    explain_manual_drain "$other"
+    return 0
+  fi
+
+  arn="$(terraform -chdir="$GROUP_DIR" output -json gateway_load_balancers 2>/dev/null |
+    jq -r --arg m "$other" '.[$m] // empty' || true)"
+  if ! new="$(read_overrides | jq -c --arg m "$other" --arg arn "$arn" '
+      .["\($m)_traffic_dial_percentage"] = 0
+      | if $arn != "" then .["\($m)_gateway_lb_arn"] = $arn else . end')"; then
+    explain_manual_drain "$other"
+    return 0
+  fi
+
+  echo "    This region is the ${this}. Setting ${other}_traffic_dial_percentage = 0"
+  echo "    in ${OVERRIDES}. It stays drained until 'failover.sh follow' rebuilds it."
+  if ! apply_group_overrides "$new" "Drain the ${other}? Type yes to continue:"; then
+    explain_manual_drain "$other"
+  fi
+}
+
+# explain_manual_drain says how to drain the old writer by hand. $1 is its
+# member, when that is known.
+explain_manual_drain() {
+  local member="${1:-<primary|secondary>}"
+  echo "warning: the old writer was not drained in the front door. The promotion" >&2
+  echo "         itself is applied. Drain it by hand, in the working directory that" >&2
+  echo "         holds the front door: set ${member}_traffic_dial_percentage = 0 in" >&2
+  echo "         terraform/region-group/terraform.tfvars and run 'make group-apply'." >&2
+  echo "         If that region is unreachable, also set ${member}_gateway_lb_arn to" >&2
+  echo "         its entry in 'make group-output gateway_load_balancers'. Put the dial" >&2
+  echo "         back to 100 once 'failover.sh follow' has rebuilt that region." >&2
+}
+
+# restore_this_region undoes drain_old_writer for this region once follow has
+# rebuilt it as a replica, and returns non-zero when it could not check or
+# undo the drain. A replica answers 503, so being back in the pool
+# takes no traffic; it is what lets the group fail back to it later.
+restore_this_region() {
+  echo
+  echo "==> Putting this region back in the front door"
+  local this old new dial
+  if ! this="$(this_member)"; then
+    echo "warning: if failover.sh promote drained this region, remove its entries from" >&2
+    echo "         failover.auto.tfvars.json in the front door's directory and run" >&2
+    echo "         'make group-apply' there." >&2
+    return 1
+  fi
+
+  old="$(read_overrides)"
+  new="$(jq -c --arg m "$this" \
+    'del(.["\($m)_traffic_dial_percentage"], .["\($m)_gateway_lb_arn"])' <<<"$old")"
+  if [[ "$new" != "$old" ]]; then
+    echo "    Removing the ${this}'s drain from ${OVERRIDES}."
+    if ! apply_group_overrides "$new" "Put the ${this} back in the front door? Type yes to continue:"; then
+      echo "warning: the ${this} is still drained by ${OVERRIDES}. Remove its" >&2
+      echo "         entries there and run 'make group-apply'." >&2
+      return 1
+    fi
+  fi
+
+  # A drain set by hand, before a planned failover, is in terraform.tfvars and
+  # is not this script's to undo.
+  dial="$(terraform -chdir="$GROUP_DIR" output -json traffic_dial_percentages 2>/dev/null |
+    jq -r --arg m "$this" '.[$m] // empty' || true)"
+  if [[ "$dial" == "0" ]]; then
+    echo "note: the ${this} is still drained: ${GROUP_DIR}/terraform.tfvars sets"
+    echo "      ${this}_traffic_dial_percentage = 0. Set it back to 100 and run"
+    echo "      'make group-apply'; the group cannot fail back to it while it is drained."
+  else
+    echo "    The ${this} is in the front door."
+  fi
 }
 
 # ---- promote ---------------------------------------------------------------
@@ -301,6 +539,8 @@ cmd_promote() {
   confirm "Promote? Type yes to continue:" || { echo "aborted"; exit 1; }
 
   terraform -chdir="$TF_DIR" apply "$PLAN_FILE"
+
+  drain_old_writer
 
   wait_for_writable
 }
@@ -449,6 +689,14 @@ cmd_follow() {
   echo
   echo "Rebuilt as replicas. Let them catch up before promoting back — a promotion"
   echo "loses whatever has not replicated yet."
+
+  # The rebuild is done either way. A region left drained takes no traffic
+  # after a later failback to it, so that must not end in a zero exit.
+  if ! restore_this_region; then
+    echo "error: the databases were rebuilt, but this region may still be drained in" >&2
+    echo "       the front door. Do what the warning above says before relying on it." >&2
+    exit 1
+  fi
 }
 
 # ---- main ------------------------------------------------------------------
@@ -458,7 +706,8 @@ if [[ "$COMMAND" == "status" ]]; then
 fi
 
 PLAN_FILE="$(mktemp -t catalyst-failover-plan.XXXXXX)"
-trap 'rm -f "$PLAN_FILE"' EXIT
+GROUP_PLAN_FILE="$(mktemp -t catalyst-failover-group-plan.XXXXXX)"
+trap 'rm -f "$PLAN_FILE" "$GROUP_PLAN_FILE"' EXIT
 
 case "$COMMAND" in
   promote) cmd_promote ;;

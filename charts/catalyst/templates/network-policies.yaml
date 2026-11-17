@@ -247,7 +247,7 @@ spec:
 {{- $infra := include "catalyst.resolvedInfra" . | fromYaml }}
 {{- $pgNs := .Values.networkPolicies.postgres.namespace }}
 {{- if and (not $pgNs) (eq $infra.stateStore.type "postgresql-shared-selfhosted") }}
-{{- $created := include "catalyst.systemNamespace" (list . "postgresql") }}
+{{- $created := include "catalyst.namespacesValue" (list . "postgresql") }}
 {{- if ne $created .Release.Namespace }}
 {{- $pgNs = $created }}
 {{- end }}
@@ -274,7 +274,7 @@ spec:
     ports:
     - { port: 5432, protocol: TCP }
 {{- end }}
-{{- $kafkaNs := include "catalyst.systemNamespace" (list . "kafka") }}
+{{- $kafkaNs := include "catalyst.namespacesValue" (list . "kafka") }}
 {{- if and (eq $infra.pubsub.type "kafka-shared-selfhosted") (ne $kafkaNs .Release.Namespace) }}
 ---
 # the agent creates each project's Kafka users and topics through the brokers
@@ -327,7 +327,7 @@ spec:
 {{- range $ns := $denied }}
 {{- $backends := list }}
 {{- range $name := list "postgresql" "kafka" }}
-{{- if eq (include "catalyst.systemNamespace" (list $ $name)) $ns }}
+{{- if eq (include "catalyst.namespacesValue" (list $ $name)) $ns }}
 {{- $backends = append $backends (printf "shared-%s" $name) }}
 {{- end }}
 {{- end }}
@@ -413,7 +413,7 @@ spec:
 # reach whatever shares the namespace.
 {{- $daprShared := $merged }}
 {{- range $name := list "postgresql" "kafka" "redis" }}
-{{- if eq (include "catalyst.systemNamespace" (list $ $name)) $daprNs }}
+{{- if eq (include "catalyst.namespacesValue" (list $ $name)) $daprNs }}
 {{- $daprShared = true }}
 {{- end }}
 {{- end }}

@@ -55,8 +55,9 @@ help:
 	@echo ""
 	@echo "Moving the writer between the two members of a region group:"
 	@echo "  ./failover.sh status   - Which member is the writer, and its traffic dial"
-	@echo "  ./failover.sh promote  - Promote this region's databases (failover)"
-	@echo "  ./failover.sh follow   - Rebuild them as replicas (failback)"
+	@echo "  ./failover.sh promote  - Promote this region's databases, then drain the old writer (failover)"
+	@echo "  ./failover.sh follow   - Rebuild them as replicas, then undrain this region (failback)"
+	@echo "  promote and follow drain through terraform/region-group/failover.auto.tfvars.json"
 	@echo ""
 	@echo "Variables:"
 	@echo "  TF_VAR_FILE           - Terraform variables file (default: terraform/terraform.tfvars)"
@@ -162,7 +163,9 @@ clean:
 # Region group front door
 #
 # Variables go in terraform/region-group/terraform.tfvars; terraform reads that
-# file on its own, so these targets pass nothing.
+# file on its own, so these targets pass nothing. It also reads
+# failover.auto.tfvars.json there, which failover.sh writes to drain the old
+# writer, and which wins over terraform.tfvars.
 group-init:
 	cd $(GROUP_DIR) && terraform init
 

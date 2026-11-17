@@ -130,7 +130,7 @@ variable "secondary_gateway_frontend_ip_configuration_id" {
 # Ordering is what the runbook actually depends on, and that is preserved: stop
 # traffic reaching the region, THEN promote.
 variable "primary_drained" {
-  description = "Take the first region out of the front door's backend pool. Set it before a planned failover away from that region, and back to false afterwards. All-or-nothing, unlike the AWS guide's percentage dial."
+  description = "Take the first region out of the front door's backend pool. Set it before a planned failover away from that region, and back to false once it has been rebuilt as a replica. failover.sh promote drains the old writer and follow undoes it, through failover.auto.tfvars.json, which overrides terraform.tfvars. All-or-nothing, unlike the AWS guide's percentage dial."
   type        = bool
   default     = false
 }

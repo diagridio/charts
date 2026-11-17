@@ -50,6 +50,14 @@ tests:
       - failedTemplate:
           errorPattern: "global.namespaces.kafka \"prj-kafka\" may not start with"
 
+  - it: refuses a project prefix Kubernetes reserves
+    set:
+      join_token: "test-token"
+      global.namespaces.projectPrefix: kube-team-
+    asserts:
+      - failedTemplate:
+          errorPattern: "may not start with \"kube-\""
+
   - it: refuses the self-hosted control plane's namespace as a data plane namespace
     set:
       join_token: "test-token"
@@ -103,3 +111,41 @@ tests:
       - failedTemplate:
           errorPattern: "the release name \"dapr\" is taken by a release the agent installs into global.namespaces.dapr"
 
+
+  # -------------------------------------------------------------------------
+  # global.namespaces.projectPrefix
+  # -------------------------------------------------------------------------
+  - it: refuses a project prefix that does not end with a dash
+    set:
+      join_token: "test-token"
+      global.namespaces.projectPrefix: team
+    asserts:
+      - failedTemplate: {}
+
+  - it: refuses a system namespace under the chosen project prefix
+    release:
+      namespace: team-catalyst
+    set:
+      join_token: "test-token"
+      global.namespaces.projectPrefix: team-
+    asserts:
+      - failedTemplate:
+          errorPattern: "the release namespace \"team-catalyst\" may not start with \"team-\""
+
+  - it: refuses a system namespace that is a project namespace under the chosen prefix
+    set:
+      join_token: "test-token"
+      global.namespaces.projectPrefix: team-
+      global.namespaces.kafka: team-7
+    asserts:
+      - failedTemplate:
+          errorPattern: "global.namespaces.kafka \"team-7\" may not start with \"team-\""
+
+  - it: accepts a system namespace that ends with a dash and digits
+    release:
+      namespace: catalyst-1
+    set:
+      join_token: "test-token"
+      global.namespaces.kafka: kafka-2
+    asserts:
+      - notFailedTemplate: {}

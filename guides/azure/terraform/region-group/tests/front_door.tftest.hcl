@@ -196,6 +196,11 @@ run "draining_a_region_takes_it_out_of_the_pool_and_leaves_the_other" {
   # A drained region is not read, so draining one works while it is unreachable
   # — which is the case draining exists for.
   assert {
+    condition     = length(data.azurerm_lb.primary_gateway) == 0
+    error_message = "a drained region must not be looked up: it may be the region that is unreachable"
+  }
+
+  assert {
     condition     = output.gateway_frontend_ip_configurations.primary == null
     error_message = "a drained region is out of the pool and has no frontend registered"
   }

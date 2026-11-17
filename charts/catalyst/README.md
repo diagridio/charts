@@ -93,7 +93,7 @@ The Catalyst Helm chart creates 4 RBAC subjects. The tables below justify each g
 
 > 🗒️ The Catalyst Agent installs a Catalyst distribution of Dapr and thus must satisfy the permissions required by that. Many of the agent permissions are simply to align with Dapr's own RBAC permissions.
 
-The agent's ServiceAccount (`<release>-agent-sa`, e.g. `catalyst-agent-sa`) carries the broadest permissions because it installs charts into, and reconciles resources across, many namespaces (the release namespace, the `global.namespaces` ones, per-project `prj-*`, and `default`; by default `cra-agent`, `root-dapr-system` and `shared-{kafka,postgresql,ratelimit-redis}`).
+The agent's ServiceAccount (`<release>-agent-sa`, e.g. `catalyst-agent-sa`) carries the broadest permissions because it installs charts into, and reconciles resources across, many namespaces (the release namespace, the `global.namespaces` ones, per-project `<prefix>*`, and `default`; by default `cra-agent`, `root-dapr-system` and `shared-{kafka,postgresql,ratelimit-redis}`).
 
 | API group | Resources | Verbs | Why it is required |
 |-----------|-----------|-------|--------------------|
@@ -185,7 +185,7 @@ Catalyst runs in the release namespace, and the agent installs the rest of the d
 | PostgreSQL | The shared self-hosted PostgreSQL | `global.namespaces.postgresql` | `shared-postgresql` |
 | Kafka | The shared self-hosted Kafka | `global.namespaces.kafka` | `shared-kafka` |
 | Redis | The managed Redis and the rate-limit service | `global.namespaces.redis` | `shared-ratelimit-redis` |
-| Projects | One project's workloads | Fixed | `prj-<project-uid>` |
+| Projects | One project's workloads, one namespace each | `global.namespaces.projectPrefix`, the start of each name | `prj-<project-uid>` |
 
 Any of them can be the same namespace. None of them may be a self-hosted control plane's namespace, because both install a Service named `dapr-sentry`. To run the whole data plane in one namespace, set them all to the release namespace:
 
@@ -205,18 +205,19 @@ helm install catalyst oci://public.ecr.aws/diagrid/catalyst \
      --set join_token="${JOIN_TOKEN}"
 ```
 
-Projects still get a namespace each. `global.sentry.endpoint` and `piko.publicToken.url` follow `global.namespaces.dapr` unless you set them to something other than their default. The agent, management, the sidecars, the network policies and the cleanup hook all read the same values, so nothing else needs changing.
+Projects still get a namespace each, named `<projectPrefix><project-uid>`. `global.sentry.endpoint` and `piko.publicToken.url` follow `global.namespaces.dapr` unless you set them to something other than their default. The agent, management, the sidecars, the network policies and the cleanup hook all read the same values, so nothing else needs changing.
 
 The chart refuses to install when:
 
-- any of the namespaces starts with `prj-`, which is reserved for projects
+- `global.namespaces.projectPrefix` does not start with a lowercase letter, end with `-`, or fit in 34 characters, or starts with `kube-`
+- any of the other namespaces starts with `prj-` or with `global.namespaces.projectPrefix`, which are reserved for project namespaces
 - any of the namespaces is the self-hosted control plane's (`global.control_plane_namespace`) or `kube-system`, or one of the `global.namespaces` values is `default`
 - the release name is one the agent uses for a release it installs into the release namespace: `dapr`, `dapr-ext` or `jwt-key-rotation` when Dapr shares it, and `shared-postgresql`, `shared-kafka`, `shared-ratelimit-redis` or `shared-ratelimit-rls` when that backend does
 
 Some things to know before you choose:
 
+- **The project prefix is fixed at first install.** Every project's namespace and its workflow history live under it, so the agent refuses to start with a different one.
 - **Upgrading needs no changes.** Every default is the name Catalyst used before, so an existing region keeps its namespaces and identities after an upgrade. The upgrade does change a few things: the agent and management configs now name the default namespaces, which restarts both; the gateway gains two identity settings and restarts; and with `networkPolicies.enabled` it adds `allow-egress-postgres`. Leave `global.namespaces` alone on an installed region.
-
 - **Choose them once.** The release and Dapr namespaces are part of the identities of the agent, management, the gateway and Sentry, and of every project's network policies. The data backends keep their data in their namespace. Moving an installed region to other namespaces is a reinstall, and the [uninstall warning](#uninstall) applies. The agent refuses to start with a `global.namespaces.dapr` other than the one the region was installed with, rather than cut every project off from Dapr.
 - **Private regions only.** Diagrid Cloud accepts a region's services from namespaces other than `cra-agent` and `root-dapr-system` only in a private region.
 - **A shared namespace shares its network policies.** With `networkPolicies.enabled`, Dapr in the release namespace runs under the release namespace's policies, which allow egress to the internet but not to private ranges. Dapr in a namespace of its own has no internet egress. Projects still reach only the pods they need there: Dapr's, the data backends, management, Piko and the MCP bridge. In the other direction, a project admits Dapr's pods from Dapr's namespace and, from the release namespace, every pod except Dapr and the data backends. So keep the release namespace for Catalyst: another workload there can reach project workloads.
@@ -250,7 +251,7 @@ The [cleanup hook](#4-cleanup-hook-optional) runs as its own ServiceAccount, and
 
 #### Namespaces to create
 
-All but the project namespaces follow your install; see [Installing into other namespaces](#installing-into-other-namespaces). The table names the defaults, and a namespace you set to the release namespace needs no creating.
+All of them follow your install, the project namespaces through `global.namespaces.projectPrefix`; see [Installing into other namespaces](#installing-into-other-namespaces). The table names the defaults, and a namespace you set to the release namespace needs no creating.
 
 | Namespace | Create it when |
 |-----------|----------------|
@@ -259,7 +260,7 @@ All but the project namespaces follow your install; see [Installing into other n
 | `global.namespaces.postgresql` (`shared-postgresql`) | `global.postgresql.create` is `true` and `global.postgresql.disabled` is `false` (the default). |
 | `global.namespaces.kafka` (`shared-kafka`) | `global.kafka.create` is `true` and `global.kafka.disabled` is `false`. |
 | `global.namespaces.redis` (`shared-ratelimit-redis`) | `global.redis.create` is `true` and `global.redis.disabled` is `false`. It also holds the regional rate-limit service. |
-| `prj-<project-uid>` | Once per project. |
+| `<prefix><project-uid>`, `<prefix>` being `global.namespaces.projectPrefix` (`prj-`) | Once per project. |
 
 Create the infrastructure namespaces before you install the chart. If the Dapr namespace, `shared-postgresql` or `shared-kafka` is missing, the agent stops at startup with a Forbidden error containing `cannot create resource "namespaces"`, and keeps restarting until the namespace exists. If `shared-ratelimit-redis` is missing, the agent logs a warning and runs without the managed Redis.
 
@@ -280,7 +281,7 @@ The project won't become ready until the namespace exists. The agent retries eve
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: prj-<project-uid>
+  name: <prefix><project-uid>
   labels:
     cra.diagrid.io/project-namespace: "true"
     cra.diagrid.io/project-id: <project-uid>
@@ -302,20 +303,20 @@ These are the same labels the agent sets on namespaces it creates. If one is mis
 
 #### Deleting a project
 
-When you delete a project, the agent removes everything it put in the project namespace, but leaves the namespace itself. Delete `prj-<project-uid>` yourself once the project is gone.
+When you delete a project, the agent removes everything it put in the project namespace, but leaves the namespace itself. Delete `<prefix><project-uid>` yourself once the project is gone.
 
 #### Turning the setting on or off for an existing region
 
 Switching the setting changes nothing for an existing project until the agent next updates that project's Helm release, which happens when something that goes into the release changes, such as its network policies. Projects created after the switch get the new behaviour straight away.
 
 - Turning it on: each existing project namespace stays, with its labels, and becomes yours to manage. On the next update Helm takes the namespace out of the project's release and tries to delete it. The agent's ClusterRole refuses, and Helm carries on. Keep the chart's ClusterRole in place when you switch: if the agent can still delete namespaces, Helm deletes each project's namespace and everything in it.
-- Turning it off: the agent can't take over a namespace your team created. Helm refuses it, and the project fails on its next update with an error containing `invalid ownership metadata`. Before you turn the setting off, give each such namespace the label `app.kubernetes.io/managed-by: Helm` and the annotations `meta.helm.sh/release-name: prj-<project-uid>` and `meta.helm.sh/release-namespace: default`. Namespaces the agent created before the setting was turned on already have them.
+- Turning it off: the agent can't take over a namespace your team created. Helm refuses it, and the project fails on its next update with an error containing `invalid ownership metadata`. Before you turn the setting off, give each such namespace the label `app.kubernetes.io/managed-by: Helm` and the annotations `meta.helm.sh/release-name: <prefix><project-uid>` and `meta.helm.sh/release-namespace: default`. Namespaces the agent created before the setting was turned on already have them.
 
 #### When a namespace is missing
 
 No error mentions this setting, so look for these signs:
 
-- Project namespace missing: the project stays not ready, and the agent logs `Apply release <release> failed: ... namespaces "prj-<project-uid>" not found`. In the `vcluster` workflow the error contains `cannot create resource "namespaces"` instead.
+- Project namespace missing: the project stays not ready, and the agent logs `Apply release <release> failed: ... namespaces "<prefix><project-uid>" not found`. In the `vcluster` workflow the error contains `cannot create resource "namespaces"` instead.
 - Infrastructure namespace missing: the agent keeps restarting, and its last log line contains `cannot create resource "namespaces"`.
 
 ### Images
@@ -336,7 +337,7 @@ The chart deploys these with its default values:
 
 | Component | Default Image | Description |
 |-----------|--------------|-------------|
-| **Catalyst** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.137.3` | Consolidated Catalyst services image |
+| **Catalyst** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.137.4` | Consolidated Catalyst services image |
 | **Alpine k8s** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy/alpine/k8s:1.36.0` | Utility image used by Helm install and cleanup hooks |
 | **Envoy Proxy** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy/envoyproxy/envoy:distroless-v1.38.0` | Envoy proxy for gateway |
 | **Piko** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/diagrid-piko:v1.0.2` | Piko reverse tunneling service |
@@ -347,9 +348,9 @@ The agent deploys these into the cluster after installation:
 
 | Component | Default Image | Description |
 |-----------|--------------|-------------|
-| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.137.3` | Catalyst Dapr server, injected into application pods |
-| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.137.3` | OTel collector for telemetry |
-| **Dapr Sentry (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.137.3` | Catalyst Dapr certificate authority |
+| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.137.4` | Catalyst Dapr server, injected into application pods |
+| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.137.4` | OTel collector for telemetry |
+| **Dapr Sentry (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.137.4` | Catalyst Dapr certificate authority |
 | **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.20.0-20261112-catalyst.1` | Catalyst Dapr control plane services |
 | **JWT Key Rotation** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/k8s-tools:1.0.0` | Rotates the signing keys for workload JWTs |
 
@@ -359,14 +360,14 @@ With `global.consolidated_image.enabled: false` the separate images replace `cat
 
 | Component | Default Image | Description |
 |-----------|--------------|-------------|
-| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/sidecar:1.137.3` | Catalyst Dapr server, injected into application pods |
-| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-otel-collector:1.137.3` | OTel collector for telemetry |
-| **Dapr Sentry (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/private-sentry:1.137.3` | Catalyst Dapr certificate authority |
-| **Catalyst Agent** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/cra-agent:1.137.3` | Catalyst agent service |
-| **Gateway Identity Injector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/identity-injector:1.137.3` | Identity injection service |
-| **Gateway Control Plane** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-gateway:1.137.3` | Gateway control plane service |
-| **Catalyst Management** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-management:1.137.3` | Catalyst management service |
-| **Catalyst MCP** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-mcp:1.137.3` | Catalyst MCP server |
+| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/sidecar:1.137.4` | Catalyst Dapr server, injected into application pods |
+| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-otel-collector:1.137.4` | OTel collector for telemetry |
+| **Dapr Sentry (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/private-sentry:1.137.4` | Catalyst Dapr certificate authority |
+| **Catalyst Agent** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/cra-agent:1.137.4` | Catalyst agent service |
+| **Gateway Identity Injector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/identity-injector:1.137.4` | Identity injection service |
+| **Gateway Control Plane** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-gateway:1.137.4` | Gateway control plane service |
+| **Catalyst Management** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-management:1.137.4` | Catalyst management service |
+| **Catalyst MCP** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-mcp:1.137.4` | Catalyst MCP server |
 <!-- END GENERATED IMAGES -->
 
 #### Add-on Images
@@ -1085,7 +1086,7 @@ four things from you, none of which this chart can do on its own:
    own KEK provider from the component metadata the agent publishes, so it
    unwraps DEKs itself and needs the same identity. Each sidecar runs under a
    service account of its own, `sidecar-<project-uid>-<appid-uid>` in the
-   `prj-<project-uid>` namespace, so the identity needs one more federated
+   `<prefix><project-uid>` namespace (`prj-` by default), so the identity needs one more federated
    credential for every app, created when the app is. The sidecar pods are
    provisioned by the agent, not by this chart's templates, so they are labelled
    through the agent's own region-wide sidecar settings — miss this and app

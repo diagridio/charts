@@ -60,7 +60,7 @@ variable "secondary_gateway_lb_arn" {
 # connections to it while its endpoint is still healthy, so writes can be
 # stopped before the database is promoted rather than by promoting it.
 variable "primary_traffic_dial_percentage" {
-  description = "Percentage of the traffic the accelerator would otherwise send to the first region that it actually sends. Set to 0 to drain that region before a planned failover, and back to 100 afterwards."
+  description = "Percentage of the traffic the accelerator would otherwise send to the first region that it actually sends. Set to 0 to drain that region before a planned failover, and back to 100 once it has been rebuilt as a replica. failover.sh promote drains the old writer and follow undoes it, through failover.auto.tfvars.json, which overrides terraform.tfvars."
   type        = number
   default     = 100
 

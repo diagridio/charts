@@ -335,3 +335,33 @@ tests:
                 key: region-type
                 optional: true
         template: mcp/deployment.yaml
+  # A delegated credential's audience must name a project namespace of this
+  # region, so catalyst-mcp is told the prefix the agent recorded for the
+  # region, never the values: a changed prefix the agent refuses must not
+  # reach catalyst-mcp either.
+  - it: should pass catalyst-mcp the project namespace prefix the region recorded
+    set:
+      join_token: "test-token"
+      mcp.enabled: true
+      global.namespaces.projectPrefix: team-
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DIAGRID_PROJECT_NAMESPACE_PREFIX
+            valueFrom:
+              configMapKeyRef:
+                name: region-details
+                key: project-namespace-prefix
+                optional: true
+        template: mcp/deployment.yaml
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DIAGRID_PROJECT_NAMESPACE_PREFIX_PINNED
+            valueFrom:
+              configMapKeyRef:
+                name: region-details
+                key: project-namespace-prefix-pinned
+                optional: true
+        template: mcp/deployment.yaml

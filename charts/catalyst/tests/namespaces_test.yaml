@@ -94,6 +94,31 @@ tests:
           path: metadata.name
           value: catalyst-dapr
 
+  - it: tells the agent the default project prefix
+    set:
+      join_token: "test-token"
+    template: agent/configmap.yaml
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "namespace_prefix: prj-"
+
+  # Management reads the prefix the agent recorded, never the values, so a
+  # changed prefix the agent refuses cannot reach it.
+  - it: tells the agent a chosen project prefix, and management none
+    set:
+      join_token: "test-token"
+      global.namespaces.projectPrefix: team-a-
+    asserts:
+      - matchRegex:
+          path: data["config.yaml"]
+          pattern: "namespace_prefix: team-a-"
+        template: agent/configmap.yaml
+      - notMatchRegex:
+          path: data["config.yaml"]
+          pattern: "project_namespace_prefix"
+        template: management/configmap.yaml
+
   # -------------------------------------------------------------------------
   # The whole data plane in one namespace
   # -------------------------------------------------------------------------

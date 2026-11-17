@@ -746,14 +746,15 @@ Usage: {{- $_ := set $configMap "sentry" (include "catalyst.sentryConfig" . | fr
 {{- end -}}
 
 {{/*
-catalyst.systemNamespace is the namespace the agent installs one of the things
-that run beside this release into: global.namespaces.<name>, or its default.
-Usage: include "catalyst.systemNamespace" (list . "postgresql")
+catalyst.namespacesValue is global.namespaces.<name>, or its default: the
+namespace the agent installs one of the things that run beside this release
+into, or, for projectPrefix, the prefix of every project namespace.
+Usage: include "catalyst.namespacesValue" (list . "postgresql")
 */}}
-{{- define "catalyst.systemNamespace" -}}
+{{- define "catalyst.namespacesValue" -}}
 {{- $root := index . 0 -}}
 {{- $name := index . 1 -}}
-{{- $defaults := dict "dapr" "root-dapr-system" "postgresql" "shared-postgresql" "kafka" "shared-kafka" "redis" "shared-ratelimit-redis" -}}
+{{- $defaults := dict "dapr" "root-dapr-system" "postgresql" "shared-postgresql" "kafka" "shared-kafka" "redis" "shared-ratelimit-redis" "projectPrefix" "prj-" -}}
 {{- $set := (($root.Values.global | default dict).namespaces | default dict) -}}
 {{- index $set $name | default (index $defaults $name) -}}
 {{- end -}}
@@ -767,7 +768,7 @@ cleanup.namespaces.dapr may only repeat it, so nothing can name a namespace the
 agent did not use.
 */}}
 {{- define "catalyst.daprNamespace" -}}
-{{- $ns := include "catalyst.systemNamespace" (list . "dapr") -}}
+{{- $ns := include "catalyst.namespacesValue" (list . "dapr") -}}
 {{- $legacy := dict
       "global.sentry.namespace" ((.Values.global.sentry | default dict).namespace)
       "cleanup.namespaces.dapr" (((.Values.cleanup | default dict).namespaces | default dict).dapr) -}}
@@ -782,8 +783,11 @@ agent did not use.
 
 {{/*
 catalyst.validateNamespaces refuses namespace choices the region cannot run
-with. "prj-" is reserved for project namespaces: the control plane never
-accepts a region service's identity from one, and uninstalling deletes them.
+with. "prj-" and global.namespaces.projectPrefix are reserved for project
+namespaces: a reader that knows the prefix takes any namespace under it for a
+project's, the control plane never accepts a region service's identity from
+one, and uninstalling deletes them. A reader that cannot know the prefix treats
+any namespace outside "prj-" as a system namespace in a private region.
 The self-hosted control plane's namespace, kube-system and default hold
 workloads the data plane's network policies and uninstall must not touch.
 Any of the namespaces may be the release namespace, but then the Helm releases
@@ -798,16 +802,26 @@ one of their names.
       "kafka" (list "shared-kafka")
       "redis" (list "shared-ratelimit-redis" "shared-ratelimit-rls") -}}
 {{- range $name, $names := $releases -}}
-{{- $ns := include "catalyst.systemNamespace" (list $ $name) -}}
+{{- $ns := include "catalyst.namespacesValue" (list $ $name) -}}
 {{- $_ := set $namespaces (printf "global.namespaces.%s" $name) $ns -}}
 {{- if and (eq $ns $.Release.Namespace) (has $.Release.Name $names) -}}
 {{- fail (printf "the release name %q is taken by a release the agent installs into %s, which is the release namespace %q; choose another release name" $.Release.Name (printf "global.namespaces.%s" $name) $.Release.Namespace) -}}
 {{- end -}}
 {{- end -}}
+{{- $prefix := include "catalyst.namespacesValue" (list . "projectPrefix") -}}
+{{- /* The same rule as projectns.Validate (services/catalyst/pkg/projectns) and values.schema.json; change all three together. */ -}}
+{{- if or (gt (len $prefix) 34) (not (regexMatch "^[a-z][-a-z0-9]*-$" $prefix)) -}}
+{{- fail (printf "global.namespaces.projectPrefix %q must start with a lowercase letter, contain only lowercase letters, digits and \"-\", end with \"-\" and be at most 34 characters" $prefix) -}}
+{{- end -}}
+{{- if hasPrefix "kube-" $prefix -}}
+{{- fail (printf "global.namespaces.projectPrefix %q may not start with \"kube-\", which Kubernetes reserves for its own namespaces" $prefix) -}}
+{{- end -}}
 {{- $controlPlane := .Values.global.control_plane_namespace | default "controlplane" -}}
 {{- range $key, $ns := $namespaces -}}
-{{- if hasPrefix "prj-" $ns -}}
-{{- fail (printf "%s %q may not start with \"prj-\": that prefix is reserved for project namespaces" $key $ns) -}}
+{{- range $reserved := uniq (list "prj-" $prefix) -}}
+{{- if hasPrefix $reserved $ns -}}
+{{- fail (printf "%s %q may not start with %q: that prefix is reserved for project namespaces" $key $ns $reserved) -}}
+{{- end -}}
 {{- end -}}
 {{- if eq $ns $controlPlane -}}
 {{- fail (printf "%s %q is the self-hosted control plane's namespace (global.control_plane_namespace), which the data plane may not share: both install a Service named dapr-sentry, and uninstalling would delete it" $key $ns) -}}

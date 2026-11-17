@@ -127,6 +127,27 @@ spec:
                   name: region-details
                   key: oidc-issuer
                   optional: true
+            {{- /* The prefix of the region's project namespaces: a delegated
+                   credential's audience must name a namespace under it. The one
+                   the agent recorded at install, never the values: the agent
+                   refuses a changed prefix, and the region's projects stay
+                   under the recorded one. Absent in a record from an agent that
+                   predates the prefix, which means "prj-". */}}
+            - name: DIAGRID_PROJECT_NAMESPACE_PREFIX
+              valueFrom:
+                configMapKeyRef:
+                  name: region-details
+                  key: project-namespace-prefix
+                  optional: true
+            {{- /* Set once the control plane accepts that prefix. Both are read
+                   at start, so --edge-auth-obo refuses to start, and restarts,
+                   until it is set. */}}
+            - name: DIAGRID_PROJECT_NAMESPACE_PREFIX_PINNED
+              valueFrom:
+                configMapKeyRef:
+                  name: region-details
+                  key: project-namespace-prefix-pinned
+                  optional: true
             {{- with .Values.mcp.extraEnvs }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
