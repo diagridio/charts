@@ -24,7 +24,7 @@ helm install catalyst oci://public.ecr.aws/diagrid/catalyst \
      --set join_token="${JOIN_TOKEN}"
 ```
 
-`JOIN_TOKEN` must be obtained from Diagrid Cloud before installing. See the [Getting Started guide](../../guides/getting-started/README.md) for signup and token retrieval.
+`JOIN_TOKEN` must be obtained from Diagrid Cloud before installing. See the [Getting Started guide](https://github.com/diagridio/charts/blob/main/guides/getting-started/README.md) for signup and token retrieval.
 
 ## Uninstall
 
@@ -323,7 +323,7 @@ No error mentions this setting, so look for these signs:
 
 These are the images a Catalyst install with the chart's default values pulls. Use this list as a starting point for building a registry allowlist or for mirroring to a private registry.
 
-Values that change an image, its tag or its repository change what your install pulls, so for your own install render the chart with your values file. The images the agent deploys after installation are named in the agent's ConfigMap (`config.yaml`: `sidecar`, `otel`, `internal_dapr` and `internal_dapr.sentry`). Two of them are there only when your values pin them: the Dapr control plane (`agent.config.internal_dapr.image_tag`) and the JWT key rotation job (`agent.config.internal_dapr.sentry.jwt.rotation_image`). Left empty, the agent deploys what it was built with, which the chart's `catalyst.diagrid.io/dapr-version` and `catalyst.diagrid.io/jwt-rotation-image` annotations name (`helm show chart`). The [mirror script](../../guides/air-gapped/README.md) applies that rule for you:
+Values that change an image, its tag or its repository change what your install pulls, so for your own install render the chart with your values file. The images the agent deploys after installation are named in the agent's ConfigMap (`config.yaml`: `sidecar`, `otel`, `internal_dapr` and `internal_dapr.sentry`). Two of them are there only when your values pin them: the Dapr control plane (`agent.config.internal_dapr.image_tag`) and the JWT key rotation job (`agent.config.internal_dapr.sentry.jwt.rotation_image`). Left empty, the agent deploys what it was built with, which the chart's `catalyst.diagrid.io/dapr-version` and `catalyst.diagrid.io/jwt-rotation-image` annotations name (`helm show chart`). The [mirror script](https://github.com/diagridio/charts/blob/main/guides/air-gapped/README.md) applies that rule for you:
 
 ```bash
 helm template catalyst oci://public.ecr.aws/diagrid/catalyst --version <version> \
@@ -439,7 +439,7 @@ opentelemetry-daemonset:
     tag: "0.112.0"
 ```
 
-For the full mirror procedure (including the `mirror-images.sh` script) see the [Air-gapped installs guide](../../guides/air-gapped/README.md).
+For the full mirror procedure (including the `mirror-images.sh` script) see the [Air-gapped installs guide](https://github.com/diagridio/charts/blob/main/guides/air-gapped/README.md).
 
 ### Private Helm Registry
 
@@ -454,7 +454,7 @@ global:
     # Or use existingSecret, clientCert, clientKey, customCA
 ```
 
-See the [Air-gapped installs guide](../../guides/air-gapped/README.md) for the steps to mirror the chart itself.
+See the [Air-gapped installs guide](https://github.com/diagridio/charts/blob/main/guides/air-gapped/README.md) for the steps to mirror the chart itself.
 
 ### Dapr PKI
 
@@ -478,7 +478,7 @@ agent:
             chain: ca.crt
 ```
 
-For an end-to-end walkthrough using `cert-manager` and `trust-manager` to provision these certificates, see the [Dapr PKI guide](../../guides/dapr-pki/README.md).
+For an end-to-end walkthrough using `cert-manager` and `trust-manager` to provision these certificates, see the [Dapr PKI guide](https://github.com/diagridio/charts/blob/main/guides/dapr-pki/README.md).
 
 The members of a [region group](https://docs.diagrid.io/operate/platform-operations/region-groups) that signs workflow history share one root here, each with its own intermediate. A region records its trust anchors on its first join, so this has to be in place before the regions join the group.
 
@@ -502,7 +502,7 @@ diagrid region get <region-id> -o json | jq -r '.status.endpoints.oidc'
 
 With that audience configured here, every sidecar the agent provisions (and the regional management service) receives an SVID that can be exchanged at Azure's token endpoint for an Entra ID access token, no client secret required.
 
-The management service uses the same mechanism when a **workflow or agent state store** references a bring-your-own secret store (for example Azure Key Vault) through a `secretKeyRef`: management resolves that secret **in-process** with its own SPIFFE identity in order to serve workflow/agent data. Federate the management SPIFFE ID (`…/ns/<release-namespace>/management`, `cra-agent` by default) on the same App Registration so it can read the store. [`setup-federated-catalyst-identity.sh`](../../guides/azure/setup-federated-catalyst-identity.sh) federates both the appid and management subjects and grants the identity the role the store needs (e.g. `Key Vault Secrets User`).
+The management service uses the same mechanism when a **workflow or agent state store** references a bring-your-own secret store (for example Azure Key Vault) through a `secretKeyRef`: management resolves that secret **in-process** with its own SPIFFE identity in order to serve workflow/agent data. Federate the management SPIFFE ID (`…/ns/<release-namespace>/management`, `cra-agent` by default) on the same App Registration so it can read the store. [`setup-federated-catalyst-identity.sh`](https://github.com/diagridio/charts/blob/main/guides/azure/setup-federated-catalyst-identity.sh) federates both the appid and management subjects and grants the identity the role the store needs (e.g. `Key Vault Secrets User`).
 
 The value applies to all sidecars in the deployment; it is empty by default (no extra audiences, no behavior change).
 
@@ -985,7 +985,7 @@ Catalyst includes optional OpenTelemetry Collector addons for collecting and exp
 
 See the [official documentation](https://opentelemetry.io/docs/collector/configuration/) for configuration details.
 
-To emit traces from Dapr apps into the collector (or any other OTLP backend), see the [tracing guide](../../guides/tracing/README.md); tracing is enabled per App ID via the Diagrid CLI, not through chart values.
+To emit traces from Dapr apps into the collector (or any other OTLP backend), see the [tracing guide](https://github.com/diagridio/charts/blob/main/guides/tracing/README.md); tracing is enabled per App ID via the Diagrid CLI, not through chart values.
 
 ### Secrets
 
@@ -1114,7 +1114,7 @@ the region.
 **One identity per app.** Past that, or to keep one app's identity away from
 another app's Azure resources, give each app its own identity, as the
 [Azure installation guide](https://docs.diagrid.io/operate/hosting/enterprise-self-hosted/azure-installation-guide#managed-identities)
-does. [`setup-user-managed-catalyst-identity.sh`](../../guides/azure/setup-user-managed-catalyst-identity.sh)
+does. [`setup-user-managed-catalyst-identity.sh`](https://github.com/diagridio/charts/blob/main/guides/azure/setup-user-managed-catalyst-identity.sh)
 `--project <project> --app <app>` creates the identity and the app's one
 federated credential, then prints the `diagrid appid update --label
 azure.workload.identity/use=true --annotation
@@ -1265,7 +1265,7 @@ helm install catalyst ./catalyst \
   --set join_token="${JOIN_TOKEN}"
 ```
 
-The overlay enables HPAs, drops Kubernetes resource `limits` on Go components (which also drops the auto-derived `GOMEMLIMIT`), lowers log verbosity, and raises the per-project Dapr scheduler memory floor. See the [Production Tuning guide](../../guides/production/README.md) for the rationale behind each value, plus guidance on managed infrastructure (managed Kubernetes, managed PostgreSQL), PodDisruptionBudgets, securityContext hardening, and NetworkPolicies.
+The overlay enables HPAs, drops Kubernetes resource `limits` on Go components (which also drops the auto-derived `GOMEMLIMIT`), lowers log verbosity, and raises the per-project Dapr scheduler memory floor. See the [Production Tuning guide](https://github.com/diagridio/charts/blob/main/guides/production/README.md) for the rationale behind each value, plus guidance on managed infrastructure (managed Kubernetes, managed PostgreSQL), PodDisruptionBudgets, securityContext hardening, and NetworkPolicies.
 
 ## Networking
 
@@ -1393,7 +1393,7 @@ The Catalyst gateway is responsible for ingress traffic into the region, on the 
   | `dapr-scheduler.<region-domain>` | Dapr scheduler (`dapr-scheduler-server`) |
   | `dapr-scheduler-server-<N>.<region-domain>` | One per scheduler replica, `0` to `2` by default |
 
-So anything in front of the gateway, such as a cloud load balancer or your own, must forward TCP without terminating TLS or rejecting HTTP/2. An L7 proxy or WAF there breaks the passthrough hostnames. The [Gateway Exposure guide](../../guides/gateway-exposure/README.md#layer-4-only) lists what works and what breaks it on each cloud.
+So anything in front of the gateway, such as a cloud load balancer or your own, must forward TCP without terminating TLS or rejecting HTTP/2. An L7 proxy or WAF there breaks the passthrough hostnames. The [Gateway Exposure guide](https://github.com/diagridio/charts/blob/main/guides/gateway-exposure/README.md#layer-4-only) lists what works and what breaks it on each cloud.
 
 You can provide your own TLS certificate and key for the gateway via the following Helm values. The certificate and key can be provided inline or via an existing Kubernetes secret.
 
@@ -1409,7 +1409,7 @@ With `gateway.plaintextRedirect: true`, when the region's ingress is https and t
 
 `gateway.corsAllowedOrigins` lists the Catalyst console origins whose browser requests the region's project endpoints accept (CORS). Leave it empty for the Diagrid-hosted consoles, the default. A self-hosted control plane sets its own console, for example `["https://catalyst.example.com"]`.
 
-For step-by-step instructions covering self-signed (dev), bring-your-own certificates, cert-manager integration, a [private or self-signed CA](../../guides/gateway-tls/README.md#private-or-self-signed-ca), and rotation, see the [Gateway TLS guide](../../guides/gateway-tls/README.md).
+For step-by-step instructions covering self-signed (dev), bring-your-own certificates, cert-manager integration, a [private or self-signed CA](https://github.com/diagridio/charts/blob/main/guides/gateway-tls/README.md#private-or-self-signed-ca), and rotation, see the [Gateway TLS guide](https://github.com/diagridio/charts/blob/main/guides/gateway-tls/README.md).
 
 ### Gateway Address
 
@@ -1424,7 +1424,7 @@ gateway:
 
 With that set and `agent.config.host.ingress.ip_addr` empty, the chart points the agent at `gateway.envoy.service.name` in the release namespace. Set `agent.config.host.ingress.service.name` and `.namespace` only when the ingress is a different Service, or `ip_addr` when it has a static address. A `ClusterIP` or `NodePort` gateway gets no default, because it never receives a LoadBalancer address and the agent would exit waiting for one.
 
-The agent also reports the Service's `https` port (`gateway.envoy.service.httpsPort`, `8443` by default), or `agent.config.host.ingress.port` (`443` by default) when `ip_addr` is set. The region's `--ingress` must use the same port. For a public or private address, a fixed address, `NodePort` behind your own load balancer, the port and DNS, see the [Gateway Exposure guide](../../guides/gateway-exposure/README.md).
+The agent also reports the Service's `https` port (`gateway.envoy.service.httpsPort`, `8443` by default), or `agent.config.host.ingress.port` (`443` by default) when `ip_addr` is set. The region's `--ingress` must use the same port. For a public or private address, a fixed address, `NodePort` behind your own load balancer, the port and DNS, see the [Gateway Exposure guide](https://github.com/diagridio/charts/blob/main/guides/gateway-exposure/README.md).
 
 ### Managed Domain
 
@@ -1440,7 +1440,7 @@ Enable it at region creation time:
 diagrid region create <region-id> --enable-managed-domain --ingress <local-endpoint>
 ```
 
-With managed domain, `--ingress` is a locally resolvable address (e.g. an internal hostname or an IP). Without it, `--ingress` must be a wildcard FQDN that you control (e.g. `*.my-region.company.com`), resolvable from every network that has to reach the region; see [DNS](../../guides/gateway-exposure/README.md#dns) in the Gateway Exposure guide.
+With managed domain, `--ingress` is a locally resolvable address (e.g. an internal hostname or an IP). Without it, `--ingress` must be a wildcard FQDN that you control (e.g. `*.my-region.company.com`), resolvable from every network that has to reach the region; see [DNS](https://github.com/diagridio/charts/blob/main/guides/gateway-exposure/README.md#dns) in the Gateway Exposure guide.
 
 When managed domain is enabled, you can omit the `gateway.tls` block from your Helm values; the certificate is provisioned by the controlplane and delivered to the dataplane gateway. See [Gateway TLS](#gateway-tls) for the bring-your-own case.
 

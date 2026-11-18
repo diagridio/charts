@@ -1,16 +1,30 @@
 # Diagrid Helm Charts Repository
 
-This repository contains official Helm charts published by Diagrid for deploying Diagrid products on Kubernetes.
+Durable execution for workflows and AI agents on [Dapr](https://dapr.io/), self-hosted in your own Kubernetes cluster: AKS, EKS, kind or air-gapped. This repository holds the official Helm chart for **Catalyst Enterprise Self-Hosted**.
 
-> ⚠️ This repository is under active development. Documentation may be updated frequently.
+Each chart version is a Catalyst release. Diagrid supports release lines according to the channel your region follows; see [Release Channels and Upgrades](./guides/release-channels/README.md#how-long-a-release-line-is-supported).
+
+## Install
+
+Get a join token from Diagrid Cloud first; the [Getting Started guide](./guides/getting-started/README.md) covers signup, creating a region and retrieving the token. Then install the chart from its OCI location:
+
+```bash
+helm install catalyst oci://public.ecr.aws/diagrid/catalyst \
+     -n cra-agent \
+     --create-namespace \
+     -f catalyst-values.yaml \
+     --set join_token="${JOIN_TOKEN}"
+```
+
+`JOIN_TOKEN` must be obtained from Diagrid Cloud before installing. For every configurable value, see the [Catalyst chart reference](./charts/catalyst/README.md); for starting values files, see the [example values](./charts/catalyst/examples/README.md).
 
 ## Available Charts
 
 ### Catalyst ⚡️
 
-https://catalyst.diagrid.io
+Console: [catalyst.diagrid.io](https://catalyst.diagrid.io)
 
-Catalyst is an enterprise platform for workflow orchestration, service discovery and pub/sub, powered by Dapr. Build apps and AI agents that are compliant, secure and failure-proof. Find out more at [diagrid.io/catalyst](https://www.diagrid.io/catalyst).
+Catalyst is an enterprise platform for durable execution, powered by Dapr: workflows and AI agents built on Dapr Workflow resume where they left off after crashes, restarts and infrastructure failures. It also provides service discovery and pub/sub. Find out more at [diagrid.io/catalyst](https://www.diagrid.io/catalyst).
 
 **Catalyst Enterprise Self-Hosted** enables you to self-host a Catalyst region within your own environment while using it as a service via Diagrid Cloud. This architecture separates the control plane (hosted by Diagrid Cloud) from the data plane (hosted in your Kubernetes cluster). The control plane manages configuration, while the data plane handles application connectivity and data.
 
@@ -28,7 +42,7 @@ You interact with your Catalyst Enterprise Self-Hosted installation via the [Dia
 
 #### Dapr API Compatibility
 
-Catalyst supports the following Dapr APIs:
+Catalyst supports the following Dapr APIs (new to Dapr Workflow? Start with the [Workflow overview](https://docs.dapr.io/developing-applications/building-blocks/workflow/workflow-overview/)):
 
 - [Workflows](https://docs.dapr.io/reference/api/workflow_api/)
 - [Conversation](https://docs.dapr.io/reference/api/conversation_api/)
