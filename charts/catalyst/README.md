@@ -1,6 +1,6 @@
-# Catalyst Helm Chart Reference
+# Diagrid Enterprise Self-Hosted Helm Chart Reference
 
-Configuration reference for the Catalyst Helm chart.
+Configuration reference for the `catalyst` Helm chart, which installs Diagrid Enterprise Self-Hosted.
 
 ## Prerequisites
 
@@ -32,7 +32,7 @@ helm install catalyst oci://public.ecr.aws/diagrid/catalyst \
 helm uninstall catalyst -n cra-agent
 ```
 
-> **WARNING:** The `region` resource is intended for a single installation, once you uninstall Catalyst, the region is no longer valid. If you want to uninstall Catalyst but allow re-installation, remove the clean up hook by setting the values:
+> **WARNING:** The `region` resource is intended for a single installation, once you uninstall Diagrid, the region is no longer valid. If you want to uninstall Diagrid but allow re-installation, remove the clean up hook by setting the values:
 
 ```yaml
 cleanup:
@@ -43,7 +43,7 @@ cleanup:
 
 ### Cluster Requirements
 
-Catalyst should be installed in a dedicated Kubernetes cluster. It manages global resources and dynamically provisions workloads, which may conflict with other applications in a shared cluster. If you must install into a shared cluster, you must ensure the cluster-wide permissions described in the [RBAC section](#permissions-rbac) are acceptable for your setup or consider using a cluster virtualization solution like [vcluster](https://github.com/loft-sh/vcluster).
+Diagrid should be installed in a dedicated Kubernetes cluster. It manages global resources and dynamically provisions workloads, which may conflict with other applications in a shared cluster. If you must install into a shared cluster, you must ensure the cluster-wide permissions described in the [RBAC section](#permissions-rbac) are acceptable for your setup or consider using a cluster virtualization solution like [vcluster](https://github.com/loft-sh/vcluster).
 
 ### Overriding nested values: Helm merges maps key by key
 
@@ -81,17 +81,17 @@ anti-affinity outright rather than merging with it.
 
 ### Permissions (RBAC)
 
-Catalyst is a self-managing infrastructure platform: not a static set of workloads, the Catalyst **agent** acts as an in-cluster provisioner that creates and manages a Dapr control plane, dapr sidecars, dapr CRDs, and optionally supporting infrastructure (Kafka, PostgreSQL, Redis, vcluster, sandboxes) **on demand** as you create Catalyst projects and resources. Because the exact resource set and target namespaces are decided at runtime, not at install time, the agent is granted a **cluster-scoped** role. The management and gateway components are scoped more narrowly.
+Diagrid is a self-managing infrastructure platform: not a static set of workloads, the Diagrid **agent** acts as an in-cluster provisioner that creates and manages a Dapr control plane, dapr sidecars, dapr CRDs, and optionally supporting infrastructure (Kafka, PostgreSQL, Redis, vcluster, sandboxes) **on demand** as you create Diagrid projects and resources. Because the exact resource set and target namespaces are decided at runtime, not at install time, the agent is granted a **cluster-scoped** role. The management and gateway components are scoped more narrowly.
 
 Depending on your use case and installation, you may be able to remove some of the permissions provided in the default config but this must be done with caution on a case by case basis to avoid breaking functionality.
 
 Project namespaces also enforce the Kubernetes Pod Security `baseline` standard by default; see [Pod Security for project namespaces](#pod-security-for-project-namespaces).
 
-The Catalyst Helm chart creates 4 RBAC subjects. The tables below justify each grant so cluster operators can review the blast radius before installing.
+The `catalyst` Helm chart creates 4 RBAC subjects. The tables below justify each grant so cluster operators can review the blast radius before installing.
 
 #### 1. Agent
 
-> 🗒️ The Catalyst Agent installs a Catalyst distribution of Dapr and thus must satisfy the permissions required by that. Many of the agent permissions are simply to align with Dapr's own RBAC permissions.
+> 🗒️ The Diagrid Agent installs a Diagrid distribution of Dapr and thus must satisfy the permissions required by that. Many of the agent permissions are simply to align with Dapr's own RBAC permissions.
 
 The agent's ServiceAccount (`<release>-agent-sa`, e.g. `catalyst-agent-sa`) carries the broadest permissions because it installs charts into, and reconciles resources across, many namespaces (the release namespace, the `global.namespaces` ones, per-project `<prefix>*`, and `default`; by default `cra-agent`, `root-dapr-system` and `shared-{kafka,postgresql,ratelimit-redis}`).
 
@@ -101,7 +101,7 @@ The agent's ServiceAccount (`<release>-agent-sa`, e.g. `catalyst-agent-sa`) carr
 | `""` | `configmaps`, `secrets`, `services`, `serviceaccounts` | full CRUD | These are created by the Dapr, vcluster, OTel, Kafka, PostgreSQL, Redis, CRA sidecar, component, and namespace charts. The agent also reads image-pull secrets / infra passwords from arbitrary namespaces and syncs pull secrets into project namespaces. Cluster-wide `get`/`list`/`watch` on secrets is also required for no-escalation against `dapr-operator-admin`. |
 | `""` | `pods` | get, list, watch, delete | Helm `--wait` polls pod readiness during install/upgrade (the agent never creates pods directly). `delete` is required for no-escalation against the Dapr chart. |
 | `""` | `pods/log` | get | The on-error handler reads pod logs to surface install/upgrade failure details. |
-| metrics.k8s.io | `pods` | get, list | *(only when `agent.config.region_usage.enabled`)* The region CPU-usage collector reads pod metrics from the cluster metrics-server for Catalyst-managed namespaces. |
+| metrics.k8s.io | `pods` | get, list | *(only when `agent.config.region_usage.enabled`)* The region CPU-usage collector reads pod metrics from the cluster metrics-server for Diagrid-managed namespaces. |
 | `""` | `namespaces` | patch | *(only when `agent.config.region_usage.enabled`)* Adds the `cra.diagrid.io/managed` label to the agent's own infrastructure namespaces so the collector measures them. |
 | `""` | `persistentvolumeclaims` | get, delete, deletecollection | Teardown of Dapr scheduler/placement StatefulSet PVCs (by label selector) and, on boot, detecting an orphaned `shared-postgresql` data directory so a fresh admin password is never seeded against an existing database. |
 | `""` | `events` | create, patch | Helm emits Kubernetes events during chart operations. |
@@ -162,7 +162,7 @@ When `cleanup.enabled` is `true` (the default), `helm uninstall` runs a `post-de
 
 | API group | Resources | Verbs | Why it is required |
 |-----------|-----------|-------|--------------------|
-| `""` | `namespaces` | get, list, delete | Delete the Dapr namespace and Catalyst-created project namespaces. |
+| `""` | `namespaces` | get, list, delete | Delete the Dapr namespace and Diagrid-created project namespaces. |
 | `""` | `secrets`, `services`, `configmaps`, `serviceaccounts`, `persistentvolumeclaims` | get, list, delete, update | Remove leftover resources from uninstalled releases. |
 | apps | `deployments`, `statefulsets`, `replicasets`, `daemonsets` | get, list, delete | Remove provisioned workloads. |
 | batch | `jobs`, `cronjobs` | get, list, delete | Remove provisioned batch workloads. |
@@ -176,7 +176,7 @@ Set `cleanup.enabled: false` to skip this hook (and its RBAC) entirely. Note thi
 
 ### Installing into other namespaces
 
-Catalyst runs in the release namespace, and the agent installs the rest of the data plane into namespaces named by `global.namespaces`:
+Diagrid runs in the release namespace, and the agent installs the rest of the data plane into namespaces named by `global.namespaces`:
 
 | Namespace | Holds | Set by | Default |
 |-----------|-------|--------|---------|
@@ -217,18 +217,18 @@ The chart refuses to install when:
 Some things to know before you choose:
 
 - **The project prefix is fixed at first install.** Every project's namespace and its workflow history live under it, so the agent refuses to start with a different one.
-- **Upgrading needs no changes.** Every default is the name Catalyst used before, so an existing region keeps its namespaces and identities after an upgrade. The upgrade does change a few things: the agent and management configs now name the default namespaces, which restarts both; the gateway gains two identity settings and restarts; and with `networkPolicies.enabled` it adds `allow-egress-postgres`. Leave `global.namespaces` alone on an installed region.
+- **Upgrading needs no changes.** Every default is the name Diagrid used before, so an existing region keeps its namespaces and identities after an upgrade. The upgrade does change a few things: the agent and management configs now name the default namespaces, which restarts both; the gateway gains two identity settings and restarts; and with `networkPolicies.enabled` it adds `allow-egress-postgres`. Leave `global.namespaces` alone on an installed region.
 - **Choose them once.** The release and Dapr namespaces are part of the identities of the agent, management, the gateway and Sentry, and of every project's network policies. The data backends keep their data in their namespace. Moving an installed region to other namespaces is a reinstall, and the [uninstall warning](#uninstall) applies. The agent refuses to start with a `global.namespaces.dapr` other than the one the region was installed with, rather than cut every project off from Dapr.
 - **Private regions only.** Diagrid Cloud accepts a region's services from namespaces other than `cra-agent` and `root-dapr-system` only in a private region.
-- **A shared namespace shares its network policies.** With `networkPolicies.enabled`, Dapr in the release namespace runs under the release namespace's policies, which allow egress to the internet but not to private ranges. Dapr in a namespace of its own has no internet egress. Projects still reach only the pods they need there: Dapr's, the data backends, management, Piko and the MCP bridge. In the other direction, a project admits Dapr's pods from Dapr's namespace and, from the release namespace, every pod except Dapr and the data backends. So keep the release namespace for Catalyst: another workload there can reach project workloads.
-- **Uninstalling.** The [cleanup hook](#4-cleanup-hook-optional) deletes the Dapr namespace only when it is the default, `root-dapr-system`. A Dapr namespace you chose may have existed before Catalyst or hold other workloads, so the hook removes Dapr's releases and its trust bundle and CA from it and leaves the namespace. It never deletes the data backends.
+- **A shared namespace shares its network policies.** With `networkPolicies.enabled`, Dapr in the release namespace runs under the release namespace's policies, which allow egress to the internet but not to private ranges. Dapr in a namespace of its own has no internet egress. Projects still reach only the pods they need there: Dapr's, the data backends, management, Piko and the MCP bridge. In the other direction, a project admits Dapr's pods from Dapr's namespace and, from the release namespace, every pod except Dapr and the data backends. So keep the release namespace for Diagrid: another workload there can reach project workloads.
+- **Uninstalling.** The [cleanup hook](#4-cleanup-hook-optional) deletes the Dapr namespace only when it is the default, `root-dapr-system`. A Dapr namespace you chose may have existed before Diagrid or hold other workloads, so the hook removes Dapr's releases and its trust bundle and CA from it and leaves the namespace. It never deletes the data backends.
 - **A self-hosted control plane in another namespace.** The settings above are the data plane's own. If your self-hosted control plane is not in `controlplane`, set `global.control_plane_namespace` and `global.sentry.remote_namespace` to its namespace.
 - **Other values that name a namespace.** `existing_secret_namespace` defaults to the release namespace. `image_pull_secret_namespace` has no default: set it to the namespace that holds the secret, usually the release namespace. Check any value you set to `cra-agent` explicitly. Pass `--agent-namespace` and `--root-dapr-namespace` to `diagrid diagnose`; the install notes print the command.
 - **Deprecated keys.** `global.sentry.namespace` and `cleanup.namespaces.dapr` used to name the Dapr namespace. Left empty or at `root-dapr-system`, their old default, they follow `global.namespaces.dapr`; any other value must equal it, or the install fails.
 
 ### Externally managed namespaces
 
-By default the agent creates every namespace Catalyst needs, and deletes a project's namespace when the project is deleted. Some clusters, often shared ones, don't let the agent create or delete namespaces. There, someone else (usually a platform team) creates them, and you tell the agent with:
+By default the agent creates every namespace Diagrid needs, and deletes a project's namespace when the project is deleted. Some clusters, often shared ones, don't let the agent create or delete namespaces. There, someone else (usually a platform team) creates them, and you tell the agent with:
 
 ```yaml
 agent:
@@ -321,7 +321,7 @@ No error mentions this setting, so look for these signs:
 
 ### Images
 
-These are the images a Catalyst install with the chart's default values pulls. Use this list as a starting point for building a registry allowlist or for mirroring to a private registry.
+These are the images a Diagrid install with the chart's default values pulls. Use this list as a starting point for building a registry allowlist or for mirroring to a private registry.
 
 Values that change an image, its tag or its repository change what your install pulls, so for your own install render the chart with your values file. The images the agent deploys after installation are named in the agent's ConfigMap (`config.yaml`: `sidecar`, `otel`, `internal_dapr` and `internal_dapr.sentry`). Two of them are there only when your values pin them: the Dapr control plane (`agent.config.internal_dapr.image_tag`) and the JWT key rotation job (`agent.config.internal_dapr.sentry.jwt.rotation_image`). Left empty, the agent deploys what it was built with, which the chart's `catalyst.diagrid.io/dapr-version` and `catalyst.diagrid.io/jwt-rotation-image` annotations name (`helm show chart`). The [mirror script](https://github.com/diagridio/charts/blob/main/guides/air-gapped/README.md) applies that rule for you:
 
@@ -508,7 +508,7 @@ The value applies to all sidecars in the deployment; it is empty by default (no 
 
 ### Pod Security and Seccomp Profiles
 
-Catalyst components expose `podSecurityContext` and `securityContext` values so you can enforce enterprise pod security standards, including custom seccomp profiles.
+Diagrid components expose `podSecurityContext` and `securityContext` values so you can enforce enterprise pod security standards, including custom seccomp profiles.
 
 Example using a node-local seccomp profile:
 
@@ -522,7 +522,7 @@ agent:
 
 #### Pod Security for project namespaces
 
-Project namespaces the agent creates carry [Pod Security Admission](https://kubernetes.io/docs/concepts/security/pod-security-admission/) labels: `pod-security.kubernetes.io/enforce: baseline`, with `warn` and `audit` set to `restricted`. Every pod Catalyst runs in a project namespace meets `baseline`. Existing project namespaces pick the labels up on the agent's next reconcile.
+Project namespaces the agent creates carry [Pod Security Admission](https://kubernetes.io/docs/concepts/security/pod-security-admission/) labels: `pod-security.kubernetes.io/enforce: baseline`, with `warn` and `audit` set to `restricted`. Every pod Diagrid runs in a project namespace meets `baseline`. Existing project namespaces pick the labels up on the agent's next reconcile.
 
 Pod Security Admission does not evict running pods. Once a namespace enforces `baseline`, the API server rejects any new pod there that does not meet it, including a pod recreated by a rollout or a node drain. Typical examples are an injected service-mesh init container that adds the `NET_ADMIN` or `NET_RAW` capability, and a `hostPath` volume. If your project workloads need either, lower the enforce level with `agent.config.project.pod_security_enforce_level`:
 
@@ -545,11 +545,11 @@ Namespaces provisioned externally (`agent.config.project.externally_managed_name
 
 ### Pod Scheduling
 
-Every Catalyst workload exposes standard Kubernetes scheduling primitives (`nodeSelector`, `tolerations`, and `affinity`), so you can pin pods to specific node pools or tolerate node taints.
+Every Diagrid workload exposes standard Kubernetes scheduling primitives (`nodeSelector`, `tolerations`, and `affinity`), so you can pin pods to specific node pools or tolerate node taints.
 
 **One knob for everything: `shared.scheduling`**
 
-`shared.scheduling` applies to every pod Catalyst runs or provisions:
+`shared.scheduling` applies to every pod Diagrid runs or provisions:
 
 - **Control-plane pods** the chart renders directly: agent, management, gateway.envoy, gateway.controlplane, piko.
 - **Dapr sidecars** the agent provisions per app.
@@ -673,11 +673,11 @@ The probe is skipped, with a warning in the agent log, when `agent.config.host.i
 
 ### Data backends (PostgreSQL, Kafka, Redis)
 
-Catalyst relies on data backends shared across a region:
+Diagrid relies on data backends shared across a region:
 
 - **PostgreSQL**: backs workflows state and visualizations, AI Agents metadata, managed state components and the Dapr **scheduler** (jobs,
-  reminders, cron). Catalyst defaults to automatic self-hosted deployment of PostgreSQL. It is a core part of Catalyst and all the features mentioned previously depend on the database being available. PostgreSQL is also crucial for the performance of workflows.
-- **Kafka**: backs managed pub/sub. Catalyst defaults to no deployment, disallowing managed pub/sub brokers to be available on project creation.
+  reminders, cron). Diagrid defaults to automatic self-hosted deployment of PostgreSQL. It is a core part of Diagrid and all the features mentioned previously depend on the database being available. PostgreSQL is also crucial for the performance of workflows.
+- **Kafka**: backs managed pub/sub. Diagrid defaults to no deployment, disallowing managed pub/sub brokers to be available on project creation.
 - **Redis**: a standalone shared Redis. Disabled by default; provisioned self-hosted in-cluster or connected externally, with optional high availability. Each of the three backends is configured independently and provisioned the same way (self-hosted vs external).
 
 #### Backwards compatibility and upgrades
@@ -690,7 +690,7 @@ The following helm values are **deprecated** but still supported to avoid servic
 
 We advise to update helm values for existing installations to the new configuration options documented below.
 
-> **Default behaviour change (breaking on upgrade):** Catalyst now uses a **Postgres-backed scheduler**
+> **Default behaviour change (breaking on upgrade):** Diagrid now uses a **Postgres-backed scheduler**
 > by default. Previously the scheduler used an etcd backend.
 > By default, on upgrade the scheduler will move from etcd to PostgreSQL.
 > **There is no automatic state migration.** Existing scheduler jobs/reminders
@@ -728,8 +728,8 @@ global:
 
 ##### Logical replication requirements (external PostgreSQL)
 
-Catalyst uses PostgreSQL **logical replication** (the Postgres-backed scheduler
-streams changes via logical decoding). Catalyst's self-hosted PostgreSQL
+Diagrid uses PostgreSQL **logical replication** (the Postgres-backed scheduler
+streams changes via logical decoding). Diagrid's self-hosted PostgreSQL
 (`global.postgresql.create: true`) is configured for this automatically. An
 **external** database needs two things:
 
@@ -747,7 +747,7 @@ streams changes via logical decoding). Catalyst's self-hosted PostgreSQL
    | Google Cloud SQL | `cloudsql.logical_decoding = on` flag |
    | Azure Database for PostgreSQL (Flexible Server) | `wal_level = logical` server parameter (restart required) |
 
-2. **Replication permission** for the user Catalyst connects with:
+2. **Replication permission** for the user Diagrid connects with:
 
    ```sql
    ALTER ROLE <username> WITH REPLICATION;
@@ -922,9 +922,9 @@ ignored):
 
 #### Agent Metrics Export
 
-A **private** region can forward the metrics collected by the catalyst agent to an external, customer-owned OTLP/HTTP endpoint to facilitate integration with existing montoring and alerting system.
+A **private** region can forward the metrics collected by the Diagrid agent to an external, customer-owned OTLP/HTTP endpoint to facilitate integration with existing montoring and alerting system.
 
-These metrics include [dapr runtime metrics](https://github.com/dapr/dapr/blob/master/docs/development/dapr-metrics.md#dapr-runtime-metrics) (`dapr_*`) and catalyst metrics (`metrics_*`).
+These metrics include [dapr runtime metrics](https://github.com/dapr/dapr/blob/master/docs/development/dapr-metrics.md#dapr-runtime-metrics) (`dapr_*`) and Diagrid metrics (`metrics_*`).
 
 You can rename metrics and their labels before exporting them using the `transform` block, a subset of the collector's [metricstransform processor](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/processor/metricstransformprocessor). Each entry selects metrics with `include` (and `match_type`) and either renames the metric via `new_name` or renames labels via `operations`. Only the `update_label` operation is supported today (assumed when `action` is omitted). Notice that `include` and `strip_labels` apply to the original metric and label names, before any transformation is applied.
 
@@ -981,7 +981,7 @@ agent:
 
 #### Collector addons
 
-Catalyst includes optional OpenTelemetry Collector addons for collecting and exporting telemetry. This gives total control of the telemetry to be collected and their destination.
+Diagrid includes optional OpenTelemetry Collector addons for collecting and exporting telemetry. This gives total control of the telemetry to be collected and their destination.
 
 See the [official documentation](https://opentelemetry.io/docs/collector/configuration/) for configuration details.
 
@@ -989,7 +989,7 @@ To emit traces from Dapr apps into the collector (or any other OTLP backend), se
 
 ### Secrets
 
-Catalyst supports three secret provider backends: **Kubernetes Secrets** (default), **AWS Secrets Manager** and **PostgreSQL**.
+Diagrid supports three secret provider backends: **Kubernetes Secrets** (default), **AWS Secrets Manager** and **PostgreSQL**.
 
 To use AWS Secrets Manager:
 
@@ -1003,9 +1003,9 @@ global:
 
 #### PostgreSQL Secrets Provider
 
-The PostgreSQL secrets provider stores Catalyst application secrets in a PostgreSQL database using envelope encryption (each secret is encrypted with a data encryption key, which is itself encrypted by a key encryption key). Every member of a [region group](https://docs.diagrid.io/operate/platform-operations/region-groups) must use this provider with the same key encryption key, at the same key version: the encrypted rows replicate between members, and a member holding a different key cannot decrypt them.
+The PostgreSQL secrets provider stores Diagrid application secrets in a PostgreSQL database using envelope encryption (each secret is encrypted with a data encryption key, which is itself encrypted by a key encryption key). Every member of a [region group](https://docs.diagrid.io/operate/platform-operations/region-groups) must use this provider with the same key encryption key, at the same key version: the encrypted rows replicate between members, and a member holding a different key cannot decrypt them.
 
-How the members come to hold the same key depends on the cloud. `awskms` names one multi-region KMS key that each region resolves its own replica of, so no key material is copied anywhere — that is what the AWS guide's region group does. On Azure, `azurekeyvault` can serve a group when both regions name the same vault and key (see [Holding the KEK in Azure Key Vault](#holding-the-kek-in-azure-key-vault)); Key Vault does not replicate a key into a second region the way a multi-region KMS key does, so both regions then depend on that one vault being reachable. The alternative, and what the Azure multi-region guide does today, is `kek_provider: "local"` with the **same 64-hex `primary_encryption_key` configured in both regions**. Catalyst compares members on a fingerprint of the material rather than on the value, so two regions holding the same key report one identity and the group raises no mismatch warning. It is a weaker posture than the AWS one: the key sits in a Kubernetes secret in both clusters rather than in a managed KMS. Treat it as key material to be distributed and rotated like any other.
+How the members come to hold the same key depends on the cloud. `awskms` names one multi-region KMS key that each region resolves its own replica of, so no key material is copied anywhere — that is what the AWS guide's region group does. On Azure, `azurekeyvault` can serve a group when both regions name the same vault and key (see [Holding the KEK in Azure Key Vault](#holding-the-kek-in-azure-key-vault)); Key Vault does not replicate a key into a second region the way a multi-region KMS key does, so both regions then depend on that one vault being reachable. The alternative, and what the Azure multi-region guide does today, is `kek_provider: "local"` with the **same 64-hex `primary_encryption_key` configured in both regions**. Diagrid compares members on a fingerprint of the material rather than on the value, so two regions holding the same key report one identity and the group raises no mismatch warning. It is a weaker posture than the AWS one: the key sits in a Kubernetes secret in both clusters rather than in a managed KMS. Treat it as key material to be distributed and rotated like any other.
 
 **Inline configuration** (connection string and keys provided directly in values):
 
@@ -1147,7 +1147,7 @@ versions of the one key.
 
 **Using an existing Kubernetes secret** (recommended for production, since it keeps all sensitive config out of values files):
 
-First, create the Kubernetes secret in the same namespace as the Catalyst installation:
+First, create the Kubernetes secret in the same namespace as the Diagrid installation:
 
 ```bash
 kubectl create secret generic catalyst-pg-secrets -n cra-agent \
@@ -1180,9 +1180,9 @@ global:
         primary_key_version: "kek_primary_version"
 ```
 
-### Catalyst Assistant model credential
+### Diagrid Assistant model credential
 
-The Catalyst Assistant answers questions about the workflows and App IDs in this
+The Diagrid Assistant answers questions about the workflows and App IDs in this
 region, which means it calls a model provider. That provider credential lives in
 this region and nowhere else. Diagrid's control plane names it but never holds it,
 so a region you own runs the assistant on a key Diagrid never sees.
@@ -1235,7 +1235,7 @@ kubectl rollout restart deployment -n <the assistant's project namespace> -l dap
 
 ### Enterprise Identity (dp Sentry IdP Federation + OBO)
 
-Catalyst can propagate the invoking user's identity from an upstream IdP through to downstream MCP calls via on-behalf-of (OBO) tokens minted by dp Sentry. The three values that govern this live under `agent.config.internal_dapr.sentry.oidc`:
+Diagrid can propagate the invoking user's identity from an upstream IdP through to downstream MCP calls via on-behalf-of (OBO) tokens minted by dp Sentry. The three values that govern this live under `agent.config.internal_dapr.sentry.oidc`:
 
 | Path | Type | Default | Purpose |
 |---|---|---|---|
@@ -1269,7 +1269,7 @@ The overlay enables HPAs, drops Kubernetes resource `limits` on Go components (w
 
 ## Networking
 
-Catalyst Enterprise Self-Hosted requires outbound connectivity to Diagrid Cloud.
+Diagrid Enterprise Self-Hosted requires outbound connectivity to Diagrid Cloud.
 
 | Endpoint | mTLS | Client | Purpose | Required |
 |---|---|---|---|---|
@@ -1291,7 +1291,7 @@ so a proxy in front of the registry needs its CA in the nodes' trust store.
 
 It is possible to route the outbound connections via a firewall or proxy. You will only be able to terminate TLS for the non-mTLS connections from the table above. The mTLS connections must pass through your firewall or proxy without content inspection.
 
-To proxy the TLS connections, you need to configure Catalyst to trust the CA that your firewall or proxy uses to terminate TLS. You can do this by setting `global.trustedCA` in your Helm values.
+To proxy the TLS connections, you need to configure Diagrid to trust the CA that your firewall or proxy uses to terminate TLS. You can do this by setting `global.trustedCA` in your Helm values.
 
 To provide a trusted CA, set exactly one of the following two sources.
 
@@ -1339,7 +1339,7 @@ global:
 ### Sidecar Outbound TLS Trust
 
 the setting `global.trustedCA` documented above already reaches every sidecar; this section is for CAs that **only** the
-sidecars need and you do not want to load into other services. To let the Catalyst sidecars trust upstreams they connect *out* to (MCP servers, external HTTP endpoints, service invocation, bindings) that terminate TLS with a **private or self-signed CA**, add the CA to the sidecars' trust via `agent.config.sidecar`. The trust applies region-wide to every sidecar the agent provisions.
+sidecars need and you do not want to load into other services. To let the Diagrid sidecars trust upstreams they connect *out* to (MCP servers, external HTTP endpoints, service invocation, bindings) that terminate TLS with a **private or self-signed CA**, add the CA to the sidecars' trust via `agent.config.sidecar`. The trust applies region-wide to every sidecar the agent provisions.
 
 To provide a sidecar trusted CA, set exactly one of the following two sources.
 
@@ -1379,7 +1379,7 @@ composes with `global.trustedCA`: sidecars trust the union of the two.
 
 ### Gateway TLS
 
-The Catalyst gateway is responsible for ingress traffic into the region, on the region's wildcard domain (`*.<region-domain>`). It routes on the hostname in the TLS handshake (SNI), and handles two kinds of traffic differently:
+The Diagrid gateway is responsible for ingress traffic into the region, on the region's wildcard domain (`*.<region-domain>`). It routes on the hostname in the TLS handshake (SNI), and handles two kinds of traffic differently:
 
 - **Terminated at the gateway**, with the certificate below: your projects' endpoints and the region's HTTP services (`oidc.`, `tunnels.`, `tunnels-proxy.` and `management.<region-domain>`).
 - **Passed through unchanged** to the region's gRPC control plane services, which present their own certificates. The gateway never decrypts these:
@@ -1407,7 +1407,7 @@ gateway:
 
 With `gateway.plaintextRedirect: true`, when the region's ingress is https and the gateway holds a certificate, the plaintext port (`gateway.envoy.service.port`, 8080 by default) answers every plain-HTTP request with a 308 redirect to https, and https responses carry `Strict-Transport-Security`. The one exception is the region-group health route, which stays reachable in plaintext; TLS passthrough to the Dapr control plane services on that port is unchanged, and a blocked region keeps answering 403 on both ports. A region whose ingress is http keeps serving all its routes on the plaintext port. Leave it off (the default) when a proxy in front of the gateway terminates TLS and forwards plain HTTP to that port, or every request is redirected back to that proxy.
 
-`gateway.corsAllowedOrigins` lists the Catalyst console origins whose browser requests the region's project endpoints accept (CORS). Leave it empty for the Diagrid-hosted consoles, the default. A self-hosted control plane sets its own console, for example `["https://catalyst.example.com"]`.
+`gateway.corsAllowedOrigins` lists the Diagrid Console origins whose browser requests the region's project endpoints accept (CORS). Leave it empty for the Diagrid-hosted consoles, the default. A self-hosted control plane sets its own console, for example `["https://catalyst.example.com"]`.
 
 For step-by-step instructions covering self-signed (dev), bring-your-own certificates, cert-manager integration, a [private or self-signed CA](https://github.com/diagridio/charts/blob/main/guides/gateway-tls/README.md#private-or-self-signed-ca), and rotation, see the [Gateway TLS guide](https://github.com/diagridio/charts/blob/main/guides/gateway-tls/README.md).
 
@@ -1448,7 +1448,7 @@ When managed domain is enabled, you can omit the `gateway.tls` block from your H
 
 ### App Tunnels
 
-App tunnels (via Piko) connect Catalyst to applications on private networks without needing to expose them. Tunnels are always secured with mTLS. To enable TLS for the proxy connection itself:
+App tunnels (via Piko) connect Diagrid to applications on private networks without needing to expose them. Tunnels are always secured with mTLS. To enable TLS for the proxy connection itself:
 
 ```yaml
 piko:
@@ -1479,14 +1479,14 @@ The management service authenticates to Piko using a JWT-SVID issued by Dapr Sen
 
 ### Network Policies (System)
 
-Catalyst always generates NetworkPolicies for **project namespaces** (deny-all plus explicit allows, created by the agent at provisioning time). The **system namespaces** (the release namespace and the internal Dapr namespace) ship without policies by default. On clusters with a default-deny security mandate, enable the chart-managed set:
+Diagrid always generates NetworkPolicies for **project namespaces** (deny-all plus explicit allows, created by the agent at provisioning time). The **system namespaces** (the release namespace and the internal Dapr namespace) ship without policies by default. On clusters with a default-deny security mandate, enable the chart-managed set:
 
 ```yaml
 networkPolicies:
   enabled: true
 ```
 
-This installs deny-all policies for both system namespaces plus the explicit allows Catalyst needs: intra-namespace traffic, project-sidecar access to piko/management and the Dapr control plane, public ingress to the gateway, and egress to DNS, the Kubernetes API server, the Diagrid control plane (public internet except private ranges, since standard NetworkPolicy cannot match hostnames), and project namespaces.
+This installs deny-all policies for both system namespaces plus the explicit allows Diagrid needs: intra-namespace traffic, project-sidecar access to piko/management and the Dapr control plane, public ingress to the gateway, and egress to DNS, the Kubernetes API server, the Diagrid control plane (public internet except private ranges, since standard NetworkPolicy cannot match hostnames), and project namespaces.
 
 These policies only take effect on clusters whose CNI enforces NetworkPolicy (Calico, Cilium, Azure NPM, ...). Without one they are silently inert; the agent logs a warning at startup when no enforcing CNI is detected.
 
@@ -1521,7 +1521,7 @@ If the PostgreSQL namespace is itself default-deny, its ingress allows are yours
 
 ### Network Policies (Projects)
 
-Catalyst configures Kubernetes `NetworkPolicy` resources per project namespace using three symmetric lists:
+Diagrid configures Kubernetes `NetworkPolicy` resources per project namespace using three symmetric lists:
 
 | Key | What it does |
 |-----|--------------|
@@ -1653,7 +1653,7 @@ removed on the next reconcile.
 
 ## Documentation
 
-- [Catalyst Documentation](https://docs.diagrid.io/catalyst)
-- [Catalyst Support](https://docs.diagrid.io/catalyst/support)
+- [Diagrid Documentation](https://docs.diagrid.io/catalyst)
+- [Diagrid Support](https://docs.diagrid.io/catalyst/support)
 - [Diagrid Website](https://www.diagrid.io/)
 - [Diagrid Support](https://diagrid.io/support)

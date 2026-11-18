@@ -1,12 +1,12 @@
 # Diagrid Helm Charts Repository
 
-Durable execution for workflows and AI agents on [Dapr](https://dapr.io/), self-hosted in your own Kubernetes cluster: AKS, EKS, kind or air-gapped. This repository holds the official Helm chart for **Catalyst Enterprise Self-Hosted**.
+Diagrid, built on [Dapr](https://dapr.io/), gives you durable execution for workflows and AI agents, self-hosted in your own Kubernetes cluster: AKS, EKS, kind or air-gapped. This repository holds the official Helm chart for **Diagrid Enterprise Self-Hosted**, published as the `catalyst` chart.
 
-Each chart version is a Catalyst release. Diagrid supports release lines according to the channel your region follows; see [Release Channels and Upgrades](./guides/release-channels/README.md#how-long-a-release-line-is-supported).
+Each chart version is a Diagrid release. Diagrid supports release lines according to the channel your region follows; see [Release Channels and Upgrades](./guides/release-channels/README.md#how-long-a-release-line-is-supported).
 
 ## Install
 
-Get a join token from Diagrid Cloud first; the [Getting Started guide](./guides/getting-started/README.md) covers signup, creating a region and retrieving the token. Then install the chart from its OCI location:
+Get a join token from the Diagrid Console first; the [Getting Started guide](./guides/getting-started/README.md) covers signup, creating a region and retrieving the token. Then install the chart from its OCI location:
 
 ```bash
 helm install catalyst oci://public.ecr.aws/diagrid/catalyst \
@@ -16,21 +16,21 @@ helm install catalyst oci://public.ecr.aws/diagrid/catalyst \
      --set join_token="${JOIN_TOKEN}"
 ```
 
-`JOIN_TOKEN` must be obtained from Diagrid Cloud before installing. For every configurable value, see the [Catalyst chart reference](./charts/catalyst/README.md); for starting values files, see the [example values](./charts/catalyst/examples/README.md).
+`JOIN_TOKEN` must be obtained from the Diagrid Console before installing. For every configurable value, see the [chart reference](./charts/catalyst/README.md); for starting values files, see the [example values](./charts/catalyst/examples/README.md).
 
 ## Available Charts
 
-### Catalyst ⚡️
+### Diagrid Enterprise Self-Hosted (`catalyst`) ⚡️
 
-Console: [catalyst.diagrid.io](https://catalyst.diagrid.io)
+Diagrid Console: [catalyst.diagrid.io](https://catalyst.diagrid.io)
 
-Catalyst is an enterprise platform for durable execution, powered by Dapr: workflows and AI agents built on Dapr Workflow resume where they left off after crashes, restarts and infrastructure failures. It also provides service discovery and pub/sub. Find out more at [diagrid.io/catalyst](https://www.diagrid.io/catalyst).
+Diagrid is an enterprise platform for durable execution, built on Dapr: workflows and AI agents built on Dapr Workflow resume where they left off after crashes, restarts and infrastructure failures. Workflow activities run at least once, so make them idempotent. Diagrid also provides service discovery and pub/sub. Find out more at [diagrid.io/catalyst](https://www.diagrid.io/catalyst).
 
-**Catalyst Enterprise Self-Hosted** enables you to self-host a Catalyst region within your own environment while using it as a service via Diagrid Cloud. This architecture separates the control plane (hosted by Diagrid Cloud) from the data plane (hosted in your Kubernetes cluster). The control plane manages configuration, while the data plane handles application connectivity and data.
+**Diagrid Enterprise Self-Hosted** enables you to self-host a Diagrid region within your own environment while using it as a service via Diagrid Cloud. This architecture separates the control plane (hosted by Diagrid Cloud) from the data plane (hosted in your Kubernetes cluster). The control plane manages configuration, while the data plane handles application connectivity and data.
 
-You interact with your Catalyst Enterprise Self-Hosted installation via the [Diagrid Cloud web console](https://catalyst.diagrid.io) and CLI. The console fetches app data directly from your installation, so your machine must be able to reach your Catalyst Enterprise Self-Hosted ingress.
+You interact with your Diagrid Enterprise Self-Hosted installation via the [Diagrid Console](https://catalyst.diagrid.io) and the Diagrid CLI. The console fetches app data directly from your installation, so your machine must be able to reach your Diagrid Enterprise Self-Hosted ingress.
 
-![Catalyst](./assets/img/catalyst.svg)
+![Diagrid Enterprise Self-Hosted architecture](./assets/img/catalyst.svg)
 
 #### Components
 
@@ -42,7 +42,7 @@ You interact with your Catalyst Enterprise Self-Hosted installation via the [Dia
 
 #### Dapr API Compatibility
 
-Catalyst supports the following Dapr APIs (new to Dapr Workflow? Start with the [Workflow overview](https://docs.dapr.io/developing-applications/building-blocks/workflow/workflow-overview/)):
+Diagrid supports the following Dapr APIs (new to Dapr Workflow? Start with the [Workflow overview](https://docs.dapr.io/developing-applications/building-blocks/workflow/workflow-overview/)):
 
 - [Workflows](https://docs.dapr.io/reference/api/workflow_api/)
 - [Conversation](https://docs.dapr.io/reference/api/conversation_api/)
@@ -57,23 +57,23 @@ Catalyst supports the following Dapr APIs (new to Dapr Workflow? Start with the 
 
 #### Chart Reference & Guides
 
-- [Catalyst chart reference](./charts/catalyst/README.md) — all configurable Helm values
+- [Chart reference](./charts/catalyst/README.md) — all configurable Helm values
 - [Example values](./charts/catalyst/examples/README.md) — starting points per scenario, checked against the chart
 - [Getting Started](./guides/getting-started/README.md) — signup, join token, first install
 - [Deploying to KinD](./guides/kind/README.md)
 - [Deploying to Azure Kubernetes Service (AKS)](./guides/azure/README.md)
 - [Deploying to AWS Elastic Kubernetes Service (EKS)](./guides/aws/README.md)
-- [Exposing the Catalyst gateway](./guides/gateway-exposure/README.md) — load balancer, public or private address, port, DNS
+- [Exposing the Diagrid gateway](./guides/gateway-exposure/README.md) — load balancer, public or private address, port, DNS
 - [Configuring Dapr PKI with cert-manager](./guides/dapr-pki/README.md)
-- [Enabling tracing for Catalyst apps](./guides/tracing/README.md)
+- [Enabling tracing for Diagrid apps](./guides/tracing/README.md)
 - [Air-gapped / private registry installs](./guides/air-gapped/README.md)
 
 ## Docs
 
-For more information about Diagrid Catalyst, including detailed usage instructions and examples, please visit:
+For more information about Diagrid, including detailed usage instructions and examples, please visit:
 
-- [Catalyst Documentation](https://docs.diagrid.io/catalyst)
-- [Catalyst Support](https://docs.diagrid.io/catalyst/support)
+- [Diagrid Documentation](https://docs.diagrid.io/catalyst)
+- [Support documentation](https://docs.diagrid.io/catalyst/support)
 - [Diagrid Website](https://www.diagrid.io/)
 - [Diagrid Support](https://diagrid.io/support)
 
