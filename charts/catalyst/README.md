@@ -1654,6 +1654,6 @@ removed on the next reconcile.
 ## Documentation
 
 - [Diagrid Documentation](https://docs.diagrid.io/catalyst)
-- [Diagrid Support](https://docs.diagrid.io/catalyst/support)
+- [Support documentation](https://docs.diagrid.io/catalyst/support)
 - [Diagrid Website](https://www.diagrid.io/)
 - [Diagrid Support](https://diagrid.io/support)
