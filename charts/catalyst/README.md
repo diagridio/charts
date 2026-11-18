@@ -702,7 +702,7 @@ We advise to update helm values for existing installations to the new configurat
 ```yaml
 global:
   postgresql:
-    # create: true  -> Catalyst provisions a self-hosted PostgreSQL (default)
+    # create: true  -> Diagrid provisions a self-hosted PostgreSQL (default)
     # create: false -> connect to an external PostgreSQL you provide (see .external)
     create: true
     # disabled: true fully turns off the managed PostgreSQL state store (and any
