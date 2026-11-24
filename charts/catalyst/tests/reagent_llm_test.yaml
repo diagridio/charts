@@ -1,4 +1,4 @@
-suite: Test the Catalyst Assistant model credential
+suite: Test the Diagrid Assistant model credential
 templates:
   - agent/reagent-llm-secret.yaml
   - agent/configmap.yaml

@@ -133,6 +133,30 @@ That's fine for evaluation. For production:
   exceeds the target. Raise for high-throughput apps.
 - **`target_cpu_utilization_percentage: 80`** — leaves CPU headroom for
   bursts without flapping. Lower (60–70%) for stricter latency SLOs.
+- **`target_memory_utilization_percentage`** — unset by default, so sidecars
+  scale on CPU alone. Set it to also scale on memory use; with both set, the
+  HPA follows whichever asks for more replicas. Set the CPU target to `0` to
+  scale on memory alone. Setting both to `0` does not turn scaling off:
+  the HPA renders with no metrics and Kubernetes falls back to 80% average
+  CPU. A sidecar's memory does not fall back quickly after load drops, so
+  a memory target scales up readily but down slowly.
+
+Both targets are percentages of the whole pod, not of the sidecar container:
+the HPA sums usage and requests across every container in the pod. That
+means:
+
+- With `appContainer` enabled, the app container's use and its request
+  (128Mi by default) count toward the target too.
+- Every container in the pod needs a request for the resource, or the HPA
+  reports `FailedGetResourceMetric` and cannot scale on it. The
+  `identity-injector` container, added when workload identity is on, sets
+  no requests, so on those App IDs neither the CPU nor the memory target can
+  be computed.
+- The sidecar's memory request is small (64Mi in the `cra` chart, 128Mi in
+  `values-production.yaml`), and its steady-state memory use can already sit
+  above a typical target such as 80%, which pins the App ID at
+  `max_replicas`. Compare the pod's normal memory use with its total request
+  before picking a target, and raise the request if needed.
 
 A min=max configuration disables HPA in practice (the controller has nowhere
 to scale to). If you need a fixed pod count for a specific app, leave

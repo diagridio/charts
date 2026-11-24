@@ -114,7 +114,7 @@
     {{- end -}}
   {{- end -}}
 {{- end -}}
-{{- /* Point the agent at the region's copy of the Catalyst Assistant's model
+{{- /* Point the agent at the region's copy of the Diagrid Assistant's model
        credential. Only the NAME and KEY are emitted — the material stays in the
        Secret, which is why this is not simply an agent.config.project entry. The
        block is omitted entirely when no credential is configured, so a region

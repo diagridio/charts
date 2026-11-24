@@ -131,7 +131,7 @@ Get the name of the charts secret to use
 {{- end }}
 
 {{/*
-Name of the Secret holding the Catalyst Assistant's model credential for this
+Name of the Secret holding the Diagrid Assistant's model credential for this
 region. Empty when none is configured, which is a normal deployment.
 
 The credential lives in the region and nowhere else: the control plane names it

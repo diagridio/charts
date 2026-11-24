@@ -578,7 +578,7 @@
                 },
                 "reagent": {
                     "type": "object",
-                    "description": "Catalyst Assistant configuration for this region. Its model credential lives here and nowhere else: the control plane names it but never holds it, so a private or dedicated region can supply its own key.",
+                    "description": "Diagrid Assistant configuration for this region. Its model credential lives here and nowhere else: the control plane names it but never holds it, so a private or dedicated region can supply its own key.",
                     "properties": {
                         "llm": {
                             "type": "object",

@@ -337,7 +337,7 @@ The chart deploys these with its default values:
 
 | Component | Default Image | Description |
 |-----------|--------------|-------------|
-| **Catalyst** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.137.4` | Consolidated Catalyst services image |
+| **Catalyst** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.138.0` | Consolidated Catalyst services image |
 | **Alpine k8s** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy/alpine/k8s:1.36.0` | Utility image used by Helm install and cleanup hooks |
 | **Envoy Proxy** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-hub-proxy/envoyproxy/envoy:distroless-v1.38.0` | Envoy proxy for gateway |
 | **Piko** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/diagrid-piko:v1.0.2` | Piko reverse tunneling service |
@@ -348,10 +348,10 @@ The agent deploys these into the cluster after installation:
 
 | Component | Default Image | Description |
 |-----------|--------------|-------------|
-| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.137.4` | Catalyst Dapr server, injected into application pods |
-| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.137.4` | OTel collector for telemetry |
-| **Dapr Sentry (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.137.4` | Catalyst Dapr certificate authority |
-| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.20.0-20261112-catalyst.1` | Catalyst Dapr control plane services |
+| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.138.0` | Catalyst Dapr server, injected into application pods |
+| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.138.0` | OTel collector for telemetry |
+| **Dapr Sentry (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-all:1.138.0` | Catalyst Dapr certificate authority |
+| **Dapr Control Plane (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/dapr:1.20.0-20261120-catalyst.1` | Catalyst Dapr control plane services |
 | **JWT Key Rotation** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/k8s-tools:1.0.0` | Rotates the signing keys for workload JWTs |
 
 #### Optional Images
@@ -360,14 +360,14 @@ With `global.consolidated_image.enabled: false` the separate images replace `cat
 
 | Component | Default Image | Description |
 |-----------|--------------|-------------|
-| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/sidecar:1.137.4` | Catalyst Dapr server, injected into application pods |
-| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-otel-collector:1.137.4` | OTel collector for telemetry |
-| **Dapr Sentry (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/private-sentry:1.137.4` | Catalyst Dapr certificate authority |
-| **Catalyst Agent** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/cra-agent:1.137.4` | Catalyst agent service |
-| **Gateway Identity Injector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/identity-injector:1.137.4` | Identity injection service |
-| **Gateway Control Plane** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-gateway:1.137.4` | Gateway control plane service |
-| **Catalyst Management** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-management:1.137.4` | Catalyst management service |
-| **Catalyst MCP** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-mcp:1.137.4` | Catalyst MCP server |
+| **Dapr Server** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/sidecar:1.138.0` | Catalyst Dapr server, injected into application pods |
+| **OpenTelemetry Collector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-otel-collector:1.138.0` | OTel collector for telemetry |
+| **Dapr Sentry (Catalyst)** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/private-sentry:1.138.0` | Catalyst Dapr certificate authority |
+| **Catalyst Agent** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/cra-agent:1.138.0` | Catalyst agent service |
+| **Gateway Identity Injector** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/identity-injector:1.138.0` | Identity injection service |
+| **Gateway Control Plane** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-gateway:1.138.0` | Gateway control plane service |
+| **Catalyst Management** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-management:1.138.0` | Catalyst management service |
+| **Catalyst MCP** | `us-central1-docker.pkg.dev/prj-common-p-shared-79896/reg-p-common-docker-public/catalyst-mcp:1.138.0` | Catalyst MCP server |
 <!-- END GENERATED IMAGES -->
 
 #### Add-on Images
@@ -1180,9 +1180,9 @@ global:
         primary_key_version: "kek_primary_version"
 ```
 
-### Catalyst Assistant model credential
+### Diagrid Assistant model credential
 
-The Catalyst Assistant answers questions about the workflows and App IDs in this
+The Diagrid Assistant answers questions about the workflows and App IDs in this
 region, which means it calls a model provider. That provider credential lives in
 this region and nowhere else. Diagrid's control plane names it but never holds it,
 so a region you own runs the assistant on a key Diagrid never sees.
@@ -1393,6 +1393,8 @@ The Catalyst gateway is responsible for ingress traffic into the region, on the 
   | `dapr-scheduler.<region-domain>` | Dapr scheduler (`dapr-scheduler-server`) |
   | `dapr-scheduler-server-<N>.<region-domain>` | One per scheduler replica, `0` to `2` by default |
 
+  In a region served on [one hostname](../../guides/gateway-exposure/README.md#one-hostname-for-all-projects), the same names sit under that hostname, such as `sentry.catalyst-api.mycompany.com`. Clients send them in the TLS handshake but connect to the hostname, and the certificate below names only the hostname.
+
 So anything in front of the gateway, such as a cloud load balancer or your own, must forward TCP without terminating TLS or rejecting HTTP/2. An L7 proxy or WAF there breaks the passthrough hostnames. The [Gateway Exposure guide](../../guides/gateway-exposure/README.md#layer-4-only) lists what works and what breaks it on each cloud.
 
 You can provide your own TLS certificate and key for the gateway via the following Helm values. The certificate and key can be provided inline or via an existing Kubernetes secret.
@@ -1440,7 +1442,7 @@ Enable it at region creation time:
 diagrid region create <region-id> --enable-managed-domain --ingress <local-endpoint>
 ```
 
-With managed domain, `--ingress` is a locally resolvable address (e.g. an internal hostname or an IP). Without it, `--ingress` must be a wildcard FQDN that you control (e.g. `*.my-region.company.com`), resolvable from every network that has to reach the region; see [DNS](../../guides/gateway-exposure/README.md#dns) in the Gateway Exposure guide.
+With managed domain, `--ingress` is a locally resolvable address (e.g. an internal hostname or an IP). Without it, `--ingress` must be a wildcard FQDN that you control (e.g. `*.my-region.company.com`), or, with `--shared-project-endpoint`, one full hostname (e.g. `https://catalyst-api.mycompany.com`), resolvable from every network that has to reach the region; see [DNS](../../guides/gateway-exposure/README.md#dns) and [One hostname for all projects](../../guides/gateway-exposure/README.md#one-hostname-for-all-projects) in the Gateway Exposure guide.
 
 When managed domain is enabled, you can omit the `gateway.tls` block from your Helm values; the certificate is provisioned by the controlplane and delivered to the dataplane gateway. See [Gateway TLS](#gateway-tls) for the bring-your-own case.
 

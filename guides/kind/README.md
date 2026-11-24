@@ -175,7 +175,7 @@ The chart ships a values file for this guide,
 [`examples/kind.yaml`](../../charts/catalyst/examples/kind.yaml). Pull the chart to get it:
 
 ```bash
-helm pull oci://public.ecr.aws/diagrid/catalyst --version 1.137.4 --untar
+helm pull oci://public.ecr.aws/diagrid/catalyst --version 1.138.0 --untar
 ```
 
 It points Catalyst at the PostgreSQL you installed in step 3 and turns on HTTPS for the
@@ -193,7 +193,7 @@ helm install catalyst oci://public.ecr.aws/diagrid/catalyst \
      --set join_token="${JOIN_TOKEN}" \
      --set-file gateway.tls.cert=server.pem \
      --set-file gateway.tls.key=server-key.pem \
-     --version 1.137.4
+     --version 1.138.0
 ```
 
 ## Step 5: Verify the Installation ✅

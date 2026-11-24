@@ -195,20 +195,21 @@ The control plane hands out the matching addresses: `https://<host>` (with the p
 
 Create one DNS record for the hostname, pointing at the gateway's address, and one certificate for it. See the [Gateway TLS guide](../gateway-tls/README.md) for installing the certificate. [Layer 4 only](#layer-4-only) applies to the hostname as it does to a wildcard.
 
-Some clients still look up a passthrough service's name in DNS rather than connecting to the hostname. For them, add DNS records only, at the same address and with no certificate:
+App IDs that run outside the region's cluster, and some older clients, look up a passthrough service's name in DNS rather than connecting to the hostname. For them, add DNS records only, at the same address and with no certificate:
 
 | Records | Needed for |
 |---|---|
-| `sentry.<host>` | `diagrid dev` and `diagrid listen` from a CLI older than the release that added this mode |
-| `xrs.<host>`, `dapr-api.<host>`, `dapr-placement.<host>`, `dapr-scheduler.<host>`, and `dapr-scheduler-server-<N>.<host>` for each scheduler replica (`0` to `2` by default) | App IDs that run outside the region's cluster, until a Dapr release lets them connect to the hostname |
+| `dapr-api.<host>`, `dapr-placement.<host>`, `dapr-scheduler.<host>`, and `dapr-scheduler-server-<N>.<host>` for each scheduler replica (`0` to `2` by default) | Every App ID that runs outside the region's cluster |
+| `sentry.<host>` | `diagrid dev` and `diagrid listen` from a Diagrid CLI older than 1.123.0, and App IDs outside the region's cluster whose sidecar is older than the release that added this mode |
+| `xrs.<host>` | App IDs outside the region's cluster whose sidecar is older than the release that added this mode |
 
-App IDs in the region's own cluster need none of them: they reach these services inside the cluster.
+A region with no App IDs outside its cluster, used with a current CLI, needs none of them. App IDs in the region's own cluster reach these services inside the cluster.
 
 ### Switching an existing region
 
 Turning the mode on changes the region's domain to the new hostname, so every name under the old wildcard stops being served at once, including the project hostnames running apps use. To switch:
 
-1. Create the DNS record and install the certificate for the new hostname, at the gateway's current address.
+1. Create the DNS record and install the certificate for the new hostname, at the gateway's current address. If App IDs run outside the region's cluster, also create their DNS-only records under the new hostname, from [Records and certificate](#records-and-certificate).
 2. Run `diagrid region update <region-name> --shared-project-endpoint --ingress https://<host>`.
 3. Point apps at the new endpoint: re-run `diagrid dev`, or set `DAPR_HTTP_ENDPOINT` and `DAPR_GRPC_ENDPOINT` to `https://<host>`, with the port if the ingress has one. External App IDs need their bootstrap configuration again.
 
